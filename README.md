@@ -5,7 +5,7 @@
 A prerequisite mod for [Drag'n Wash](https://store.steampowered.com/app/4739660/) (BepInEx 5). It is a small core that keeps the code hooking into the game in one place and gives other mods, and libraries built on top of it, a stable API: a Mods screen reached from the game's Options screen (like Minecraft Forge's mod list, with on/off switches), settings in the game's Options screen, text and dialogue events, safe asset loading on Direct3D 12, and more. When the game updates, only the framework has to follow.
 
 > [!NOTE]
-> **Version 1.0.0**, released together with [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on it. From 1.0.0 on, a change that breaks the public API comes only with a new major version; see [CHANGELOG.md](CHANGELOG.md).
+> **Core 1.1.0** (the libraries are at 1.0.0) adds [update notices](#update-notices). 1.0.0 was released together with [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on it. From 1.0.0 on, a change that breaks the public API comes only with a new major version; see [CHANGELOG.md](CHANGELOG.md).
 
 See [docs/DESIGN.md](docs/DESIGN.md) for goals and the order of work, [docs/GUIDE.md](docs/GUIDE.md) for how to build a mod on it, and [docs/GAME_BUILDS.md](docs/GAME_BUILDS.md) for the game builds it was checked on. The [wiki](https://github.com/TomXV/dragnwash-modframework/wiki) has a page for players, a getting-started walkthrough and a reference page for each library.
 
@@ -21,6 +21,10 @@ See [docs/DESIGN.md](docs/DESIGN.md) for goals and the order of work, [docs/GUID
 | **Flags and saves** | `com.tomxv.dragnwash.modframework.saves` | Save slots, flags and a history of every save (`GameSaves`, `GameFlags`) |
 
 Each library is its own plugin with its own version; install the ones the mods you use need. See [CHANGELOG.md](CHANGELOG.md) for versions.
+
+### Update notices
+
+From core 1.1.0, the framework tells you on the Mods screen and the title screen when a mod you have installed has a newer release. Only mods that name their GitHub repository are checked, each at most once a day. The framework asks GitHub's public API (`api.github.com`) for the repository's latest release and sends nothing about you, your game or your other mods; GitHub sees your IP address, as with any web page. Nothing is downloaded or installed: the Mods screen opens the release page for you. To switch it off, open **Options → Mods → Drag'n Wash ModFramework → Settings** and set **Check for updates** to Off, or set `Check for updates = false` in `BepInEx/config/com.tomxv.dragnwash.modframework.cfg`.
 
 ## For mod developers
 
