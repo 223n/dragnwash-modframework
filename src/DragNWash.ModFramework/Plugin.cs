@@ -12,7 +12,14 @@ namespace DragNWash.ModFramework
         private void Awake()
         {
             ModFramework.Initialize(Logger);
-            Mods.ModsScreen.Install(new Harmony(ModFramework.Guid));
+            var harmony = new Harmony(ModFramework.Guid);
+            Mods.ModsScreen.Install(harmony);
+            Options.OptionsRows.Install(harmony);
+        }
+
+        private void Update()
+        {
+            Options.OptionsRows.Tick();
         }
     }
 }

@@ -15,7 +15,7 @@ namespace DragNWash.ModFramework.Mods
     // the game's scroll view), details of the selected one on the right with
     // its On/Off button. Every fixed word is its own label so translation mods
     // can translate it. Switching takes effect at the next launch.
-    internal sealed class ModsMenu : Menu
+    internal sealed partial class ModsMenu : Menu
     {
         internal RectTransform Content;
         internal RectTransform Details;
@@ -50,6 +50,7 @@ namespace DragNWash.ModFramework.Mods
         {
             base.OnShow(response);
             _confirming = null;
+            _settingsFor = null;
             try
             {
                 _entries = ModCatalog.Build();
@@ -67,6 +68,11 @@ namespace DragNWash.ModFramework.Mods
         {
             if (e is MenuEventUserIntent intent && (intent.name == "Back" || intent.name == "Cancel"))
             {
+                if (_settingsFor != null)
+                {
+                    CloseSettings();
+                    return new MenuResponseIgnored();
+                }
                 return new MenuResponseTransition("Menu_Options", "Player left the Mods screen.");
             }
             return new MenuResponseIgnored();
@@ -95,6 +101,12 @@ namespace DragNWash.ModFramework.Mods
                 }
             }
             _rows.Clear();
+
+            if (_settingsFor != null)
+            {
+                BuildSettingsList();
+                return;
+            }
 
             foreach (ModCatalog.Entry entry in _entries)
             {
@@ -167,6 +179,12 @@ namespace DragNWash.ModFramework.Mods
             }
             _detailParts.Clear();
 
+            if (_settingsFor != null)
+            {
+                BuildSettingDetails();
+                return;
+            }
+
             ModCatalog.Entry entry = _selected;
             if (Details == null || entry == null)
             {
@@ -232,6 +250,11 @@ namespace DragNWash.ModFramework.Mods
                 {
                     EventSystem.current.SetSelectedGameObject(button);
                 }
+            }
+
+            if (entry.Loaded && ConfigItem.For(entry).Count > 0)
+            {
+                MakeButton("Settings", TextSettings, 0.44f, 0.8f, 0.04f, 0.17f, SettingsColor, () => OpenSettings(entry));
             }
         }
 
