@@ -99,34 +99,64 @@ ModFramework.Register(new ModInfo
 
 Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes a toggle, a ranged number a slider, an enum a dropdown), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
 
+## Layers: a small core, and libraries on top
+
+The framework does not try to hold every API. It is a small core that other prerequisite mods, libraries, build on, the way the framework itself builds on BepInEx:
+
+```
+Game + BepInEx
+  └ Drag'n Wash ModFramework (core)      Mods screen, settings, Options rows, game info
+      ├ a text library                   text event, re-apply on language change
+      ├ a dialogue library               line and option events, speakers, flags
+      ├ a tool window library            the shared F1 window
+      └ ... any library someone needs
+          └ mods that use them            e.g. Drag'n Wash Localization
+```
+
+- **Core stays small.** Only what nearly every mod needs, or what must exist once for the whole game, goes into the core: the Mods screen, on/off switching, settings pages, Options rows, game information and the rules for following game updates.
+- **Everything else is a library.** A library is an ordinary BepInEx plugin that depends on the framework (`BepInDependency`) and is depended on by mods. It can live in this repository as a separate project, or be written by anyone in their own repository.
+- **Libraries are first-class on the Mods screen.** A library says so in its `ModInfo` (`IsLibrary`), and the screen shows it as a library, lists the mods that need it, and asks before switching it off.
+- **Libraries extend the core through extension points** rather than by patching it:
+  - a service registry, so a library can offer an interface and a mod can ask for it (`ModFramework.Services.Register<T>(implementation)`, `Get<T>()`), with a version on each service;
+  - extra pages on a mod's entry in the Mods screen, next to the generated settings page;
+  - health checks: a library tells the core which game methods it patches, the core checks them at startup and shows a library as unavailable on a game build where they are gone.
+- **Versions are separate.** The core and each library have their own version numbers; a mod depends on the core and on the libraries it uses, each with a minimum version.
+
 ## API candidates
 
 Most areas come from working code in the localization mod (file names refer to `src/DragNWashLocalization/` there).
 
+**Core**
+
 | Area | What mods get | Comes from |
 |---|---|---|
 | Mods screen | A Mods button in the Options screen, the mod list and details, on/off switches applied at the next launch, settings pages generated from BepInEx config, `ModFramework.Register(ModInfo)` | new; uses the menu knowledge from `OptionsLanguage.cs` |
+| Settings | Rows in the game's Options screen (`GameOptions`) that preview on change, save with the game's Save button and revert with Back | `OptionsLanguage.cs` |
 | Game info | Unity version, graphics API, platform, game build, "is this build known to work" | `Plugin.cs` startup checks |
-| Settings | Add a row to the game's Options screen (dropdown, toggle, slider) that previews on change, saves with the game's Save button and reverts with Back | `OptionsLanguage.cs` |
+| Extension points | Service registry, extra pages on the Mods screen, health checks for patched game methods, `ModInfo.IsLibrary` | new |
+
+**Libraries** (separate plugins on top of the core)
+
+| Library | What mods get | Comes from |
+|---|---|---|
 | Tool window | A shared developer window (F1 by default) for debug tools, where each mod registers a tab; cursor unlock, input blocking behind the window, gamepad and Steam Deck trackpad clicks, a CJK-capable menu font | `Plugin.ImGui.cs`, `CursorUnlock.cs`, `InputBlocker.cs`, `VirtualClick.cs`, `MenuFontBundle.cs` |
 | Text | An event before a TMP text is shown, with the source text and the component, where a mod can replace it; re-apply on demand (e.g. after a language switch) | `TmpTextPatches.cs` |
 | Dialogue | Events for a line about to be shown and options about to be offered, with line ID, speaker and node; the loaded Yarn project | `LineIdContext.cs`, `SpeakerLookup.cs`, `DialogueDumper.cs` |
 | Flags and saves | Read game flags; snapshots of save slots before a mod changes anything | `FlagCatalog.cs`, `SaveHistory.cs` |
 | Assets | Load fonts, textures and asset bundles at a safe moment (at startup on Direct3D 12) | `FontFallback.cs`, `MenuFontBundle.cs` |
-| Installer | One installer that puts BepInEx, the framework and chosen mods in place (Windows, Steam Deck) | `installer/` |
+
+The installer is not an API; it installs BepInEx, the core and the libraries a mod needs.
 
 ## Order of work
 
 1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (done)
 2. **0.2 Mods screen.** (done) The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
-3. **0.3 Settings.** Settings pages on the Mods screen generated from BepInEx config, and the API for rows in the game's Options screen, with the localization mod's language picker as the first user.
-4. **0.4 Tool window.** The shared F1 window for developer tools, with cursor and input handling.
-5. **0.5 Text.** The text event.
-6. **0.6 Dialogue.** Line and option events.
-7. **Assets, flags and saves, installer**, in whichever order the localization mod needs them.
-8. **1.0** when Drag'n Wash Localization v1.0.0 runs on the framework.
+3. **0.3 Settings.** (done) Settings pages on the Mods screen generated from BepInEx config, and `GameOptions` for rows in the game's Options screen.
+4. **0.4 Extension points.** Service registry, `ModInfo.IsLibrary` and library display on the Mods screen, extra Mods screen pages, health checks.
+5. **Libraries**, one at a time and each in the order the localization mod needs them: text, dialogue, tool window, assets, flags and saves. Each is its own plugin with its own version.
+6. **1.0 of the core** when Drag'n Wash Localization v1.0.0 runs on the core and the libraries it uses.
 
-Each step moves one feature out of the localization mod, and the localization mod switches to the framework for that feature before the next step starts. Every step is tested in the game on Windows and on the Steam Deck.
+Each step moves one feature out of the localization mod, and the localization mod switches to it before the next step starts. Every step is tested in the game on Windows and on the Steam Deck.
 
 ## Following game updates
 

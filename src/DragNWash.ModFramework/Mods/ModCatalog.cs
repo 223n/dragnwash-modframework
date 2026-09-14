@@ -36,6 +36,8 @@ namespace DragNWash.ModFramework.Mods
 
             public bool IsPatcher;
 
+            public bool IsLibrary => Info?.IsLibrary == true;
+
             // Path under BepInEx/plugins; null when the plugin lives elsewhere and
             // cannot be switched off from here.
             public string RelativePath;

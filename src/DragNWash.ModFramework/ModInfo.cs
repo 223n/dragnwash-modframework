@@ -24,5 +24,11 @@ namespace DragNWash.ModFramework
 
         /// <summary>Project page or download page.</summary>
         public string Website { get; set; }
+
+        /// <summary>
+        /// True for a library: a prerequisite mod other mods build on. The Mods
+        /// screen shows it as a library and lists the mods that need it.
+        /// </summary>
+        public bool IsLibrary { get; set; }
     }
 }

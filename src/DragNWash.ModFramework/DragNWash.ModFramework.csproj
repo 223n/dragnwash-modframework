@@ -39,6 +39,8 @@
     <Reference Include="UnityEngine.TextRenderingModule"><HintPath>libs\UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.TextCoreFontEngineModule"><HintPath>libs\UnityEngine.TextCoreFontEngineModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>libs\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Naelstrof.UnityScriptableSettings"><HintPath>libs/Naelstrof.UnityScriptableSettings.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Localization"><HintPath>libs/Unity.Localization.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.InputSystem"><HintPath>libs\Unity.InputSystem.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 

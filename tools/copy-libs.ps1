@@ -31,7 +31,9 @@ $fromManaged = @(
     'UnityEngine.TextRenderingModule.dll',
     'UnityEngine.TextCoreFontEngineModule.dll',
     'Unity.TextMeshPro.dll',
-    'Unity.InputSystem.dll'
+    'Unity.InputSystem.dll',
+    'Naelstrof.UnityScriptableSettings.dll',
+    'Unity.Localization.dll'
 )
 
 New-Item -ItemType Directory -Force -Path $libs | Out-Null

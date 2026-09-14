@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BepInEx.Logging;
 
 namespace DragNWash.ModFramework
@@ -71,6 +72,29 @@ namespace DragNWash.ModFramework
             lock (Infos)
             {
                 Infos[info.Guid] = info;
+            }
+        }
+
+        private static readonly List<ModsScreenPage> Pages = new List<ModsScreenPage>();
+
+        /// <summary>Adds a page for a mod on the Mods screen, opened with a button in its details.</summary>
+        public static void AddModsPage(ModsScreenPage page)
+        {
+            if (page == null || string.IsNullOrEmpty(page.Guid) || string.IsNullOrEmpty(page.Title) || page.Build == null)
+            {
+                throw new ArgumentException("ModsScreenPage needs Guid, Title and Build.", nameof(page));
+            }
+            lock (Pages)
+            {
+                Pages.Add(page);
+            }
+        }
+
+        internal static List<ModsScreenPage> PagesFor(string guid)
+        {
+            lock (Pages)
+            {
+                return Pages.Where(p => p.Guid == guid).ToList();
             }
         }
 
