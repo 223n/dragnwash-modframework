@@ -33,7 +33,10 @@ $fromManaged = @(
     'Unity.TextMeshPro.dll',
     'Unity.InputSystem.dll',
     'Naelstrof.UnityScriptableSettings.dll',
-    'Unity.Localization.dll'
+    'Unity.Localization.dll',
+    'YarnSpinner.dll',
+    'YarnSpinner.Unity.dll',
+    'Yarn.Google.Protobuf.dll'
 )
 
 New-Item -ItemType Directory -Force -Path $libs | Out-Null
