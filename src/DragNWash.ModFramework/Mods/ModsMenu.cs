@@ -32,6 +32,12 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextNeededBy = "Needed by";
         internal const string TextLibrary = "Library";
         internal const string TextUnavailable = "Unavailable on this game build:";
+        internal const string TextConflictTag = "Conflict";
+        internal const string TextSameCode = "Changes the same game code as:";
+        internal const string TextSameCodeRisky = "Changes the same game code as, and may override:";
+
+        private static readonly Color WarnColor = new Color(1f, 0.75f, 0.5f, 1f);
+        private List<PatchConflicts.Conflict> _conflicts = new List<PatchConflicts.Conflict>();
 
         // The Back button's pointing hand is drawn just right of the button,
         // over the start of the list; keep the text clear of it.
@@ -57,6 +63,7 @@ namespace DragNWash.ModFramework.Mods
             try
             {
                 _entries = ModCatalog.Build();
+                _conflicts = PatchConflicts.Find(_entries);
                 _selected = _entries.FirstOrDefault(e => SameMod(e, _selected)) ?? _entries.FirstOrDefault();
                 RebuildList();
                 RebuildDetails(false);
@@ -175,6 +182,18 @@ namespace DragNWash.ModFramework.Mods
                 tagRect.anchorMax = new Vector2(0.84f, 1f);
             }
 
+            if (!entry.IsLibrary && ConflictsOf(entry).Count > 0)
+            {
+                TMP_Text tag = UiText.Create(band.transform, "Conflict", TextConflictTag, UiText.BodySize * 0.8f);
+                tag.alignment = TextAlignmentOptions.MidlineRight;
+                tag.textWrappingMode = TextWrappingModes.NoWrap;
+                tag.color = WarnColor;
+                var tagRect = (RectTransform)tag.transform;
+                tagRect.anchorMin = new Vector2(0.58f, 0f);
+                tagRect.anchorMax = new Vector2(0.84f, 1f);
+                nameRect.anchorMax = new Vector2(0.58f, 1f);
+            }
+
             if (!entry.IsFramework && !entry.IsPatcher)
             {
                 TMP_Text state = UiText.Create(band.transform, "State", entry.WantOn ? TextOn : TextOff, UiText.BodySize);
@@ -255,28 +274,44 @@ namespace DragNWash.ModFramework.Mods
                 s.alignment = TextAlignmentOptions.TopLeft;
             }
 
+            // Notes about the mod, one per line from the top of this band down.
+            var notes = new List<(string Name, string Label, string Value, bool Warn)>();
             if (entry.ProblemGuids.Count > 0 && _confirming != entry)
             {
-                string missing = string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g)));
-                Label("ProblemMods", Escape(missing), UiText.BodySize, 0.28f, 0.35f, false);
+                notes.Add(("ProblemMods", null, string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g))), false));
             }
-
             IReadOnlyList<string> unavailable = GameHooks.UnavailableFeatures(entry.Guid);
             if (unavailable.Count > 0 && _confirming != entry)
             {
-                TMP_Text list = LabelPair("Unavailable", TextUnavailable, Escape(string.Join(", ", unavailable)), UiText.BodySize * 0.9f, 0.35f, 0.42f);
-                list.color = new Color(1f, 0.75f, 0.5f, 1f);
+                notes.Add(("Unavailable", TextUnavailable, string.Join(", ", unavailable), true));
             }
-
+            foreach (PatchConflicts.Conflict c in ConflictsOf(entry))
+            {
+                string others = string.Join(", ", c.Guids.Where(g => g != entry.Guid).Select(g => ModCatalog.NameOf(_entries, g)));
+                notes.Add(("Conflict", c.Risky ? TextSameCodeRisky : TextSameCode, others + " (" + c.Method + ")", true));
+            }
             if (entry.IsLibrary && entry.Dependents.Count > 0 && _confirming != entry && entry.ProblemGuids.Count == 0)
             {
-                LabelPair("UsedBy", TextNeededBy, Escape(string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)))), UiText.BodySize, 0.28f, 0.35f);
+                notes.Add(("UsedBy", TextNeededBy, string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g))), false));
             }
-
             if (_confirming == entry)
             {
-                string names = string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)));
-                LabelPair("NeededBy", TextNeededBy, Escape(names), UiText.BodySize, 0.28f, 0.35f);
+                notes.Add(("NeededBy", TextNeededBy, string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g))), false));
+            }
+
+            bool hasPages = entry.Loaded && entry.Guid != null && ModFramework.PagesFor(entry.Guid).Count > 0;
+            int maxNotes = hasPages ? 2 : 3;
+            for (int i = 0; i < notes.Count && i < maxNotes; i++)
+            {
+                float top = 0.42f - i * 0.07f;
+                var note = notes[i];
+                TMP_Text text = note.Label == null
+                    ? Label(note.Name + i, Escape(note.Value), UiText.BodySize * 0.9f, top - 0.07f, top, false)
+                    : LabelPair(note.Name + i, note.Label, Escape(note.Value), UiText.BodySize * 0.9f, top - 0.07f, top);
+                if (note.Warn)
+                {
+                    text.color = WarnColor;
+                }
             }
 
             if (entry.CanSwitch)
@@ -300,7 +335,7 @@ namespace DragNWash.ModFramework.Mods
                 {
                     ModsScreenPage page = pages[i];
                     float left = 0.04f + i * 0.4f;
-                    MakeButton("Page" + i, page.Title, left, left + 0.36f, 0.18f, 0.27f, SettingsColor, () => OpenPage(entry, page));
+                    MakeButton("Page" + i, page.Title, left, left + 0.36f, 0.18f, 0.26f, SettingsColor, () => OpenPage(entry, page));
                 }
             }
         }
@@ -336,6 +371,11 @@ namespace DragNWash.ModFramework.Mods
             rect.offsetMin = new Vector2(28f, 0f);
             rect.offsetMax = new Vector2(-28f, 0f);
             return label;
+        }
+
+        private List<PatchConflicts.Conflict> ConflictsOf(ModCatalog.Entry entry)
+        {
+            return entry.Guid == null ? new List<PatchConflicts.Conflict>() : _conflicts.Where(c => c.Guids.Contains(entry.Guid)).ToList();
         }
 
         // A bold label and its value on one line. The value starts after the label's
