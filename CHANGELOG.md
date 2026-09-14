@@ -2,10 +2,6 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
-## Unreleased
-
-- Core: the title screen shows "Drag'n Wash ModFramework <version>" and how many mods loaded, just above the game's build id, like Minecraft Forge.
-
 ## 2026-09-15
 
 First release, together with [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on the framework.
@@ -17,6 +13,7 @@ First release, together with [Drag'n Wash Localization](https://github.com/TomXV
 - Settings pages generated from BepInEx config, and rows in the game's own Options screen (`GameOptions`).
 - Extension points: service registry (`Services`), health checks for patched game methods (`GameHooks`), extra Mods screen pages (`ModFramework.AddModsPage`), libraries (`ModInfo.IsLibrary`) with the mods that need them and the mods each one uses.
 - Detection of game methods patched by more than one mod, shown as a Conflict.
+- The title screen shows "Drag'n Wash ModFramework <version>" and how many mods loaded, just above the game's build id, like Minecraft Forge.
 - Works with mouse, gamepad and on the Steam Deck: a thin white frame shows the selected item, and A, R2 and the trackpad click press it. The layout follows window resizes and full screen.
 
 ### Text 1.0.0
