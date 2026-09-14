@@ -21,6 +21,21 @@ namespace DragNWash.ModFramework.Mods
 
             public string DisplayName => string.IsNullOrEmpty(Info?.DisplayName) ? Name : Info.DisplayName;
 
+            // What the mod registered through the API wins; otherwise what could be
+            // read from the DLL and its package, so plain BepInEx plugins get details too.
+            public PluginScanner.Found Scanned;
+            public string Description => !string.IsNullOrEmpty(Info?.Description) ? Info.Description : Scanned?.Description;
+            public string Authors => Info?.Authors != null && Info.Authors.Length > 0 ? string.Join(", ", Info.Authors) : Scanned?.Authors;
+            public string Website => !string.IsNullOrEmpty(Info?.Website) ? Info.Website : Scanned?.Website;
+
+            // Why a plugin in BepInEx/plugins did not load, when that can be told:
+            // a label ("Needs", "Cannot run together with") and the mods it names,
+            // or just a label.
+            public string ProblemLabel;
+            public List<string> ProblemGuids = new List<string>();
+
+            public bool IsPatcher;
+
             // Path under BepInEx/plugins; null when the plugin lives elsewhere and
             // cannot be switched off from here.
             public string RelativePath;
@@ -34,12 +49,13 @@ namespace DragNWash.ModFramework.Mods
             // GUIDs of loaded plugins that cannot load without this one.
             public List<string> Dependents = new List<string>();
 
-            public bool CanSwitch => RelativePath != null && !IsFramework;
+            public bool CanSwitch => RelativePath != null && !IsFramework && !IsPatcher;
         }
 
         internal static List<Entry> Build()
         {
             var entries = new List<Entry>();
+            List<PluginScanner.Found> scanned = PluginScanner.ScanPluginsFolder();
             List<DisabledMods.Record> desired = DisabledMods.ReadDesired(Paths.ConfigPath);
             var desiredPaths = new HashSet<string>(desired.Select(r => r.RelativePath), StringComparer.OrdinalIgnoreCase);
 
@@ -57,7 +73,109 @@ namespace DragNWash.ModFramework.Mods
                     Loaded = true,
                     IsFramework = meta.GUID == ModFramework.Guid || string.Equals(rel, FrameworkRelativePath, StringComparison.OrdinalIgnoreCase),
                     WantOn = rel == null || !desiredPaths.Contains(rel),
+                    Scanned = scanned.FirstOrDefault(s => s.Guid == meta.GUID),
                 });
+            }
+
+            // Plugins BepInEx found in the folder but did not load.
+            var loadedGuids = new HashSet<string>(Chainloader.PluginInfos.Keys);
+            foreach (PluginScanner.Found s in scanned)
+            {
+                if (s.Guid == null || loadedGuids.Contains(s.Guid))
+                {
+                    continue;
+                }
+                string rel = RelativeToPlugins(s.FullPath);
+                if (rel == null || entries.Any(e => e.Guid == s.Guid && string.Equals(e.RelativePath, rel, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+                var entry = new Entry
+                {
+                    Guid = s.Guid,
+                    Name = s.Name,
+                    Version = s.Version,
+                    Info = ModFramework.GetInfo(s.Guid),
+                    Scanned = s,
+                    RelativePath = rel,
+                    Loaded = false,
+                    WantOn = !desiredPaths.Contains(rel),
+                };
+                List<string> missing = s.HardDependencies.Where(g => !loadedGuids.Contains(g)).ToList();
+                List<string> conflicts = s.Incompatibilities.Where(g => loadedGuids.Contains(g)).ToList();
+                if (missing.Count > 0)
+                {
+                    entry.ProblemLabel = TextNeeds;
+                    entry.ProblemGuids = missing;
+                }
+                else if (conflicts.Count > 0)
+                {
+                    entry.ProblemLabel = TextConflicts;
+                    entry.ProblemGuids = conflicts;
+                }
+                else if (entry.WantOn)
+                {
+                    entry.ProblemLabel = TextNotLoaded;
+                }
+                entries.Add(entry);
+            }
+
+            // Preloader patchers run before plugins and cannot be switched from here.
+            string patchers = Paths.PatcherPluginPath;
+            if (Directory.Exists(patchers))
+            {
+                foreach (string path in Directory.GetFiles(patchers, "*.dll", SearchOption.AllDirectories))
+                {
+                    if (string.Equals(Path.GetFileName(path), "DragNWash.ModFramework.Preloader.dll", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    entries.Add(new Entry
+                    {
+                        Guid = null,
+                        Name = Path.GetFileNameWithoutExtension(path),
+                        Version = SafeVersion(path),
+                        Loaded = true,
+                        WantOn = true,
+                        IsPatcher = true,
+                        ProblemLabel = TextPatcher,
+                    });
+                }
+            }
+
+            // Plugins the preloader renamed at this launch and the player has since
+            // switched back on: not loaded, no longer in the list, but still there.
+            foreach (string rel in DisabledMods.ReadState(Paths.ConfigPath))
+            {
+                if (desiredPaths.Contains(rel) || entries.Any(e => string.Equals(e.RelativePath, rel, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+                string off = Path.Combine(Paths.PluginPath, rel) + DisabledMods.DisabledSuffix;
+                if (!File.Exists(off))
+                {
+                    continue;
+                }
+                List<PluginScanner.Found> inFile = PluginScanner.Read(off);
+                if (inFile.Count == 0)
+                {
+                    entries.Add(new Entry { Name = Path.GetFileNameWithoutExtension(rel), RelativePath = rel, Loaded = false, WantOn = true });
+                    continue;
+                }
+                foreach (PluginScanner.Found s in inFile)
+                {
+                    entries.Add(new Entry
+                    {
+                        Guid = s.Guid,
+                        Name = s.Name,
+                        Version = s.Version,
+                        Info = ModFramework.GetInfo(s.Guid),
+                        Scanned = s,
+                        RelativePath = rel,
+                        Loaded = false,
+                        WantOn = true,
+                    });
+                }
             }
 
             foreach (DisabledMods.Record record in desired)
@@ -74,6 +192,9 @@ namespace DragNWash.ModFramework.Mods
                     RelativePath = record.RelativePath,
                     Loaded = false,
                     WantOn = false,
+                    Info = ModFramework.GetInfo(record.Guid),
+                    Scanned = PluginScanner.Read(Path.Combine(Paths.PluginPath, record.RelativePath) + DisabledMods.DisabledSuffix)
+                        .FirstOrDefault(s => s.Guid == record.Guid),
                 });
             }
 
@@ -126,9 +247,26 @@ namespace DragNWash.ModFramework.Mods
             ModFramework.Log.LogInfo($"{entry.Name} will be switched {(on ? "on" : "off")} at the next launch.");
         }
 
+        internal const string TextNeeds = "Not loaded. It needs";
+        internal const string TextConflicts = "Not loaded. It cannot run together with";
+        internal const string TextNotLoaded = "Not loaded. See BepInEx/LogOutput.log for why.";
+        internal const string TextPatcher = "Preloader patcher. It runs before other mods and cannot be switched off here.";
+
+        private static string SafeVersion(string path)
+        {
+            try
+            {
+                return System.Reflection.AssemblyName.GetAssemblyName(path).Version?.ToString();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         internal static string NameOf(List<Entry> entries, string guid)
         {
-            Entry e = entries.FirstOrDefault(x => x.Guid == guid);
+            Entry e = entries.FirstOrDefault(x => x.Guid == guid && x.Guid != null);
             return e != null ? e.DisplayName : guid;
         }
 

@@ -74,7 +74,7 @@ namespace DragNWash.ModFramework.Mods
             }
             catch (System.Exception ex)
             {
-                ModFramework.Log.LogWarning($"Could not style a label: {ex.Message}");
+                ModFramework.Log.LogWarning($"Could not style a label: {ex}");
             }
         }
 

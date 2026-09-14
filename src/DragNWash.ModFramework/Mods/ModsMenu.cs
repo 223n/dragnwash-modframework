@@ -142,7 +142,7 @@ namespace DragNWash.ModFramework.Mods
             nameRect.anchorMax = new Vector2(0.72f, 1f);
             nameRect.offsetMin = new Vector2(20f, 0f);
 
-            if (!entry.IsFramework)
+            if (!entry.IsFramework && !entry.IsPatcher)
             {
                 TMP_Text state = UiText.Create(band.transform, "State", entry.WantOn ? TextOn : TextOff, UiText.BodySize);
                 state.alignment = TextAlignmentOptions.MidlineRight;
@@ -181,24 +181,23 @@ namespace DragNWash.ModFramework.Mods
             Label("Name", Escape(entry.DisplayName), UiText.TitleSize * 0.6f, 0.86f, 0.98f, false);
 
             string meta = string.IsNullOrEmpty(entry.Version) ? "" : "v" + Escape(entry.Version);
-            string[] authors = entry.Info?.Authors;
-            if (authors != null && authors.Length > 0)
+            if (!string.IsNullOrEmpty(entry.Authors))
             {
-                meta += (meta.Length > 0 ? "   " : "") + Escape(string.Join(", ", authors));
+                meta += (meta.Length > 0 ? "   " : "") + Escape(entry.Authors);
             }
             if (meta.Length > 0)
             {
                 Label("Meta", meta, UiText.BodySize, 0.78f, 0.86f, false);
             }
 
-            string description = entry.Info?.Description;
+            string description = entry.Description;
             if (!string.IsNullOrEmpty(description))
             {
                 TMP_Text d = Label("Description", description, UiText.BodySize, 0.5f, 0.77f, true);
                 d.alignment = TextAlignmentOptions.TopLeft;
             }
 
-            string website = entry.Info?.Website;
+            string website = entry.Website;
             if (!string.IsNullOrEmpty(website))
             {
                 Label("Website", Escape(website), UiText.BodySize * 0.85f, 0.42f, 0.5f, false);
@@ -210,6 +209,12 @@ namespace DragNWash.ModFramework.Mods
                 TMP_Text s = Label("Status", status, UiText.BodySize, 0.26f, 0.41f, true);
                 s.fontStyle |= FontStyles.Italic;
                 s.alignment = TextAlignmentOptions.TopLeft;
+            }
+
+            if (entry.ProblemGuids.Count > 0 && _confirming != entry)
+            {
+                string missing = string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g)));
+                Label("ProblemMods", Escape(missing), UiText.BodySize, 0.19f, 0.26f, false);
             }
 
             if (_confirming == entry)
@@ -319,6 +324,10 @@ namespace DragNWash.ModFramework.Mods
             if (_confirming == entry)
             {
                 return TextConfirmOff;
+            }
+            if (entry.ProblemLabel != null && entry.WantOn)
+            {
+                return entry.ProblemLabel;
             }
             if (entry.Loaded && !entry.WantOn)
             {
