@@ -30,6 +30,7 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextConfirmOff = "Other mods need this one. Press Off again to switch it off anyway.";
         internal const string TextOutsidePlugins = "Installed outside BepInEx/plugins, so it cannot be switched off here";
         internal const string TextNeededBy = "Needed by";
+        internal const string TextUses = "Uses";
         internal const string TextLibrary = "Library";
         internal const string TextUnavailable = "Unavailable on this game build:";
         internal const string TextConflictTag = "Conflict";
@@ -263,7 +264,22 @@ namespace DragNWash.ModFramework.Mods
             bandImage.color = BandColor;
             bandImage.raycastTarget = false;
 
-            Label("Name", Escape(entry.DisplayName), UiText.TitleSize * 0.6f, 0.86f, 0.98f, false);
+            TMP_Text nameLabel = Label("Name", Escape(entry.DisplayName), UiText.TitleSize * 0.6f, 0.86f, 0.98f, false);
+            Texture2D icon = entry.Info?.Icon;
+            if (icon != null)
+            {
+                // Square, as tall as the name's band, with the name moved beside it.
+                float side = Details.rect.height * 0.12f - 8f;
+                GameObject iconPart = Part("Icon", 0f, 0f, 0.92f, 0.92f);
+                var iconRect = (RectTransform)iconPart.transform;
+                iconRect.pivot = new Vector2(0f, 0.5f);
+                iconRect.sizeDelta = new Vector2(side, side);
+                iconRect.anchoredPosition = new Vector2(28f, 0f);
+                RawImage image = iconPart.AddComponent<RawImage>();
+                image.texture = icon;
+                image.raycastTarget = false;
+                ((RectTransform)nameLabel.transform).offsetMin = new Vector2(28f + side + 16f, 0f);
+            }
 
             string meta = string.IsNullOrEmpty(entry.Version) ? "" : "v" + Escape(entry.Version);
             if (!string.IsNullOrEmpty(entry.Authors))
@@ -311,6 +327,11 @@ namespace DragNWash.ModFramework.Mods
             {
                 string others = string.Join(", ", c.Guids.Where(g => g != entry.Guid).Select(g => ModCatalog.NameOf(_entries, g)));
                 notes.Add(("Conflict", c.Risky ? TextSameCodeRisky : TextSameCode, others + " (" + c.Method + ")", true));
+            }
+            if (entry.Uses.Count > 0 && _confirming != entry && !entry.IsFramework)
+            {
+                notes.Add(("Uses", TextUses, string.Join(", ", entry.Uses.Select(u =>
+                    ModCatalog.ShortNameOf(_entries, u.Key) + (u.Value != null && u.Value > new Version(0, 0) ? " " + u.Value + "+" : ""))), false));
             }
             if (entry.IsLibrary && entry.Dependents.Count > 0 && _confirming != entry && entry.ProblemGuids.Count == 0)
             {

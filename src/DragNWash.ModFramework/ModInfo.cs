@@ -30,5 +30,19 @@ namespace DragNWash.ModFramework
         /// screen shows it as a library and lists the mods that need it.
         /// </summary>
         public bool IsLibrary { get; set; }
+
+        /// <summary>
+        /// Icon shown next to the name on the Mods screen, ideally square. Create it
+        /// in the plugin's Awake: on Direct3D 12 a texture made later can crash the
+        /// game. Wins over <see cref="IconPath"/>.
+        /// </summary>
+        public UnityEngine.Texture2D Icon { get; set; }
+
+        /// <summary>
+        /// A PNG or JPG file to load as the icon when the mod registers, for example
+        /// <c>Path.Combine(Path.GetDirectoryName(Info.Location), "icon.png")</c>.
+        /// Register from Awake so it loads at startup.
+        /// </summary>
+        public string IconPath { get; set; }
     }
 }
