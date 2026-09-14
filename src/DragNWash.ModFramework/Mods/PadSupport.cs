@@ -8,9 +8,9 @@ namespace DragNWash.ModFramework.Mods
 {
     // Gamepad and Steam Deck help for the Mods screen.
     //
-    // A frame around whatever is selected, so a player using the pad or the Deck
-    // can see where they are: the game's own hover tint is too faint on the dark
-    // bands.
+    // A thin white frame around whatever is selected, so a player using the pad or
+    // the Deck can see where they are: the game's own hover tint is too faint on
+    // the dark bands.
     //
     // Presses of A, R2 and the stick buttons (Steam Input reports a trackpad click
     // as a stick press) click the selected button when the game's UI input did
@@ -20,8 +20,8 @@ namespace DragNWash.ModFramework.Mods
     {
         internal ModsMenu Menu;
 
-        private const float Thickness = 4f;
-        private static readonly Color FrameColor = new Color(1f, 0.82f, 0.25f, 1f);
+        private const float Thickness = 2f;
+        private static readonly Color FrameColor = Color.white;
 
         private GameObject _frame;
         private GameObject _framed;
