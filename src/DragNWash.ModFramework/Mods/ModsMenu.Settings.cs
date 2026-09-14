@@ -82,6 +82,7 @@ namespace DragNWash.ModFramework.Mods
             LayoutElement layout = row.AddComponent<LayoutElement>();
             layout.minHeight = 56f;
             layout.preferredHeight = 56f;
+            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 56f);
             layout.flexibleWidth = 1f;
             TMP_Text label = UiText.Create(row.transform, "Label", Escape(section), UiText.BodySize);
             label.alignment = TextAlignmentOptions.BottomLeft;
@@ -97,6 +98,7 @@ namespace DragNWash.ModFramework.Mods
             LayoutElement layout = row.AddComponent<LayoutElement>();
             layout.minHeight = 72f;
             layout.preferredHeight = 72f;
+            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 72f);
             layout.flexibleWidth = 1f;
 
             var band = new GameObject("Band", typeof(RectTransform));

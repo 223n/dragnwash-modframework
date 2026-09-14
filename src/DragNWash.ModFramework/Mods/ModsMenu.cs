@@ -121,6 +121,7 @@ namespace DragNWash.ModFramework.Mods
             LayoutElement layout = row.AddComponent<LayoutElement>();
             layout.minHeight = RowHeight;
             layout.preferredHeight = RowHeight;
+            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, RowHeight);
             layout.flexibleWidth = 1f;
 
             var band = new GameObject("Band", typeof(RectTransform));
