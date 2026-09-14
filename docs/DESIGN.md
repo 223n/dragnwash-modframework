@@ -117,8 +117,8 @@ Most areas come from working code in the localization mod (file names refer to `
 
 ## Order of work
 
-1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (this version)
-2. **0.2 Mods screen.** The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
+1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (done)
+2. **0.2 Mods screen.** (done) The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
 3. **0.3 Settings.** Settings pages on the Mods screen generated from BepInEx config, and the API for rows in the game's Options screen, with the localization mod's language picker as the first user.
 4. **0.4 Tool window.** The shared F1 window for developer tools, with cursor and input handling.
 5. **0.5 Text.** The text event.

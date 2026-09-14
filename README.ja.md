@@ -5,7 +5,7 @@
 [Drag'n Wash](https://store.steampowered.com/app/4739660/) 用の前提 Mod（BepInEx 5）です。ゲームに入り込むためのコードを 1 か所にまとめ、ほかの Mod に安定した API として提供します。ゲームの Options 画面から開く Mods 画面（Minecraft Forge の Mod 一覧のようなもので、Mod のオン・オフもできる）、ゲームの Options 画面への設定の追加、テキストや会話のイベント、Direct3D 12 で安全なアセットの読み込みなどです。ゲームがアップデートされても、追従が必要なのはフレームワークだけになります。
 
 > [!WARNING]
-> **開発初期です。** バージョン 0.1 は骨組みだけで、プレイヤーが入れるものはまだありません。1.0 までは API が変わります。
+> **開発初期です。** バージョン 0.2 で Mods 画面ができましたが、プレイヤー向けのリリースはまだありません。1.0 までは API が変わります。
 
 最初にこの上で動く Mod は、[Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) の v1.0.0 になる予定です。
 
