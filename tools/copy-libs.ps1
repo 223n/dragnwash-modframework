@@ -21,15 +21,25 @@ if (-not (Test-Path -LiteralPath $core)) {
     throw "BepInEx is not installed in '$GamePath' (no BepInEx\core)."
 }
 
-$files = @(
-    @{ From = $core;    Name = 'BepInEx.dll' },
-    @{ From = $core;    Name = '0Harmony.dll' },
-    @{ From = $managed; Name = 'UnityEngine.dll' },
-    @{ From = $managed; Name = 'UnityEngine.CoreModule.dll' }
+$fromCore = @('BepInEx.dll', '0Harmony.dll', 'Mono.Cecil.dll')
+$fromManaged = @(
+    'Assembly-CSharp.dll',
+    'UnityEngine.dll',
+    'UnityEngine.CoreModule.dll',
+    'UnityEngine.UI.dll',
+    'UnityEngine.UIModule.dll',
+    'UnityEngine.TextRenderingModule.dll',
+    'UnityEngine.TextCoreFontEngineModule.dll',
+    'Unity.TextMeshPro.dll',
+    'Unity.InputSystem.dll'
 )
 
 New-Item -ItemType Directory -Force -Path $libs | Out-Null
-foreach ($f in $files) {
-    Copy-Item -LiteralPath (Join-Path $f.From $f.Name) -Destination $libs -Force
-    Write-Host "copied $($f.Name)"
+foreach ($name in $fromCore) {
+    Copy-Item -LiteralPath (Join-Path $core $name) -Destination $libs -Force
+    Write-Host "copied $name"
+}
+foreach ($name in $fromManaged) {
+    Copy-Item -LiteralPath (Join-Path $managed $name) -Destination $libs -Force
+    Write-Host "copied $name"
 }
