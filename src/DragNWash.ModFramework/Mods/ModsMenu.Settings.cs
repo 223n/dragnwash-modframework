@@ -116,7 +116,14 @@ namespace DragNWash.ModFramework.Mods
             ConfigRowSelect select = band.AddComponent<ConfigRowSelect>();
             select.Menu = this;
             select.Item = item;
-            button.onClick.AddListener(() => SelectItem(item));
+            button.onClick.AddListener(() =>
+            {
+                SelectItem(item);
+                if (PadSupport.PadPressedThisFrame())
+                {
+                    Focus("Step+", "Toggle", "Reset");
+                }
+            });
 
             TMP_Text key = UiText.Create(band.transform, "Key", Escape(item.Key), UiText.BodySize);
             key.alignment = TextAlignmentOptions.MidlineLeft;
