@@ -160,16 +160,18 @@ namespace DragNWash.ModFramework.Mods
             name.textWrappingMode = TextWrappingModes.NoWrap;
             name.overflowMode = TextOverflowModes.Ellipsis;
             var nameRect = (RectTransform)name.transform;
-            nameRect.anchorMax = new Vector2(0.72f, 1f);
+            nameRect.anchorMax = new Vector2(entry.IsLibrary ? 0.58f : 0.72f, 1f);
             nameRect.offsetMin = new Vector2(20f, 0f);
 
+            // Long names shrink and end in an ellipsis before the tag starts.
             if (entry.IsLibrary)
             {
                 TMP_Text tag = UiText.Create(band.transform, "Library", TextLibrary, UiText.BodySize * 0.8f);
                 tag.alignment = TextAlignmentOptions.MidlineRight;
+                tag.textWrappingMode = TextWrappingModes.NoWrap;
                 tag.color = new Color(0.7f, 0.8f, 1f, 1f);
                 var tagRect = (RectTransform)tag.transform;
-                tagRect.anchorMin = new Vector2(0.5f, 0f);
+                tagRect.anchorMin = new Vector2(0.58f, 0f);
                 tagRect.anchorMax = new Vector2(0.84f, 1f);
             }
 
