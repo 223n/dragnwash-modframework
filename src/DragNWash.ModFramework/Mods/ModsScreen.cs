@@ -224,9 +224,8 @@ namespace DragNWash.ModFramework.Mods
                 MenuContainerField.SetValue(menu, container);
                 MenuIntentsField.SetValue(menu, intents);
                 menu.Content = (RectTransform)content;
-                // Measured on the live Options screen: the copy is not under a canvas yet.
-                var liveScroll = options.transform.Find("Container/Panel/Scroll View") as RectTransform;
-                menu.Details = SplitForDetails(panel, liveScroll != null ? liveScroll.rect.width : 0f);
+                menu.Details = SplitForDetails(panel);
+                menu.Details.gameObject.AddComponent<DetailsResizeWatcher>().Menu = menu;
 
                 int index = options.transform.GetSiblingIndex();
                 copy.transform.SetParent(options.transform.parent, false);
@@ -241,7 +240,10 @@ namespace DragNWash.ModFramework.Mods
 
         // The Options scroll view spans the panel right of the buttons. Keep its
         // left part for the list of mods and put the details panel beside it.
-        private static RectTransform SplitForDetails(Transform panel, float width)
+        // Both go into a holder that takes the scroll view's place, and are
+        // anchored by fractions of it, so they keep their shares when the window
+        // is resized (fixed offsets measured at build time did not).
+        private static RectTransform SplitForDetails(Transform panel)
         {
             var scroll = (RectTransform)panel.Find("Scroll View");
             Transform horizontal = scroll.Find("Scrollbar Horizontal");
@@ -250,21 +252,31 @@ namespace DragNWash.ModFramework.Mods
                 horizontal.gameObject.SetActive(false);
             }
 
-            var details = (RectTransform)new GameObject("Details", typeof(RectTransform)).transform;
-            details.SetParent(panel, false);
-            details.anchorMin = scroll.anchorMin;
-            details.anchorMax = scroll.anchorMax;
-            details.pivot = scroll.pivot;
-            details.anchoredPosition = scroll.anchoredPosition;
-            details.sizeDelta = scroll.sizeDelta;
+            var split = (RectTransform)new GameObject("Split", typeof(RectTransform)).transform;
+            split.SetParent(panel, false);
+            split.SetSiblingIndex(scroll.GetSiblingIndex());
+            split.anchorMin = scroll.anchorMin;
+            split.anchorMax = scroll.anchorMax;
+            split.pivot = scroll.pivot;
+            split.anchoredPosition = scroll.anchoredPosition;
+            split.sizeDelta = scroll.sizeDelta;
 
-            if (width < 1f)
-            {
-                width = 1500f;
-            }
-            scroll.offsetMax -= new Vector2(width * 0.55f, 0f);
-            details.offsetMin += new Vector2(width * 0.47f, 0f);
+            scroll.SetParent(split, false);
+            Fill(scroll, 0f, 0.45f);
+
+            var details = (RectTransform)new GameObject("Details", typeof(RectTransform)).transform;
+            details.SetParent(split, false);
+            Fill(details, 0.47f, 1f);
             return details;
+        }
+
+        private static void Fill(RectTransform rect, float left, float right)
+        {
+            rect.anchorMin = new Vector2(left, 0f);
+            rect.anchorMax = new Vector2(right, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
         }
 
         private static void RewireButtons(GameObject menu)

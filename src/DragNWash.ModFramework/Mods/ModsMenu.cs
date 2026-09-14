@@ -93,6 +93,25 @@ namespace DragNWash.ModFramework.Mods
             return new MenuResponseIgnored();
         }
 
+        // The details panel changed size (the window was resized). Its notes
+        // measure the panel to decide where labels wrap, so lay them out again,
+        // keeping the focused button. A page another mod built is left alone:
+        // building it again could lose what the player has done on it.
+        internal void OnDetailsResized()
+        {
+            if (_page != null || !isActiveAndEnabled)
+            {
+                return;
+            }
+            GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            string focusName = focused != null && _detailParts.Contains(focused) ? focused.name : null;
+            RebuildDetails(false);
+            if (focusName != null)
+            {
+                Focus(focusName);
+            }
+        }
+
         internal void Select(ModCatalog.Entry entry)
         {
             if (entry == null || ReferenceEquals(entry, _selected))
@@ -513,6 +532,50 @@ namespace DragNWash.ModFramework.Mods
         private static string Escape(string text)
         {
             return (text ?? "").Replace("<", "<noparse><</noparse>");
+        }
+    }
+
+    // Tells the menu when the details panel is resized, at most once a frame
+    // and only once the size has settled for that frame.
+    internal sealed class DetailsResizeWatcher : UIBehaviour
+    {
+        internal ModsMenu Menu;
+        private Vector2 _builtFor;
+        private bool _dirty;
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _builtFor = ((RectTransform)transform).rect.size;
+            _dirty = false;
+        }
+
+        protected override void OnRectTransformDimensionsChange()
+        {
+            _dirty = true;
+        }
+
+        private void LateUpdate()
+        {
+            if (!_dirty)
+            {
+                return;
+            }
+            _dirty = false;
+            Vector2 size = ((RectTransform)transform).rect.size;
+            if (Mathf.Abs(size.x - _builtFor.x) < 1f && Mathf.Abs(size.y - _builtFor.y) < 1f)
+            {
+                return;
+            }
+            _builtFor = size;
+            try
+            {
+                Menu?.OnDetailsResized();
+            }
+            catch (System.Exception ex)
+            {
+                ModFramework.Log.LogError($"Could not lay out the Mods screen again: {ex}");
+            }
         }
     }
 
