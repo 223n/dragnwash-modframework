@@ -21,3 +21,5 @@ jobs:
             exit 1
           fi
           echo "OK"
+      - name: Compare every file with the fingerprints of real game installs
+        run: python3 tools/check-game-files.py
