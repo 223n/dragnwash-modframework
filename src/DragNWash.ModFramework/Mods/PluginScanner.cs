@@ -35,6 +35,8 @@ namespace DragNWash.ModFramework.Mods
         private static readonly Dictionary<string, (DateTime Stamp, List<Found> Plugins)> Cache =
             new Dictionary<string, (DateTime, List<Found>)>(StringComparer.OrdinalIgnoreCase);
 
+        private static readonly HashSet<string> Reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         internal static List<Found> ScanPluginsFolder()
         {
             var all = new List<Found>();
@@ -108,9 +110,13 @@ namespace DragNWash.ModFramework.Mods
                 Cache[path] = (stamp, plugins);
                 return plugins;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // Not a .NET assembly, or unreadable: not a plugin we can describe.
+                if (Reported.Add(path))
+                {
+                    ModFramework.Log.LogInfo($"Could not read {Path.GetFileName(path)} for the Mods screen: {ex.GetType().Name}: {ex.Message}");
+                }
                 return new List<Found>();
             }
         }

@@ -64,13 +64,11 @@ namespace DragNWash.ModFramework.Mods
                 {
                     label.font = font;
                 }
+                // No outline: setting one builds a material instance, which throws
+                // on a label that is not under a canvas yet. The rows' dark bands
+                // keep the text readable.
                 label.color = Color.white;
                 label.fontStyle = FontStyles.Bold;
-                if (label.font != null)
-                {
-                    label.outlineWidth = 0.25f;
-                    label.outlineColor = new Color32(20, 16, 14, 255);
-                }
             }
             catch (System.Exception ex)
             {
