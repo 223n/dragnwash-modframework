@@ -2,7 +2,7 @@
 
 [日本語](README.ja.md)
 
-A prerequisite mod for [Drag'n Wash](https://store.steampowered.com/app/4739660/) (BepInEx 5). It keeps the code that hooks into the game in one place and gives other mods a stable API for it: a Mods screen reached from the game's Options screen (like Minecraft Forge's mod list, with on/off switches), settings in the game's Options screen, text and dialogue events, safe asset loading on Direct3D 12, and more. When the game updates, only the framework has to follow.
+A prerequisite mod for [Drag'n Wash](https://store.steampowered.com/app/4739660/) (BepInEx 5). It is a small core that keeps the code hooking into the game in one place and gives other mods, and libraries built on top of it, a stable API: a Mods screen reached from the game's Options screen (like Minecraft Forge's mod list, with on/off switches), settings in the game's Options screen, text and dialogue events, safe asset loading on Direct3D 12, and more. When the game updates, only the framework has to follow.
 
 > [!WARNING]
 > **Early development.** Version 0.2 has the Mods screen; nothing has been released for players yet. The API will change until 1.0.
