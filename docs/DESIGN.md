@@ -164,6 +164,22 @@ Each step moves one feature out of the localization mod, and the localization mo
 - For each patch target, check it exists at startup and log a clear line when it does not.
 - After an update: decompile and diff the game assembly, diff the Yarn string table, update the table, release.
 
+## Future: Steam Workshop
+
+Drag'n Wash has no Steam Workshop today; only the developers can enable it for the game. If they do, the framework could take mods from it, so players subscribe on Steam instead of copying files.
+
+What is already in place: the game ships Steamworks.NET (`com.rlabrecque.steamworks.net.dll` and `steam_api64.dll`), so the framework can talk to Steam without adding anything.
+
+How it could work:
+
+- **Finding subscribed mods.** Steam downloads subscribed items to `steamapps/workshop/content/4739660/<item id>/`. The framework asks Steam (`ISteamUGC`) for the subscribed items and their folders.
+- **Loading them.** BepInEx only loads plugins from `BepInEx/plugins`. The preloader patcher, which already runs before plugins, would link or copy each item's plugin DLLs into `BepInEx/plugins/Workshop/<item id>/` before BepInEx scans the folder, and remove them when the item is unsubscribed.
+- **On the Mods screen.** Workshop mods are listed with where they came from, their Workshop page, and the same on/off switch; switching off keeps the subscription.
+- **Dependencies.** A Workshop item can list required items; the Mods screen can say which libraries are missing and link to them.
+- **Uploading.** Uploading needs the game's app ID and Workshop enabled, so it would be a small tool or a page on the Mods screen for mod authors.
+
+Things to settle first: whether the developers want code mods on their Workshop at all, the game's adult content rating for Workshop items, and warning players that a mod runs code on their computer.
+
 ## Open questions
 
 - How mods show up in the tool window when several register tabs (order, naming).
