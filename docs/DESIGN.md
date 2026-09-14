@@ -19,9 +19,9 @@ In most modding scenes every author designs things their own way. Two mods patch
 - **One shared hook instead of many patches.** When several mods need the same place in the game (text, dialogue, the Options screen), the framework or a library patches it once and mods register into it, in an explicit order.
 - **Isolation.** Every mod callback runs inside the framework's error handling: an exception is logged with the mod's name and the others keep running. One broken mod never stops the game or another mod.
 - **Check before patching.** Patch targets are checked with `GameHooks` first; a missing target turns the feature off and says so, instead of crashing after a game update.
-- **Conflicts are visible.** The Mods screen shows what it can detect: missing or too old libraries, `BepInIncompatibility`, a plugin that did not load and why, and (planned) game methods that several mods patch directly.
+- **Conflicts are visible.** The Mods screen shows what it can detect: missing or too old libraries, `BepInIncompatibility`, a plugin that did not load and why, and game methods that several mods patch directly.
 - **Nothing silently replaced.** A service can have only one provider; a second registration is refused and logged.
-- **Guidelines for authors.** The documentation will say what to use from the framework, what not to patch directly, and how to write a library others can build on.
+- **Guidelines for authors.** [GUIDE.md](GUIDE.md) says what to use from the framework, what not to patch directly, and how to write a library others can build on.
 
 ## Goals
 
@@ -72,9 +72,9 @@ The game's menus are simple enough to extend without touching its files (checked
   1. clone a button in `Menu_Options/Container/Panel/LeftButtons`, rename it `Mods` and give it its own label,
   2. patch `MenuOptions.OnEvent` so the `Mods` intent transitions to `Menu_Mods`,
   3. create `Menu_Mods` as a `Menu` subclass built from the Options screen's layout, register it with `MenuManager`, and send `Back` to `Menu_Options`.
-- To check in the game: that pending changes on the Options screen are kept when the player goes to the Mods screen and comes back, rather than being reverted as Back does.
+- Checked in the game: settings changed on the Options screen and not saved yet are still there, with the Save button, after a visit to the Mods screen.
 - The game's buttons have their words painted into the artwork. The Mods button and everything on the Mods screen are TextMeshPro text in the game's own TMP font instead, so no artwork is drawn or copied and every label can be translated (the localization mod's text hook picks them up like any other UI text).
-- Mod icons, if a mod provides one, are loaded at startup, which is safe on Direct3D 12.
+- Mod icons (`ModInfo.Icon`, or a file in `ModInfo.IconPath`) are loaded when the mod registers, at startup, which is safe on Direct3D 12.
 
 ### Turning mods on and off
 
@@ -108,7 +108,7 @@ ModFramework.Register(new ModInfo
 });
 ```
 
-Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes a toggle, a ranged number a slider, an enum a dropdown), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
+Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes an On/Off button, numbers, enums and lists of accepted values get `<` and `>` steps, and anything else is shown with a note to edit the config file), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
 
 ## Layers: a small core, and libraries on top
 
@@ -163,15 +163,15 @@ The installer is not an API; it installs BepInEx, the core and the libraries a m
 1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (done)
 2. **0.2 Mods screen.** (done) The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
 3. **0.3 Settings.** (done) Settings pages on the Mods screen generated from BepInEx config, and `GameOptions` for rows in the game's Options screen.
-4. **0.4 Extension points.** Service registry, `ModInfo.IsLibrary` and library display on the Mods screen, extra Mods screen pages, health checks.
-5. **Libraries**, one at a time and each in the order the localization mod needs them: text, dialogue, tool window, assets, flags and saves. Each is its own plugin with its own version.
-6. **1.0 of the core** when Drag'n Wash Localization v1.0.0 runs on the core and the libraries it uses.
+4. **0.4 Extension points.** (done) Service registry, `ModInfo.IsLibrary` and library display on the Mods screen, extra Mods screen pages, health checks.
+5. **Libraries**, one at a time and each in the order the localization mod needs them: text, dialogue, tool window, assets, flags and saves. Each is its own plugin with its own version. (done: all five are at 0.1; the text library is at 0.1.1)
+6. **1.0 of the core** when Drag'n Wash Localization v1.0.0 runs on the core and the libraries it uses. (ready: the localization mod's `feature/v1.0.0` branch runs on all of them and was checked in the game on Windows; the release of both is still to come, and so is the Steam Deck run)
 
 Each step moves one feature out of the localization mod, and the localization mod switches to it before the next step starts. Every step is tested in the game on Windows and on the Steam Deck.
 
 ## Following game updates
 
-- Keep a table of game builds the framework was checked against.
+- [GAME_BUILDS.md](GAME_BUILDS.md) lists the game builds the framework was checked against.
 - For each patch target, check it exists at startup and log a clear line when it does not.
 - After an update: decompile and diff the game assembly, diff the Yarn string table, update the table, release.
 

@@ -69,6 +69,10 @@ namespace DragNWash.ModFramework
             {
                 throw new ArgumentException("ModInfo.Guid is required.", nameof(info));
             }
+            if (info.Icon == null && !string.IsNullOrEmpty(info.IconPath))
+            {
+                info.Icon = Mods.IconLoader.Load(info.IconPath);
+            }
             lock (Infos)
             {
                 Infos[info.Guid] = info;

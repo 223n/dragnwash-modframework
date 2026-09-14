@@ -5,15 +5,26 @@
 [Drag'n Wash](https://store.steampowered.com/app/4739660/) 用の前提 Mod（BepInEx 5）です。ゲームに入り込むためのコードを 1 か所にまとめた小さな中核で、ほかの Mod や、その上に乗るライブラリ（前提 Mod の上の前提 Mod）に安定した API を提供します。ゲームの Options 画面から開く Mods 画面（Minecraft Forge の Mod 一覧のようなもので、Mod のオン・オフもできる）、ゲームの Options 画面への設定の追加、テキストや会話のイベント、Direct3D 12 で安全なアセットの読み込みなどです。ゲームがアップデートされても、追従が必要なのはフレームワークだけになります。
 
 > [!WARNING]
-> **開発初期です。** バージョン 0.2 で Mods 画面ができましたが、プレイヤー向けのリリースはまだありません。1.0 までは API が変わります。
+> **まだリリースしていません。** 中核と予定していたすべてのライブラリが動き、Windows の実機で確認済みです。1.0 までは API が変わることがあります。1.0 は、最初にこの上で動く Mod である [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) の v1.0.0 と一緒に出します。
 
-最初にこの上で動く Mod は、[Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) の v1.0.0 になる予定です。
+目標と作業の順番は [docs/DESIGN.ja.md](docs/DESIGN.ja.md)、この上での Mod の作り方は [docs/GUIDE.ja.md](docs/GUIDE.ja.md)、確認したゲームのビルドは [docs/GAME_BUILDS.md](docs/GAME_BUILDS.md) を参照してください。
 
-目標、予定している API、作業の順番は [docs/DESIGN.ja.md](docs/DESIGN.ja.md) を参照してください。
+## 中身
+
+| プラグイン | GUID | Mod が使えるもの |
+|---|---|---|
+| **Drag'n Wash ModFramework**（中核） | `com.tomxv.dragnwash.modframework` | オン・オフ、設定ページ、アイコン付きの Mods 画面（`ModFramework.Register`）、ゲームの Options 画面への行の追加（`GameOptions`）、サービスの登録（`Services`）、動作チェック（`GameHooks`）、`GameInfo` |
+| **Text** | `com.tomxv.dragnwash.modframework.text` | ゲームが表示する前のテキストを見て置き換える（`GameText`） |
+| **Dialogue** | `com.tomxv.dragnwash.modframework.dialogue` | これから表示される台詞や選択肢を、台詞 ID・話者・ノードつきで受け取る（`GameDialogue`） |
+| **Tool window** | `com.tomxv.dragnwash.modframework.toolwindow` | 開発ツール用の共通の F1 ウィンドウに、Mod ごとにタブを足す（`ToolWindow`） |
+| **Assets** | `com.tomxv.dragnwash.modframework.assets` | どの言語でも表示できるフォント、テクスチャとアセットバンドルの読み込みを、Direct3D 12 でクラッシュさせずに行う（`GameFonts`、`GameAssets`） |
+| **Flags and saves** | `com.tomxv.dragnwash.modframework.saves` | セーブスロット、フラグ、すべてのセーブの履歴（`GameSaves`、`GameFlags`） |
+
+ライブラリはそれぞれ独自のバージョンを持つ別のプラグインです。使う Mod が必要とするものを入れてください。バージョンは [CHANGELOG.md](CHANGELOG.md) を参照してください。
 
 ## Mod を作る方へ
 
-`DragNWash.ModFramework.dll` を参照し、BepInEx がフレームワークを先に読み込むよう依存関係を宣言します。
+`DragNWash.ModFramework.dll`（と使うライブラリの DLL）を参照し、BepInEx が先に読み込むようそれぞれを依存関係として宣言します。何に何を使うか、Mod 同士を一緒に動かすためのルールは [docs/GUIDE.ja.md](docs/GUIDE.ja.md) にあります。
 
 ```csharp
 [BepInPlugin("com.example.mymod", "MyMod", "1.0.0")]
@@ -43,13 +54,15 @@ public class MyMod : BaseUnityPlugin
    ```
 
    ゲームが既定の Steam ライブラリにない場合は `-GamePath` を指定します
-3. ビルドする
+3. 中核、プリローダーパッチャー、ライブラリをビルドする
 
    ```bash
    dotnet build src/DragNWash.ModFramework/DragNWash.ModFramework.csproj -c Release
    ```
 
-DLL は `src/DragNWash.ModFramework/bin/Release/` にできます。試すときは `<ゲーム>/BepInEx/plugins/DragNWash.ModFramework/` にコピーしてください。
+   `src/DragNWash.ModFramework.*` の各プロジェクトも同じようにビルドします
+
+DLL はそれぞれのプロジェクトの `bin/Release/` にできます。試すときは、プラグインの DLL を 1 つずつ `<ゲーム>/BepInEx/plugins/<アセンブリ名>/` に、`DragNWash.ModFramework.Preloader.dll` を `<ゲーム>/BepInEx/patchers/` にコピーしてください。
 
 ## このリポジトリのルール
 

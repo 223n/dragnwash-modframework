@@ -51,6 +51,9 @@ namespace DragNWash.ModFramework.Mods
             // GUIDs of loaded plugins that cannot load without this one.
             public List<string> Dependents = new List<string>();
 
+            // Mods this one cannot load without, with the oldest version it accepts.
+            public List<KeyValuePair<string, Version>> Uses = new List<KeyValuePair<string, Version>>();
+
             public bool CanSwitch => RelativePath != null && !IsFramework && !IsPatcher;
         }
 
@@ -210,6 +213,8 @@ namespace DragNWash.ModFramework.Mods
                     }
                     Entry target = entries.FirstOrDefault(e => e.Guid == dep.DependencyGUID);
                     target?.Dependents.Add(plugin.Metadata.GUID);
+                    entries.FirstOrDefault(e => e.Loaded && e.Guid == plugin.Metadata.GUID)?
+                        .Uses.Add(new KeyValuePair<string, Version>(dep.DependencyGUID, dep.MinimumVersion));
                 }
             }
 
@@ -270,6 +275,19 @@ namespace DragNWash.ModFramework.Mods
         {
             Entry e = entries.FirstOrDefault(x => x.Guid == guid && x.Guid != null);
             return e != null ? e.DisplayName : guid;
+        }
+
+        // In a list of what a mod uses, the framework's own libraries are named
+        // without the shared prefix ("Text", not "Drag'n Wash ModFramework: Text").
+        internal static string ShortNameOf(List<Entry> entries, string guid)
+        {
+            const string Prefix = "Drag'n Wash ModFramework: ";
+            string name = NameOf(entries, guid);
+            if (guid == ModFramework.Guid)
+            {
+                return "ModFramework";
+            }
+            return name.StartsWith(Prefix, StringComparison.Ordinal) ? name.Substring(Prefix.Length) : name;
         }
 
         private static string FrameworkRelativePath => RelativeToPlugins(typeof(ModCatalog).Assembly.Location);

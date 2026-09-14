@@ -52,7 +52,7 @@ namespace DragNWash.ModFramework.Text
         public const string Guid = "com.tomxv.dragnwash.modframework.text";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "0.1.0";
+        public const string Version = "0.1.1";
 
         private sealed class Rewriter
         {
@@ -64,6 +64,10 @@ namespace DragNWash.ModFramework.Text
         private static readonly List<Rewriter> Rewriters = new List<Rewriter>();
         private static Rewriter[] _snapshot = new Rewriter[0];
         private static readonly Dictionary<TMP_Text, string> Sources = new Dictionary<TMP_Text, string>();
+        // What the rewriters last put on each component. When the component shows
+        // something else, the game changed it through a path the library does not
+        // hook (formatted SetText, SetCharArray), and its source is stale.
+        private static readonly Dictionary<TMP_Text, string> Shown = new Dictionary<TMP_Text, string>();
         private static int _rewriteDepth;
 
         /// <summary>True when the library's hooks are installed on this game build.</summary>
@@ -99,7 +103,7 @@ namespace DragNWash.ModFramework.Text
         /// </summary>
         public static bool TryGetSource(TMP_Text component, out string source)
         {
-            if (component != null && Sources.TryGetValue(component, out source))
+            if (component != null && Sources.TryGetValue(component, out source) && IsCurrent(component))
             {
                 return true;
             }
@@ -122,6 +126,11 @@ namespace DragNWash.ModFramework.Text
                     dead.Add(component);
                     continue;
                 }
+                if (!IsCurrent(component))
+                {
+                    dead.Add(component);
+                    continue;
+                }
                 string text = Run(component, pair.Value, fromPrefab: false, refreshing: true);
 
                 // The game's typewriter reveals dialogue by raising
@@ -139,6 +148,7 @@ namespace DragNWash.ModFramework.Text
                 {
                     _rewriteDepth--;
                 }
+                Shown[component] = text;
                 if (fullyShown && component.maxVisibleCharacters != int.MaxValue)
                 {
                     component.maxVisibleCharacters = int.MaxValue;
@@ -146,15 +156,22 @@ namespace DragNWash.ModFramework.Text
             }
             foreach (TMP_Text component in dead)
             {
-                Sources.Remove(component);
+                Forget(component);
             }
         }
 
         // From the setter and SetText hooks.
         internal static void OnSet(TMP_Text component, ref string text)
         {
-            if (_rewriteDepth > 0 || string.IsNullOrEmpty(text) || component == null)
+            if (_rewriteDepth > 0 || component == null)
             {
+                return;
+            }
+            if (string.IsNullOrEmpty(text))
+            {
+                // The game cleared it: whatever the component showed before (often
+                // placeholder text from the prefab) is not to be shown again.
+                Forget(component);
                 return;
             }
             if (Sources.Count > 4096 && !Sources.ContainsKey(component))
@@ -163,6 +180,7 @@ namespace DragNWash.ModFramework.Text
             }
             Sources[component] = text;
             text = Run(component, text, fromPrefab: false, refreshing: false);
+            Shown[component] = text;
         }
 
         // From OnEnable: prefab text is deserialized straight into the component
@@ -180,6 +198,7 @@ namespace DragNWash.ModFramework.Text
             }
             Sources[component] = source;
             string text = Run(component, source, fromPrefab: true, refreshing: false);
+            Shown[component] = text;
             if (text == source)
             {
                 return;
@@ -201,8 +220,19 @@ namespace DragNWash.ModFramework.Text
         {
             foreach (TMP_Text component in Sources.Keys.Where(k => k == null).ToList())
             {
-                Sources.Remove(component);
+                Forget(component);
             }
+        }
+
+        private static bool IsCurrent(TMP_Text component)
+        {
+            return !Shown.TryGetValue(component, out string shown) || component.text == shown;
+        }
+
+        private static void Forget(TMP_Text component)
+        {
+            Sources.Remove(component);
+            Shown.Remove(component);
         }
 
         private static string Run(TMP_Text component, string source, bool fromPrefab, bool refreshing)

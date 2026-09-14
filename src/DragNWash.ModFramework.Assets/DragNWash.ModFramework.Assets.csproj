@@ -2,12 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <AssemblyName>DragNWash.ModFramework.Text</AssemblyName>
-    <RootNamespace>DragNWash.ModFramework.Text</RootNamespace>
+    <AssemblyName>DragNWash.ModFramework.Assets</AssemblyName>
+    <RootNamespace>DragNWash.ModFramework.Assets</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <!-- A library on top of the core, with its own version. Keep in sync with GameText.Version. -->
-    <Version>0.1.1</Version>
-    <FileVersion>0.1.1</FileVersion>
+    <!-- A library on top of the core, with its own version. Keep in sync with GameFonts.Version. -->
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0</FileVersion>
     <Nullable>disable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -27,9 +27,10 @@
     <Reference Include="0Harmony"><HintPath>../DragNWash.ModFramework/libs/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.UI"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.TextCoreFontEngineModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.TextCoreFontEngineModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>../DragNWash.ModFramework/libs/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextCoreFontEngineModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.TextCoreFontEngineModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AssetBundleModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.AssetBundleModule.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 
 </Project>

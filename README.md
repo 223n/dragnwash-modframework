@@ -5,15 +5,26 @@
 A prerequisite mod for [Drag'n Wash](https://store.steampowered.com/app/4739660/) (BepInEx 5). It is a small core that keeps the code hooking into the game in one place and gives other mods, and libraries built on top of it, a stable API: a Mods screen reached from the game's Options screen (like Minecraft Forge's mod list, with on/off switches), settings in the game's Options screen, text and dialogue events, safe asset loading on Direct3D 12, and more. When the game updates, only the framework has to follow.
 
 > [!WARNING]
-> **Early development.** Version 0.2 has the Mods screen; nothing has been released for players yet. The API will change until 1.0.
+> **Not released yet.** The core and all planned libraries work and were checked in the game on Windows; the API may still change until 1.0, which comes out together with [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on it.
 
-The first mod built on it will be [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization), as its v1.0.0.
+See [docs/DESIGN.md](docs/DESIGN.md) for goals and the order of work, [docs/GUIDE.md](docs/GUIDE.md) for how to build a mod on it, and [docs/GAME_BUILDS.md](docs/GAME_BUILDS.md) for the game builds it was checked on.
 
-See [docs/DESIGN.md](docs/DESIGN.md) for goals, the planned API and the order of work.
+## What is in it
+
+| Plugin | GUID | What mods get |
+|---|---|---|
+| **Drag'n Wash ModFramework** (core) | `com.tomxv.dragnwash.modframework` | The Mods screen with on/off switches, settings pages and icons (`ModFramework.Register`), rows in the game's Options screen (`GameOptions`), a service registry (`Services`), health checks (`GameHooks`), `GameInfo` |
+| **Text** | `com.tomxv.dragnwash.modframework.text` | See and replace every text before the game shows it (`GameText`) |
+| **Dialogue** | `com.tomxv.dragnwash.modframework.dialogue` | The line of dialogue or option about to be shown, with line ID, speaker and node (`GameDialogue`) |
+| **Tool window** | `com.tomxv.dragnwash.modframework.toolwindow` | One shared F1 window for developer tools, where each mod adds tabs (`ToolWindow`) |
+| **Assets** | `com.tomxv.dragnwash.modframework.assets` | Fonts for any language and texture and asset bundle loading, without the Direct3D 12 crash (`GameFonts`, `GameAssets`) |
+| **Flags and saves** | `com.tomxv.dragnwash.modframework.saves` | Save slots, flags and a history of every save (`GameSaves`, `GameFlags`) |
+
+Each library is its own plugin with its own version; install the ones the mods you use need. See [CHANGELOG.md](CHANGELOG.md) for versions.
 
 ## For mod developers
 
-Reference `DragNWash.ModFramework.dll` and declare the dependency so BepInEx loads the framework first:
+Reference `DragNWash.ModFramework.dll` (and the library DLLs you use) and declare each dependency so BepInEx loads them first. [docs/GUIDE.md](docs/GUIDE.md) has what to use for what, and the rules that keep mods working together.
 
 ```csharp
 [BepInPlugin("com.example.mymod", "MyMod", "1.0.0")]
@@ -43,13 +54,15 @@ public class MyMod : BaseUnityPlugin
    ```
 
    Pass `-GamePath` if the game is not in the default Steam library.
-3. Build:
+3. Build the core, the preloader patcher and the libraries:
 
    ```bash
    dotnet build src/DragNWash.ModFramework/DragNWash.ModFramework.csproj -c Release
    ```
 
-The DLL goes to `src/DragNWash.ModFramework/bin/Release/`. To try it, copy it to `<Game>/BepInEx/plugins/DragNWash.ModFramework/`.
+   and the same for each `src/DragNWash.ModFramework.*` project.
+
+Each DLL goes to its project's `bin/Release/`. To try them, copy each plugin DLL to its own folder, `<Game>/BepInEx/plugins/<assembly name>/`, and `DragNWash.ModFramework.Preloader.dll` to `<Game>/BepInEx/patchers/`.
 
 ## Rules for this repository
 
