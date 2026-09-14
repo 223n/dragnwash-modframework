@@ -15,6 +15,7 @@ namespace DragNWash.ModFramework
             var harmony = new Harmony(ModFramework.Guid);
             Mods.ModsScreen.Install(harmony);
             Options.OptionsRows.Install(harmony);
+            Title.TitleVersion.Install(harmony);
         }
 
         private void Update()
