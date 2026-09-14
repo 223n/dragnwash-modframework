@@ -12,6 +12,17 @@ The game update of September 14, 2026 (build `9/12/2026_a93aa21a`) showed how th
 
 The framework puts the code that touches the game in one place and gives mods a stable API instead.
 
+## First principle: every mod runs safely together
+
+In most modding scenes every author designs things their own way. Two mods patch the same game method differently, one mod's error takes another down, load order decides who wins, and the result is conflicts and crashes that players cannot trace. The framework exists to prevent that, and every API is judged by it.
+
+- **One shared hook instead of many patches.** When several mods need the same place in the game (text, dialogue, the Options screen), the framework or a library patches it once and mods register into it, in an explicit order.
+- **Isolation.** Every mod callback runs inside the framework's error handling: an exception is logged with the mod's name and the others keep running. One broken mod never stops the game or another mod.
+- **Check before patching.** Patch targets are checked with `GameHooks` first; a missing target turns the feature off and says so, instead of crashing after a game update.
+- **Conflicts are visible.** The Mods screen shows what it can detect: missing or too old libraries, `BepInIncompatibility`, a plugin that did not load and why, and (planned) game methods that several mods patch directly.
+- **Nothing silently replaced.** A service can have only one provider; a second registration is refused and logged.
+- **Guidelines for authors.** The documentation will say what to use from the framework, what not to patch directly, and how to write a library others can build on.
+
 ## Goals
 
 - **A Mods screen inside the game.** Players see and configure every installed mod from the game's own menus, like Minecraft Forge's mod list. See [The Mods screen](#the-mods-screen).
