@@ -180,7 +180,15 @@ namespace DragNWash.ModFramework.Mods
             ModRowSelect select = band.AddComponent<ModRowSelect>();
             select.Menu = this;
             select.Entry = entry;
-            button.onClick.AddListener(() => Select(entry));
+            button.onClick.AddListener(() =>
+            {
+                Select(entry);
+                // With the pad, pressing a mod moves on to its buttons.
+                if (PadSupport.PadPressedThisFrame())
+                {
+                    Focus("Settings", "Switch");
+                }
+            });
 
             // From the right: the on/off state, then a tag, each as wide as its
             // text (which differs a lot between languages); the name takes what
