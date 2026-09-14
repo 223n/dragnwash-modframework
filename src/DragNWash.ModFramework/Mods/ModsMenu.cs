@@ -30,6 +30,8 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextConfirmOff = "Other mods need this one. Press Off again to switch it off anyway.";
         internal const string TextOutsidePlugins = "Installed outside BepInEx/plugins, so it cannot be switched off here";
         internal const string TextNeededBy = "Needed by";
+        internal const string TextLibrary = "Library";
+        internal const string TextUnavailable = "Unavailable on this game build:";
 
         // The Back button's pointing hand is drawn just right of the button,
         // over the start of the list; keep the text clear of it.
@@ -51,6 +53,7 @@ namespace DragNWash.ModFramework.Mods
             base.OnShow(response);
             _confirming = null;
             _settingsFor = null;
+            _page = null;
             try
             {
                 _entries = ModCatalog.Build();
@@ -68,6 +71,11 @@ namespace DragNWash.ModFramework.Mods
         {
             if (e is MenuEventUserIntent intent && (intent.name == "Back" || intent.name == "Cancel"))
             {
+                if (_page != null)
+                {
+                    ClosePage();
+                    return new MenuResponseIgnored();
+                }
                 if (_settingsFor != null)
                 {
                     CloseSettings();
@@ -155,6 +163,16 @@ namespace DragNWash.ModFramework.Mods
             nameRect.anchorMax = new Vector2(0.72f, 1f);
             nameRect.offsetMin = new Vector2(20f, 0f);
 
+            if (entry.IsLibrary)
+            {
+                TMP_Text tag = UiText.Create(band.transform, "Library", TextLibrary, UiText.BodySize * 0.8f);
+                tag.alignment = TextAlignmentOptions.MidlineRight;
+                tag.color = new Color(0.7f, 0.8f, 1f, 1f);
+                var tagRect = (RectTransform)tag.transform;
+                tagRect.anchorMin = new Vector2(0.5f, 0f);
+                tagRect.anchorMax = new Vector2(0.84f, 1f);
+            }
+
             if (!entry.IsFramework && !entry.IsPatcher)
             {
                 TMP_Text state = UiText.Create(band.transform, "State", entry.WantOn ? TextOn : TextOff, UiText.BodySize);
@@ -180,6 +198,11 @@ namespace DragNWash.ModFramework.Mods
             }
             _detailParts.Clear();
 
+            if (_page != null)
+            {
+                BuildPage();
+                return;
+            }
             if (_settingsFor != null)
             {
                 BuildSettingDetails();
@@ -212,20 +235,20 @@ namespace DragNWash.ModFramework.Mods
             string description = entry.Description;
             if (!string.IsNullOrEmpty(description))
             {
-                TMP_Text d = Label("Description", description, UiText.BodySize, 0.5f, 0.77f, true);
+                TMP_Text d = Label("Description", description, UiText.BodySize, 0.57f, 0.77f, true);
                 d.alignment = TextAlignmentOptions.TopLeft;
             }
 
             string website = entry.Website;
             if (!string.IsNullOrEmpty(website))
             {
-                Label("Website", Escape(website), UiText.BodySize * 0.85f, 0.42f, 0.5f, false);
+                Label("Website", Escape(website), UiText.BodySize * 0.85f, 0.51f, 0.57f, false);
             }
 
             string status = Status(entry);
             if (status != null)
             {
-                TMP_Text s = Label("Status", status, UiText.BodySize, 0.26f, 0.41f, true);
+                TMP_Text s = Label("Status", status, UiText.BodySize * 0.9f, 0.42f, 0.51f, true);
                 s.fontStyle |= FontStyles.Italic;
                 s.alignment = TextAlignmentOptions.TopLeft;
             }
@@ -233,14 +256,32 @@ namespace DragNWash.ModFramework.Mods
             if (entry.ProblemGuids.Count > 0 && _confirming != entry)
             {
                 string missing = string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g)));
-                Label("ProblemMods", Escape(missing), UiText.BodySize, 0.19f, 0.26f, false);
+                Label("ProblemMods", Escape(missing), UiText.BodySize, 0.28f, 0.35f, false);
+            }
+
+            IReadOnlyList<string> unavailable = GameHooks.UnavailableFeatures(entry.Guid);
+            if (unavailable.Count > 0 && _confirming != entry)
+            {
+                TMP_Text u = Label("Unavailable", TextUnavailable, UiText.BodySize * 0.9f, 0.35f, 0.42f, false);
+                u.fontStyle |= FontStyles.Bold;
+                u.color = new Color(1f, 0.75f, 0.5f, 1f);
+                TMP_Text list = Label("UnavailableFeatures", Escape(string.Join(", ", unavailable)), UiText.BodySize * 0.9f, 0.35f, 0.42f, false);
+                ((RectTransform)list.transform).offsetMin = new Vector2(520f, 0f);
+                list.color = new Color(1f, 0.75f, 0.5f, 1f);
+            }
+
+            if (entry.IsLibrary && entry.Dependents.Count > 0 && _confirming != entry && entry.ProblemGuids.Count == 0)
+            {
+                Label("UsedByLabel", TextNeededBy, UiText.BodySize, 0.28f, 0.35f, false).fontStyle |= FontStyles.Bold;
+                TMP_Text users = Label("UsedBy", Escape(string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)))), UiText.BodySize, 0.28f, 0.35f, false);
+                ((RectTransform)users.transform).offsetMin = new Vector2(260f, 0f);
             }
 
             if (_confirming == entry)
             {
-                Label("NeededByLabel", TextNeededBy, UiText.BodySize, 0.19f, 0.26f, false).fontStyle |= FontStyles.Bold;
+                Label("NeededByLabel", TextNeededBy, UiText.BodySize, 0.28f, 0.35f, false).fontStyle |= FontStyles.Bold;
                 string names = string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)));
-                TMP_Text n = Label("NeededBy", Escape(names), UiText.BodySize, 0.19f, 0.26f, false);
+                TMP_Text n = Label("NeededBy", Escape(names), UiText.BodySize, 0.28f, 0.35f, false);
                 ((RectTransform)n.transform).offsetMin = new Vector2(260f, 0f);
             }
 
@@ -255,7 +296,18 @@ namespace DragNWash.ModFramework.Mods
 
             if (entry.Loaded && ConfigItem.For(entry).Count > 0)
             {
-                MakeButton("Settings", TextSettings, 0.44f, 0.8f, 0.04f, 0.17f, SettingsColor, () => OpenSettings(entry));
+                MakeButton("Settings", TextSettings, 0.44f, 0.8f, 0.04f, 0.16f, SettingsColor, () => OpenSettings(entry));
+            }
+
+            if (entry.Loaded && entry.Guid != null)
+            {
+                List<ModsScreenPage> pages = ModFramework.PagesFor(entry.Guid);
+                for (int i = 0; i < pages.Count && i < 2; i++)
+                {
+                    ModsScreenPage page = pages[i];
+                    float left = 0.04f + i * 0.4f;
+                    MakeButton("Page" + i, page.Title, left, left + 0.36f, 0.18f, 0.27f, SettingsColor, () => OpenPage(entry, page));
+                }
             }
         }
 
@@ -294,7 +346,7 @@ namespace DragNWash.ModFramework.Mods
 
         private GameObject CreateSwitch(ModCatalog.Entry entry)
         {
-            GameObject go = Part("Switch", 0.04f, 0.4f, 0.04f, 0.17f);
+            GameObject go = Part("Switch", 0.04f, 0.4f, 0.04f, 0.16f);
             Image background = go.AddComponent<Image>();
             background.color = entry.WantOn ? OnColor : OffColor;
 

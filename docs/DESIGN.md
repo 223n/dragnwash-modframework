@@ -151,7 +151,7 @@ The installer is not an API; it installs BepInEx, the core and the libraries a m
 
 1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (done)
 2. **0.2 Mods screen.** (done) The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
-3. **0.3 Settings.** Settings pages on the Mods screen generated from BepInEx config, and `GameOptions` for rows in the game's Options screen.
+3. **0.3 Settings.** (done) Settings pages on the Mods screen generated from BepInEx config, and `GameOptions` for rows in the game's Options screen.
 4. **0.4 Extension points.** Service registry, `ModInfo.IsLibrary` and library display on the Mods screen, extra Mods screen pages, health checks.
 5. **Libraries**, one at a time and each in the order the localization mod needs them: text, dialogue, tool window, assets, flags and saves. Each is its own plugin with its own version.
 6. **1.0 of the core** when Drag'n Wash Localization v1.0.0 runs on the core and the libraries it uses.
