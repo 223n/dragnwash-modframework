@@ -98,9 +98,10 @@ for project in versions:
 
 # ---- documentation links ----------------------------------------------------
 link = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)\)")
-for md in sorted(ROOT.rglob("*.md")):
-    if any(part in (".git", "bin", "obj", "libs") for part in md.parts):
-        continue
+# Only files in the repository: a packed release folder has READMEs without docs/.
+import subprocess
+tracked = subprocess.run(["git", "ls-files", "*.md"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout.split()
+for md in sorted(ROOT / t for t in tracked):
     text = md.read_text(encoding="utf-8-sig")
     # Links inside code blocks are examples, not links.
     text = re.sub(r"```.*?```", "", text, flags=re.S)
