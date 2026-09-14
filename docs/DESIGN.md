@@ -62,8 +62,8 @@ The game's menus are simple enough to extend without touching its files (checked
   2. patch `MenuOptions.OnEvent` so the `Mods` intent transitions to `Menu_Mods`,
   3. create `Menu_Mods` as a `Menu` subclass built from the Options screen's layout, register it with `MenuManager`, and send `Back` to `Menu_Options`.
 - To check in the game: that pending changes on the Options screen are kept when the player goes to the Mods screen and comes back, rather than being reverted as Back does.
-- The game's buttons have their words painted into the artwork, so the Mods button uses the framework's own button art with the label drawn as text. That keeps it translatable, and no game artwork is copied.
-- Button art and icons are loaded at startup, which is safe on Direct3D 12.
+- The game's buttons have their words painted into the artwork. The Mods button and everything on the Mods screen are TextMeshPro text in the game's own TMP font instead, so no artwork is drawn or copied and every label can be translated (the localization mod's text hook picks them up like any other UI text).
+- Mod icons, if a mod provides one, are loaded at startup, which is safe on Direct3D 12.
 
 ### Turning mods on and off
 
@@ -125,7 +125,6 @@ Each step moves one feature out of the localization mod, and the localization mo
 
 ## Open questions
 
-- The button art for the Mods button, drawn to sit with the game's hand-drawn buttons.
 - How mods show up in the tool window when several register tabs (order, naming).
 - Whether the installer lives here or stays in the localization repository.
 - Distribution beyond GitHub Releases.
