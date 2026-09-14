@@ -262,27 +262,19 @@ namespace DragNWash.ModFramework.Mods
             IReadOnlyList<string> unavailable = GameHooks.UnavailableFeatures(entry.Guid);
             if (unavailable.Count > 0 && _confirming != entry)
             {
-                TMP_Text u = Label("Unavailable", TextUnavailable, UiText.BodySize * 0.9f, 0.35f, 0.42f, false);
-                u.fontStyle |= FontStyles.Bold;
-                u.color = new Color(1f, 0.75f, 0.5f, 1f);
-                TMP_Text list = Label("UnavailableFeatures", Escape(string.Join(", ", unavailable)), UiText.BodySize * 0.9f, 0.35f, 0.42f, false);
-                ((RectTransform)list.transform).offsetMin = new Vector2(520f, 0f);
+                TMP_Text list = LabelPair("Unavailable", TextUnavailable, Escape(string.Join(", ", unavailable)), UiText.BodySize * 0.9f, 0.35f, 0.42f);
                 list.color = new Color(1f, 0.75f, 0.5f, 1f);
             }
 
             if (entry.IsLibrary && entry.Dependents.Count > 0 && _confirming != entry && entry.ProblemGuids.Count == 0)
             {
-                Label("UsedByLabel", TextNeededBy, UiText.BodySize, 0.28f, 0.35f, false).fontStyle |= FontStyles.Bold;
-                TMP_Text users = Label("UsedBy", Escape(string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)))), UiText.BodySize, 0.28f, 0.35f, false);
-                ((RectTransform)users.transform).offsetMin = new Vector2(260f, 0f);
+                LabelPair("UsedBy", TextNeededBy, Escape(string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)))), UiText.BodySize, 0.28f, 0.35f);
             }
 
             if (_confirming == entry)
             {
-                Label("NeededByLabel", TextNeededBy, UiText.BodySize, 0.28f, 0.35f, false).fontStyle |= FontStyles.Bold;
                 string names = string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)));
-                TMP_Text n = Label("NeededBy", Escape(names), UiText.BodySize, 0.28f, 0.35f, false);
-                ((RectTransform)n.transform).offsetMin = new Vector2(260f, 0f);
+                LabelPair("NeededBy", TextNeededBy, Escape(names), UiText.BodySize, 0.28f, 0.35f);
             }
 
             if (entry.CanSwitch)
@@ -342,6 +334,20 @@ namespace DragNWash.ModFramework.Mods
             rect.offsetMin = new Vector2(28f, 0f);
             rect.offsetMax = new Vector2(-28f, 0f);
             return label;
+        }
+
+        // A bold label and its value on one line. The value starts after the label's
+        // actual width, which differs a lot between languages.
+        private TMP_Text LabelPair(string name, string label, string value, float size, float bottom, float top)
+        {
+            TMP_Text head = Label(name + "Label", label, size, bottom, top, false);
+            head.fontStyle |= FontStyles.Bold;
+            head.enableAutoSizing = false;
+            head.fontSize = size;
+            float width = head.GetPreferredValues(head.text).x;
+            TMP_Text text = Label(name, value, size, bottom, top, false);
+            ((RectTransform)text.transform).offsetMin = new Vector2(28f + width + 16f, 0f);
+            return text;
         }
 
         private GameObject CreateSwitch(ModCatalog.Entry entry)

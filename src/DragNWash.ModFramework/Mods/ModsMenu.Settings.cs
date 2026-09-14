@@ -159,9 +159,7 @@ namespace DragNWash.ModFramework.Mods
                 d.alignment = TextAlignmentOptions.TopLeft;
             }
 
-            Label("DefaultLabel", TextDefault, UiText.BodySize, 0.37f, 0.44f, false).fontStyle |= FontStyles.Bold;
-            TMP_Text def = Label("DefaultValue", Escape(item.DefaultText), UiText.BodySize, 0.37f, 0.44f, false);
-            ((RectTransform)def.transform).offsetMin = new Vector2(240f, 0f);
+            LabelPair("Default", TextDefault, Escape(item.DefaultText), UiText.BodySize, 0.37f, 0.44f);
 
             switch (item.Type)
             {
