@@ -3,21 +3,21 @@ using UnityEngine;
 
 namespace DragNWash.ModFramework.Mods
 {
-    // TextMeshPro labels in the game's own font, so framework UI looks like the
-    // game's and translation mods can pick the text up like any other UI text.
+    // TextMeshPro labels styled like the labels in the game's Options screen
+    // (white text that reads over the scene behind the menu), so framework UI
+    // looks like the game's and translation mods can pick the text up like any
+    // other UI text.
     internal static class UiText
     {
-        internal const float TitleSize = 64f;
-        internal const float ButtonSize = 34f;
-        internal const float BodySize = 28f;
+        internal const float TitleSize = 72f;
+        internal const float ButtonSize = 44f;
+        internal const float NameSize = 34f;
+        internal const float BodySize = 26f;
 
-        private static TMP_FontAsset _font;
-        private static Color _color = new Color(0.16f, 0.12f, 0.1f, 1f);
-        private static bool _looked;
+        private static TMP_Text _gameLabel;
 
         internal static TMP_Text Create(Transform parent, string name, string text, float size)
         {
-            FindGameStyle();
             var go = new GameObject(name, typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
@@ -27,11 +27,7 @@ namespace DragNWash.ModFramework.Mods
             rect.offsetMax = Vector2.zero;
 
             TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
-            if (_font != null)
-            {
-                label.font = _font;
-            }
-            label.color = _color;
+            Style(label);
             label.fontSize = size;
             label.enableAutoSizing = true;
             label.fontSizeMin = size * 0.5f;
@@ -41,35 +37,62 @@ namespace DragNWash.ModFramework.Mods
             return label;
         }
 
-        // Borrow the font and colour of a label the game already shows.
-        private static void FindGameStyle()
+        // Game font, material and colour when a settings label can be found,
+        // otherwise white with a dark outline.
+        internal static void Style(TMP_Text label)
         {
-            if (_looked && _font != null)
+            TMP_Text game = FindGameLabel();
+            if (game != null)
             {
+                label.font = game.font;
+                label.fontSharedMaterial = game.fontSharedMaterial;
+                label.color = game.color;
+                label.fontStyle = game.fontStyle;
                 return;
             }
-            _looked = true;
+            label.color = Color.white;
+            label.fontStyle = FontStyles.Bold;
+            label.outlineWidth = 0.25f;
+            label.outlineColor = new Color32(20, 16, 14, 255);
+        }
+
+        // A label from the Options screen's settings rows: those are drawn over
+        // the same background as the Mods screen.
+        private static TMP_Text FindGameLabel()
+        {
+            if (_gameLabel != null)
+            {
+                return _gameLabel;
+            }
             foreach (TMP_Text t in Resources.FindObjectsOfTypeAll<TMP_Text>())
             {
-                if (t == null || t.font == null || t.gameObject.scene.name == null)
+                if (t == null || t.font == null || t.gameObject.scene.name == null || string.IsNullOrEmpty(t.text))
                 {
                     continue;
                 }
-                if (t.name == "Label" && t.transform.GetComponentInParent<Menu>(true) != null)
+                Menu menu = t.GetComponentInParent<Menu>(true);
+                if (menu == null || ((Component)menu).gameObject.name != "Menu_Options" || !t.transform.GetPath().Contains("Scroll View/Viewport/Content"))
                 {
-                    _font = t.font;
-                    _color = t.color;
-                    return;
+                    continue;
                 }
-                if (_font == null)
+                Color c = t.color;
+                if (c.r + c.g + c.b > 2.4f && c.a > 0.9f)
                 {
-                    _font = t.font;
+                    _gameLabel = t;
+                    return t;
                 }
             }
-            if (_font == null)
+            return null;
+        }
+
+        private static string GetPath(this Transform t)
+        {
+            string path = t.name;
+            for (Transform p = t.parent; p != null; p = p.parent)
             {
-                _font = TMP_Settings.defaultFontAsset;
+                path = p.name + "/" + path;
             }
+            return path;
         }
     }
 }

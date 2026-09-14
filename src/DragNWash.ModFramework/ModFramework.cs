@@ -97,6 +97,7 @@ namespace DragNWash.ModFramework
             Register(new ModInfo
             {
                 Guid = Guid,
+                DisplayName = "Drag'n Wash ModFramework",
                 Description = "Shared tools for Drag'n Wash mods, including this Mods screen.",
                 Authors = new[] { "TomXV" },
                 Website = "https://github.com/TomXV/dragnwash-modframework",

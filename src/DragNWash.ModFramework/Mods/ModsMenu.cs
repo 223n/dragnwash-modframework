@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,11 +10,18 @@ namespace DragNWash.ModFramework.Mods
     // The Mods screen. A game Menu, so MenuManager shows and hides it, and the
     // game handles the cursor and pad input as on any other screen.
     //
-    // One row per mod: name, version, authors and description on the left, an
-    // On/Off button on the right. Switching takes effect at the next launch.
+    // One row per mod: name, version and authors, the description, and a status
+    // line on the left, an On/Off button on the right. Each piece is its own
+    // label so fixed words such as "Required" can be translated. Switching takes
+    // effect at the next launch.
     internal sealed class ModsMenu : Menu
     {
         internal RectTransform Content;
+
+        // The Back button's pointing hand is drawn just right of the button,
+        // over the start of the list; keep the text clear of it.
+        private const float LeftMargin = 110f;
+        private const float RowHeight = 170f;
 
         private List<ModCatalog.Entry> _entries = new List<ModCatalog.Entry>();
         private readonly List<GameObject> _rows = new List<GameObject>();
@@ -67,18 +73,37 @@ namespace DragNWash.ModFramework.Mods
             var row = new GameObject("Mod " + entry.Name, typeof(RectTransform));
             row.transform.SetParent(Content, false);
             LayoutElement layout = row.AddComponent<LayoutElement>();
-            layout.minHeight = 150f;
-            layout.preferredHeight = 150f;
+            layout.minHeight = RowHeight;
+            layout.preferredHeight = RowHeight;
             layout.flexibleWidth = 1f;
 
-            TMP_Text info = UiText.Create(row.transform, "Info", Describe(entry), UiText.BodySize);
-            info.alignment = TextAlignmentOptions.MidlineLeft;
-            info.enableAutoSizing = false;
-            info.fontSize = UiText.BodySize;
-            info.textWrappingMode = TextWrappingModes.Normal;
-            info.overflowMode = TextOverflowModes.Ellipsis;
-            var infoRect = (RectTransform)info.transform;
-            infoRect.anchorMax = new Vector2(entry.CanSwitch ? 0.74f : 1f, 1f);
+            // A dark band behind each row keeps the text readable over the scene.
+            var band = new GameObject("Band", typeof(RectTransform));
+            var bandRect = (RectTransform)band.transform;
+            bandRect.SetParent(row.transform, false);
+            bandRect.anchorMin = Vector2.zero;
+            bandRect.anchorMax = Vector2.one;
+            bandRect.offsetMin = new Vector2(LeftMargin - 20f, 8f);
+            bandRect.offsetMax = new Vector2(0f, -8f);
+            Image bandImage = band.AddComponent<Image>();
+            bandImage.color = new Color(0f, 0f, 0f, 0.45f);
+            bandImage.raycastTarget = false;
+
+            float textRight = entry.CanSwitch ? 0.72f : 1f;
+            AddLine(row.transform, "Name", NameLine(entry), UiText.NameSize, 0.62f, 0.95f, textRight);
+
+            string description = entry.Info?.Description;
+            if (!string.IsNullOrEmpty(description))
+            {
+                AddLine(row.transform, "Description", description, UiText.BodySize, 0.33f, 0.62f, textRight);
+            }
+
+            string status = Status(entry);
+            if (status != null)
+            {
+                TMP_Text s = AddLine(row.transform, "Status", status, UiText.BodySize, 0.06f, 0.33f, textRight);
+                s.fontStyle |= FontStyles.Italic;
+            }
 
             if (entry.CanSwitch)
             {
@@ -87,25 +112,40 @@ namespace DragNWash.ModFramework.Mods
             return row;
         }
 
+        private static TMP_Text AddLine(Transform row, string name, string text, float size, float bottom, float top, float right)
+        {
+            TMP_Text label = UiText.Create(row, name, text, size);
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            var rect = (RectTransform)label.transform;
+            rect.anchorMin = new Vector2(0f, bottom);
+            rect.anchorMax = new Vector2(right, top);
+            rect.offsetMin = new Vector2(LeftMargin, 0f);
+            rect.offsetMax = new Vector2(-12f, 0f);
+            return label;
+        }
+
         private void CreateSwitch(Transform row, ModCatalog.Entry entry)
         {
             var go = new GameObject("Switch", typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(row, false);
-            rect.anchorMin = new Vector2(0.77f, 0.2f);
-            rect.anchorMax = new Vector2(1f, 0.8f);
+            rect.anchorMin = new Vector2(0.75f, 0.22f);
+            rect.anchorMax = new Vector2(0.98f, 0.78f);
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
 
             Image background = go.AddComponent<Image>();
-            background.color = entry.WantOn ? new Color(0.45f, 0.75f, 0.45f, 0.55f) : new Color(0.8f, 0.45f, 0.4f, 0.55f);
+            background.color = entry.WantOn ? new Color(0.36f, 0.62f, 0.36f, 1f) : new Color(0.62f, 0.3f, 0.27f, 1f);
 
             Button button = go.AddComponent<Button>();
             button.targetGraphic = background;
             ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 1f);
-            colors.selectedColor = new Color(1f, 1f, 1f, 1f);
             colors.normalColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+            colors.highlightedColor = Color.white;
+            colors.selectedColor = Color.white;
+            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
             button.colors = colors;
 
             TMP_Text label = UiText.Create(go.transform, "Label", entry.WantOn ? "On" : "Off", UiText.ButtonSize);
@@ -118,13 +158,10 @@ namespace DragNWash.ModFramework.Mods
         {
             try
             {
-                bool turningOff = entry.WantOn;
-                if (turningOff)
+                if (entry.WantOn)
                 {
-                    List<string> needed = entry.Dependents
-                        .Where(g => _entries.Any(x => x.Guid == g && x.WantOn))
-                        .ToList();
-                    if (needed.Count > 0 && _confirming != entry)
+                    bool needed = entry.Dependents.Any(g => _entries.Any(x => x.Guid == g && x.WantOn));
+                    if (needed && _confirming != entry)
                     {
                         _confirming = entry;
                         Rebuild();
@@ -141,31 +178,19 @@ namespace DragNWash.ModFramework.Mods
             }
         }
 
-        private string Describe(ModCatalog.Entry entry)
+        private static string NameLine(ModCatalog.Entry entry)
         {
-            var sb = new StringBuilder();
-            sb.Append("<b>").Append(Escape(entry.Name)).Append("</b>");
+            string line = Escape(entry.DisplayName);
             if (!string.IsNullOrEmpty(entry.Version))
             {
-                sb.Append("  <size=80%>v").Append(Escape(entry.Version)).Append("</size>");
+                line += "  <size=75%>v" + Escape(entry.Version) + "</size>";
             }
-
-            ModInfo info = entry.Info;
-            if (info?.Authors != null && info.Authors.Length > 0)
+            string[] authors = entry.Info?.Authors;
+            if (authors != null && authors.Length > 0)
             {
-                sb.Append("  <size=80%>").Append(Escape(string.Join(", ", info.Authors))).Append("</size>");
+                line += "  <size=75%>" + Escape(string.Join(", ", authors)) + "</size>";
             }
-            if (!string.IsNullOrEmpty(info?.Description))
-            {
-                sb.Append("\n<size=80%>").Append(Escape(info.Description)).Append("</size>");
-            }
-
-            string status = Status(entry);
-            if (status != null)
-            {
-                sb.Append("\n<size=75%><i>").Append(Escape(status)).Append("</i></size>");
-            }
-            return sb.ToString();
+            return line;
         }
 
         private string Status(ModCatalog.Entry entry)
@@ -187,13 +212,9 @@ namespace DragNWash.ModFramework.Mods
             {
                 return "On from the next launch";
             }
-            if (!entry.Loaded)
-            {
-                return "Off";
-            }
             if (entry.RelativePath == null)
             {
-                return "Installed outside BepInEx/plugins; cannot be switched off here";
+                return "Installed outside BepInEx/plugins, so it cannot be switched off here";
             }
             return null;
         }

@@ -19,6 +19,8 @@ namespace DragNWash.ModFramework.Mods
             public string Version;
             public ModInfo Info;
 
+            public string DisplayName => string.IsNullOrEmpty(Info?.DisplayName) ? Name : Info.DisplayName;
+
             // Path under BepInEx/plugins; null when the plugin lives elsewhere and
             // cannot be switched off from here.
             public string RelativePath;
@@ -90,7 +92,7 @@ namespace DragNWash.ModFramework.Mods
 
             return entries
                 .OrderBy(e => e.IsFramework ? 0 : 1)
-                .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(e => e.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
@@ -118,7 +120,7 @@ namespace DragNWash.ModFramework.Mods
                 {
                     continue;
                 }
-                records.Add(new DisabledMods.Record { RelativePath = e.RelativePath, Guid = e.Guid, Name = e.Name, Version = e.Version });
+                records.Add(new DisabledMods.Record { RelativePath = e.RelativePath, Guid = e.Guid, Name = e.DisplayName, Version = e.Version });
             }
             DisabledMods.WriteDesired(Paths.ConfigPath, records);
             ModFramework.Log.LogInfo($"{entry.Name} will be switched {(on ? "on" : "off")} at the next launch.");
@@ -127,7 +129,7 @@ namespace DragNWash.ModFramework.Mods
         internal static string NameOf(List<Entry> entries, string guid)
         {
             Entry e = entries.FirstOrDefault(x => x.Guid == guid);
-            return e != null ? e.Name : guid;
+            return e != null ? e.DisplayName : guid;
         }
 
         private static string FrameworkRelativePath => RelativeToPlugins(typeof(ModCatalog).Assembly.Location);

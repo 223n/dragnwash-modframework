@@ -110,7 +110,10 @@ namespace DragNWash.ModFramework.Mods
         {
             GameObject copy = UnityEngine.Object.Instantiate(back.gameObject, leftButtons, false);
             copy.name = ButtonName;
-            copy.transform.SetAsLastSibling();
+            // Above Save: the game keeps Save's slot even while Save is hidden,
+            // and the Mods button should not float below an empty gap.
+            Transform save = leftButtons.Find("Save");
+            copy.transform.SetSiblingIndex(save != null ? save.GetSiblingIndex() : leftButtons.childCount - 1);
             Transform inner = copy.transform.childCount > 0 ? copy.transform.GetChild(0) : copy.transform;
             inner.name = ButtonName;
 
