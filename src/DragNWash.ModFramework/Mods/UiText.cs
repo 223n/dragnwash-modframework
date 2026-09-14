@@ -41,19 +41,65 @@ namespace DragNWash.ModFramework.Mods
         // otherwise white with a dark outline.
         internal static void Style(TMP_Text label)
         {
-            TMP_Text game = FindGameLabel();
-            if (game != null)
+            try
             {
-                label.font = game.font;
-                label.fontSharedMaterial = game.fontSharedMaterial;
-                label.color = game.color;
-                label.fontStyle = game.fontStyle;
-                return;
+                TMP_Text game = FindGameLabel();
+                if (game != null)
+                {
+                    label.font = game.font;
+                    if (game.fontSharedMaterial != null)
+                    {
+                        label.fontSharedMaterial = game.fontSharedMaterial;
+                    }
+                    label.color = game.color;
+                    label.fontStyle = game.fontStyle;
+                    return;
+                }
+
+                // The first time Options opens its rows are not built yet. The game
+                // sets no TMP default font, so pick one it has loaded: a label
+                // without a font throws as soon as its material is touched.
+                TMP_FontAsset font = AnyFont();
+                if (font != null)
+                {
+                    label.font = font;
+                }
+                label.color = Color.white;
+                label.fontStyle = FontStyles.Bold;
+                if (label.font != null)
+                {
+                    label.outlineWidth = 0.25f;
+                    label.outlineColor = new Color32(20, 16, 14, 255);
+                }
             }
-            label.color = Color.white;
-            label.fontStyle = FontStyles.Bold;
-            label.outlineWidth = 0.25f;
-            label.outlineColor = new Color32(20, 16, 14, 255);
+            catch (System.Exception ex)
+            {
+                ModFramework.Log.LogWarning($"Could not style a label: {ex.Message}");
+            }
+        }
+
+        private static TMP_FontAsset AnyFont()
+        {
+            try
+            {
+                if (TMP_Settings.defaultFontAsset != null)
+                {
+                    return TMP_Settings.defaultFontAsset;
+                }
+            }
+            catch (System.Exception)
+            {
+                // No TMP Settings asset in this build.
+            }
+            foreach (TMP_Text t in Resources.FindObjectsOfTypeAll<TMP_Text>())
+            {
+                if (t != null && t.font != null && t.gameObject.scene.name != null)
+                {
+                    return t.font;
+                }
+            }
+            TMP_FontAsset[] fonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+            return fonts.Length > 0 ? fonts[0] : null;
         }
 
         // A label from the Options screen's settings rows: those are drawn over

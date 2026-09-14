@@ -55,14 +55,32 @@ namespace DragNWash.ModFramework.Mods
             }
         }
 
-        private static bool BeforeOptionsEvent(MenuEvent e, ref MenuResponse __result)
+        private static bool BeforeOptionsEvent(MenuOptions __instance, MenuEvent e, ref MenuResponse __result)
         {
-            if (_available && e is MenuEventUserIntent intent && intent.name == ButtonName)
+            if (!_available || !(e is MenuEventUserIntent intent) || intent.name != ButtonName)
             {
-                __result = new MenuResponseTransition(MenuName, "Player opened the Mods screen.");
-                return false;
+                return true;
             }
-            return true;
+
+            // Never hand MenuManager a menu that does not exist: it throws. If
+            // building the screen failed earlier, try once more now.
+            GameObject options = ((Component)__instance).gameObject;
+            Transform parent = options.transform.parent;
+            if (parent != null && parent.Find(MenuName) == null)
+            {
+                try
+                {
+                    BuildModsMenu(__instance, options);
+                }
+                catch (Exception ex)
+                {
+                    ModFramework.Log.LogWarning($"Could not build the Mods screen: {ex}");
+                }
+            }
+            __result = parent != null && parent.Find(MenuName) != null
+                ? new MenuResponseTransition(MenuName, "Player opened the Mods screen.")
+                : (MenuResponse)new MenuResponseIgnored();
+            return false;
         }
 
         private static void AfterOptionsShown(MenuOptions __instance)
@@ -77,15 +95,15 @@ namespace DragNWash.ModFramework.Mods
                     return;
                 }
 
-                if (leftButtons.Find(ButtonName) == null)
-                {
-                    AddModsButton(options, leftButtons, back);
-                }
-
                 Transform parent = options.transform.parent;
                 if (parent != null && parent.Find(MenuName) == null)
                 {
                     BuildModsMenu(__instance, options);
+                }
+
+                if (leftButtons.Find(ButtonName) == null)
+                {
+                    AddModsButton(options, leftButtons, back);
                 }
 
                 // The game hides Save whenever Options is shown, even with unsaved
