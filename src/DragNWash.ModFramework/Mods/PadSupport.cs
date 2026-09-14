@@ -48,7 +48,17 @@ namespace DragNWash.ModFramework.Mods
                     _selected = null;
                     return;
                 }
-                ShowFrame(selected);
+                // Only the list and the details: the game's own buttons on the left
+                // (Back) already show the game's pointing hand.
+                Transform split = Menu.Details != null ? Menu.Details.parent : null;
+                if (split != null && selected.transform.IsChildOf(split))
+                {
+                    ShowFrame(selected);
+                }
+                else
+                {
+                    HideFrame();
+                }
                 if (!ReferenceEquals(selected, _selected))
                 {
                     _selected = selected;
