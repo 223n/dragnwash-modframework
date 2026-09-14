@@ -93,6 +93,25 @@ namespace DragNWash.ModFramework.Mods
             return new MenuResponseIgnored();
         }
 
+        // The details panel changed size (the window was resized). Its notes
+        // measure the panel to decide where labels wrap, so lay them out again,
+        // keeping the focused button. A page another mod built is left alone:
+        // building it again could lose what the player has done on it.
+        internal void OnDetailsResized()
+        {
+            if (_page != null || !isActiveAndEnabled)
+            {
+                return;
+            }
+            GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            string focusName = focused != null && _detailParts.Contains(focused) ? focused.name : null;
+            RebuildDetails(false);
+            if (focusName != null)
+            {
+                Focus(focusName);
+            }
+        }
+
         internal void Select(ModCatalog.Entry entry)
         {
             if (entry == null || ReferenceEquals(entry, _selected))
@@ -162,48 +181,51 @@ namespace DragNWash.ModFramework.Mods
             select.Entry = entry;
             button.onClick.AddListener(() => Select(entry));
 
+            // From the right: the on/off state, then a tag, each as wide as its
+            // text (which differs a lot between languages); the name takes what
+            // is left and ends in an ellipsis. Measured widths do not depend on
+            // the window size, so the row holds together however narrow it gets.
+            float used = 20f;
+            if (!entry.IsFramework && !entry.IsPatcher)
+            {
+                TMP_Text state = UiText.Create(band.transform, "State", entry.WantOn ? TextOn : TextOff, UiText.BodySize);
+                state.color = entry.WantOn ? new Color(0.65f, 0.95f, 0.65f, 1f) : new Color(1f, 0.6f, 0.55f, 1f);
+                used += FitRight(state, used) + 16f;
+            }
+
+            string tagText = entry.IsLibrary ? TextLibrary : ConflictsOf(entry).Count > 0 ? TextConflictTag : null;
+            if (tagText != null)
+            {
+                TMP_Text tag = UiText.Create(band.transform, entry.IsLibrary ? "Library" : "Conflict", tagText, UiText.BodySize * 0.8f);
+                tag.color = entry.IsLibrary ? new Color(0.7f, 0.8f, 1f, 1f) : WarnColor;
+                used += FitRight(tag, used) + 16f;
+            }
+
             TMP_Text name = UiText.Create(band.transform, "Name", Escape(entry.DisplayName), UiText.NameSize);
             name.alignment = TextAlignmentOptions.MidlineLeft;
             name.textWrappingMode = TextWrappingModes.NoWrap;
             name.overflowMode = TextOverflowModes.Ellipsis;
             var nameRect = (RectTransform)name.transform;
-            nameRect.anchorMax = new Vector2(entry.IsLibrary ? 0.58f : 0.72f, 1f);
             nameRect.offsetMin = new Vector2(20f, 0f);
-
-            // Long names shrink and end in an ellipsis before the tag starts.
-            if (entry.IsLibrary)
-            {
-                TMP_Text tag = UiText.Create(band.transform, "Library", TextLibrary, UiText.BodySize * 0.8f);
-                tag.alignment = TextAlignmentOptions.MidlineRight;
-                tag.textWrappingMode = TextWrappingModes.NoWrap;
-                tag.color = new Color(0.7f, 0.8f, 1f, 1f);
-                var tagRect = (RectTransform)tag.transform;
-                tagRect.anchorMin = new Vector2(0.58f, 0f);
-                tagRect.anchorMax = new Vector2(0.84f, 1f);
-            }
-
-            if (!entry.IsLibrary && ConflictsOf(entry).Count > 0)
-            {
-                TMP_Text tag = UiText.Create(band.transform, "Conflict", TextConflictTag, UiText.BodySize * 0.8f);
-                tag.alignment = TextAlignmentOptions.MidlineRight;
-                tag.textWrappingMode = TextWrappingModes.NoWrap;
-                tag.color = WarnColor;
-                var tagRect = (RectTransform)tag.transform;
-                tagRect.anchorMin = new Vector2(0.58f, 0f);
-                tagRect.anchorMax = new Vector2(0.84f, 1f);
-                nameRect.anchorMax = new Vector2(0.58f, 1f);
-            }
-
-            if (!entry.IsFramework && !entry.IsPatcher)
-            {
-                TMP_Text state = UiText.Create(band.transform, "State", entry.WantOn ? TextOn : TextOff, UiText.BodySize);
-                state.alignment = TextAlignmentOptions.MidlineRight;
-                state.color = entry.WantOn ? new Color(0.65f, 0.95f, 0.65f, 1f) : new Color(1f, 0.6f, 0.55f, 1f);
-                var stateRect = (RectTransform)state.transform;
-                stateRect.anchorMin = new Vector2(0.72f, 0f);
-                stateRect.offsetMax = new Vector2(-20f, 0f);
-            }
+            nameRect.offsetMax = new Vector2(-used, 0f);
             return row;
+        }
+
+        // Puts a one-line label at the right of its row, ending `right` pixels
+        // from the row's right edge and as wide as its text. Returns the width.
+        private static float FitRight(TMP_Text label, float right)
+        {
+            label.enableAutoSizing = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.alignment = TextAlignmentOptions.MidlineRight;
+            float width = Mathf.Ceil(label.GetPreferredValues(label.text).x) + 2f;
+            var rect = (RectTransform)label.transform;
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.offsetMin = new Vector2(-right - width, 0f);
+            rect.offsetMax = new Vector2(-right, 0f);
+            return width;
         }
 
         // ---- details ----
@@ -321,10 +343,13 @@ namespace DragNWash.ModFramework.Mods
                     head.enableAutoSizing = false;
                     head.fontSize = size;
                     float labelWidth = head.GetPreferredValues(head.text).x;
-                    if (width > 0f && labelWidth > width * 0.5f && line + 1 < maxLines)
+                    // Measured in the label's bold style, a little wider than the value's.
+                    float valueWidth = head.GetPreferredValues(Escape(note.Value)).x;
+                    bool squeezed = labelWidth > width * 0.5f || labelWidth + 16f + valueWidth * 0.75f > width;
+                    if (width > 0f && squeezed && line + 1 < maxLines)
                     {
-                        // A long label (common in Japanese or German) gets its own
-                        // line, so the names are not squeezed into what is left.
+                        // A long label (common in Japanese or German), or names that
+                        // would shrink to fit beside it, get their own line.
                         text = Label(note.Name + i, Escape(note.Value), size, top - 0.14f, top - 0.07f, false);
                         ((RectTransform)text.transform).offsetMin = new Vector2(56f, 0f);
                         line += 2;
@@ -394,8 +419,9 @@ namespace DragNWash.ModFramework.Mods
             label.overflowMode = TextOverflowModes.Ellipsis;
             if (wrap)
             {
-                label.enableAutoSizing = false;
-                label.fontSize = size;
+                // Wraps at full size, and only shrinks a little when the text still
+                // does not fit (a narrow window, a long translation).
+                label.fontSizeMin = size * 0.7f;
             }
             var rect = (RectTransform)label.transform;
             rect.anchorMin = new Vector2(0f, bottom);
@@ -513,6 +539,50 @@ namespace DragNWash.ModFramework.Mods
         private static string Escape(string text)
         {
             return (text ?? "").Replace("<", "<noparse><</noparse>");
+        }
+    }
+
+    // Tells the menu when the details panel is resized, at most once a frame
+    // and only once the size has settled for that frame.
+    internal sealed class DetailsResizeWatcher : UIBehaviour
+    {
+        internal ModsMenu Menu;
+        private Vector2 _builtFor;
+        private bool _dirty;
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _builtFor = ((RectTransform)transform).rect.size;
+            _dirty = false;
+        }
+
+        protected override void OnRectTransformDimensionsChange()
+        {
+            _dirty = true;
+        }
+
+        private void LateUpdate()
+        {
+            if (!_dirty)
+            {
+                return;
+            }
+            _dirty = false;
+            Vector2 size = ((RectTransform)transform).rect.size;
+            if (Mathf.Abs(size.x - _builtFor.x) < 1f && Mathf.Abs(size.y - _builtFor.y) < 1f)
+            {
+                return;
+            }
+            _builtFor = size;
+            try
+            {
+                Menu?.OnDetailsResized();
+            }
+            catch (System.Exception ex)
+            {
+                ModFramework.Log.LogError($"Could not lay out the Mods screen again: {ex}");
+            }
         }
     }
 
