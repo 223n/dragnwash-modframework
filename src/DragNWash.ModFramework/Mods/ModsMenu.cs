@@ -300,14 +300,46 @@ namespace DragNWash.ModFramework.Mods
             }
 
             bool hasPages = entry.Loaded && entry.Guid != null && ModFramework.PagesFor(entry.Guid).Count > 0;
-            int maxNotes = hasPages ? 2 : 3;
-            for (int i = 0; i < notes.Count && i < maxNotes; i++)
+            int maxLines = hasPages ? 2 : 3;
+            float size = UiText.BodySize * 0.9f;
+            float width = Details.rect.width - 56f;
+            int line = 0;
+            for (int i = 0; i < notes.Count && line < maxLines; i++)
             {
-                float top = 0.42f - i * 0.07f;
                 var note = notes[i];
-                TMP_Text text = note.Label == null
-                    ? Label(note.Name + i, Escape(note.Value), UiText.BodySize * 0.9f, top - 0.07f, top, false)
-                    : LabelPair(note.Name + i, note.Label, Escape(note.Value), UiText.BodySize * 0.9f, top - 0.07f, top);
+                float top = 0.42f - line * 0.07f;
+                TMP_Text text;
+                if (note.Label == null)
+                {
+                    text = Label(note.Name + i, Escape(note.Value), size, top - 0.07f, top, false);
+                    line++;
+                }
+                else
+                {
+                    TMP_Text head = Label(note.Name + i + "Label", note.Label, size, top - 0.07f, top, false);
+                    head.fontStyle |= FontStyles.Bold;
+                    head.enableAutoSizing = false;
+                    head.fontSize = size;
+                    float labelWidth = head.GetPreferredValues(head.text).x;
+                    if (width > 0f && labelWidth > width * 0.5f && line + 1 < maxLines)
+                    {
+                        // A long label (common in Japanese or German) gets its own
+                        // line, so the names are not squeezed into what is left.
+                        text = Label(note.Name + i, Escape(note.Value), size, top - 0.14f, top - 0.07f, false);
+                        ((RectTransform)text.transform).offsetMin = new Vector2(56f, 0f);
+                        line += 2;
+                    }
+                    else
+                    {
+                        text = Label(note.Name + i, Escape(note.Value), size, top - 0.07f, top, false);
+                        ((RectTransform)text.transform).offsetMin = new Vector2(28f + labelWidth + 16f, 0f);
+                        line++;
+                    }
+                    if (note.Warn)
+                    {
+                        head.color = WarnColor;
+                    }
+                }
                 if (note.Warn)
                 {
                     text.color = WarnColor;
