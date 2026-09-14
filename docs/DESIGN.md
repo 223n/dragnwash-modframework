@@ -2,7 +2,7 @@
 
 [日本語](DESIGN.ja.md)
 
-Status: draft, September 2026. Nothing here is final; open an issue to discuss any part of it.
+Status: September 2026. The core and the libraries are released as 1.0.0; parts marked planned or future are not done yet. Open an issue to discuss any part of it.
 
 ## Why a framework
 
@@ -165,7 +165,7 @@ The installer is not an API; it installs BepInEx, the core and the libraries a m
 3. **0.3 Settings.** (done) Settings pages on the Mods screen generated from BepInEx config, and `GameOptions` for rows in the game's Options screen.
 4. **0.4 Extension points.** (done) Service registry, `ModInfo.IsLibrary` and library display on the Mods screen, extra Mods screen pages, health checks.
 5. **Libraries**, one at a time and each in the order the localization mod needs them: text, dialogue, tool window, assets, flags and saves. Each is its own plugin with its own version. (done: all five are at 0.1; the text library is at 0.1.1)
-6. **1.0 of the core** when Drag'n Wash Localization v1.0.0 runs on the core and the libraries it uses. (ready: the localization mod's `feature/v1.0.0` branch runs on all of them and was checked in the game on Windows; the release of both is still to come, and so is the Steam Deck run)
+6. **1.0 of the core** when Drag'n Wash Localization v1.0.0 runs on the core and the libraries it uses. (done: released as 1.0.0 together with Drag'n Wash Localization v1.0.0, checked on Windows and on the Steam Deck)
 
 Each step moves one feature out of the localization mod, and the localization mod switches to it before the next step starts. Every step is tested in the game on Windows and on the Steam Deck.
 

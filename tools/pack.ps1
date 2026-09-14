@@ -1,0 +1,66 @@
+# Builds the core, the libraries and the preloader patcher, and packs them into
+# release/DragNWash.ModFramework-<version>.zip with the layout of a game folder:
+#
+#   BepInEx/plugins/DragNWash.ModFramework/DragNWash.ModFramework.dll (+ LICENSE.txt)
+#   BepInEx/plugins/DragNWash.ModFramework.<Library>/DragNWash.ModFramework.<Library>.dll
+#   BepInEx/patchers/DragNWash.ModFramework.Preloader.dll
+#   README.md, README.ja.md, CHANGELOG.md
+#
+# Players normally get the framework with a mod that needs it (Drag'n Wash
+# Localization ships it); this zip is for mod authors and for installing by hand.
+# The game's reference assemblies must be in src/DragNWash.ModFramework/libs
+# (tools/copy-libs.ps1), so this runs on a machine with the game installed.
+#
+#   pwsh tools/pack.ps1
+param(
+    [string]$Version
+)
+
+$ErrorActionPreference = 'Stop'
+$Root = Split-Path -Parent $PSScriptRoot
+$Plugins = @(
+    'DragNWash.ModFramework',
+    'DragNWash.ModFramework.Text',
+    'DragNWash.ModFramework.Dialogue',
+    'DragNWash.ModFramework.ToolWindow',
+    'DragNWash.ModFramework.Assets',
+    'DragNWash.ModFramework.Saves'
+)
+$Patcher = 'DragNWash.ModFramework.Preloader'
+
+if (-not $Version) {
+    $csproj = Get-Content -LiteralPath (Join-Path $Root "src/DragNWash.ModFramework/DragNWash.ModFramework.csproj") -Raw
+    if ($csproj -notmatch '<Version>([^<]+)</Version>') { throw 'Could not read the core version. Pass -Version.' }
+    $Version = $Matches[1]
+}
+
+& python (Join-Path $Root 'tools/check-repo.py')
+if ($LASTEXITCODE -ne 0) { throw 'tools/check-repo.py failed.' }
+
+foreach ($name in $Plugins + $Patcher) {
+    $project = Join-Path $Root "src/$name/$name.csproj"
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $Root "src/$name/bin"), (Join-Path $Root "src/$name/obj")
+    Write-Host "Building $name ..."
+    dotnet build $project -c Release
+    if ($LASTEXITCODE -ne 0) { throw "Build of $name failed." }
+}
+
+$OutDir = Join-Path $Root 'release'
+$Stage = Join-Path $OutDir "DragNWash.ModFramework-$Version"
+if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+foreach ($name in $Plugins) {
+    $dir = Join-Path $Stage "BepInEx/plugins/$name"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Copy-Item -LiteralPath (Join-Path $Root "src/$name/bin/Release/$name.dll") -Destination $dir
+}
+Copy-Item -LiteralPath (Join-Path $Root 'LICENSE') -Destination (Join-Path $Stage 'BepInEx/plugins/DragNWash.ModFramework/LICENSE.txt')
+New-Item -ItemType Directory -Force -Path (Join-Path $Stage 'BepInEx/patchers') | Out-Null
+Copy-Item -LiteralPath (Join-Path $Root "src/$Patcher/bin/Release/$Patcher.dll") -Destination (Join-Path $Stage 'BepInEx/patchers')
+foreach ($doc in 'README.md', 'README.ja.md', 'CHANGELOG.md') {
+    Copy-Item -LiteralPath (Join-Path $Root $doc) -Destination $Stage
+}
+
+$Zip = Join-Path $OutDir "DragNWash.ModFramework-$Version.zip"
+if (Test-Path -LiteralPath $Zip) { Remove-Item -LiteralPath $Zip -Force }
+Compress-Archive -Path (Join-Path $Stage '*') -DestinationPath $Zip
+Write-Host "Created $Zip"

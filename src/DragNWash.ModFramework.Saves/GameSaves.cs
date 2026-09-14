@@ -59,7 +59,7 @@ namespace DragNWash.ModFramework.Saves
         public const string Guid = "com.tomxv.dragnwash.modframework.saves";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "0.1.0";
+        public const string Version = "1.0.0";
 
         /// <summary>The game's save file name inside a slot folder.</summary>
         public const string SaveFileName = "savegame.dgn";

@@ -1,41 +1,36 @@
 # Changelog
 
-Versions of the core and of each library are separate. Nothing has been released yet.
+Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
-## Unreleased
+## 2026-09-15
 
-### Core 0.4.0
+First release, together with [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on the framework.
 
-The version was still 0.2.0 while the settings (0.3) and extension points (0.4) steps were done; it now matches the order of work in docs/DESIGN.md.
+### Core 1.0.0
 
-- Mods screen: a thin white frame around the selected item in the list and details, and gamepad presses (A, R2, the trackpad click on the Steam Deck) click the selected button. Pressing a mod with the pad moves on to its buttons.
-- Mods screen: mod icons (`ModInfo.Icon`, `ModInfo.IconPath`) and a "Uses" line listing the mods each one depends on, with the minimum version when one is declared.
-- Mods screen: the list and the details keep their shares of the screen when the window is resized or switched to full screen, and the details are laid out again at the new size. Row labels are placed by their measured width, so a library tag no longer overlaps "On" in a narrow window.
-- Mods screen: detection of game methods patched by more than one mod, shown as a Conflict.
-- Extension points: service registry (`Services`), health checks (`GameHooks`), extra Mods screen pages (`ModFramework.AddModsPage`), libraries (`ModInfo.IsLibrary`).
-- Settings pages generated from BepInEx config; rows in the game's Options screen (`GameOptions`).
-- On/off switches applied by the preloader patcher at the next launch.
+- Mods screen, reached from the game's Options screen: every BepInEx plugin with its name, version, description, authors, website and icon (`ModFramework.Register(ModInfo)`, or read from the DLL and a Thunderstore manifest), plugins that did not load and why, and preloader patchers.
+- On/off switches, applied by the preloader patcher at the next launch; switching off a mod other mods need asks first.
+- Settings pages generated from BepInEx config, and rows in the game's own Options screen (`GameOptions`).
+- Extension points: service registry (`Services`), health checks for patched game methods (`GameHooks`), extra Mods screen pages (`ModFramework.AddModsPage`), libraries (`ModInfo.IsLibrary`) with the mods that need them and the mods each one uses.
+- Detection of game methods patched by more than one mod, shown as a Conflict.
+- Works with mouse, gamepad and on the Steam Deck: a thin white frame shows the selected item, and A, R2 and the trackpad click press it. The layout follows window resizes and full screen.
 
-### Text 0.1.1
+### Text 1.0.0
 
-- A text the game cleared, or changed through a path the library does not hook, is no longer put back by `GameText.RefreshAll`. Before, a language switch on the Options screen could bring back the prefab placeholder "LABEL".
+- `GameText.AddRewriter`, `RefreshAll`, `TryGetSource`: see and replace every TextMeshPro text before the game shows it, in an explicit order, and apply the rewriters again after something they depend on changed.
 
-### Text 0.1.0
+### Dialogue 1.0.0
 
-- `GameText.AddRewriter`, `RefreshAll`, `TryGetSource`.
+- `GameDialogue.LineShowing`, `OptionShowing`, `NodeStarted`, `CurrentNode`, `TryGetLine`: the line of dialogue or option about to be shown, with line ID, speaker and node.
 
-### Dialogue 0.1.0
-
-- `GameDialogue.LineShowing`, `OptionShowing`, `NodeStarted`, `CurrentNode`, `TryGetLine`.
-
-### Tool window 0.1.0
+### Tool window 1.0.0
 
 - One shared window (F1 by default, `[General] ToggleKey`) where mods add tabs with `ToolWindow.AddTab`. Frees the cursor, blocks game input under the window, turns gamepad and Steam Deck trackpad presses into clicks, and draws with a font that has Japanese and Chinese glyphs. A tab that throws is turned off with its error shown; the other tabs keep working.
 
-### Assets 0.1.0
+### Assets 1.0.0
 
 - `GameFonts`: one fallback font chain for the whole game, prepared per language at startup so Direct3D 12 does not crash. `GameAssets.LoadTexture` and `LoadBundle`, cached per file.
 
-### Flags and saves 0.1.0
+### Flags and saves 1.0.0
 
 - `GameSaves`: save slots, level and flags, edits that snapshot first, restore, and a history of every version in `BepInEx/SaveHistory`. `GameFlags`: the flag catalog from CSV files.
