@@ -35,6 +35,31 @@ namespace DragNWash.ModFramework.Mods
         private static readonly Dictionary<string, (DateTime Stamp, List<Found> Plugins)> Cache =
             new Dictionary<string, (DateTime, List<Found>)>(StringComparer.OrdinalIgnoreCase);
 
+        // Reading an enum argument such as BepInDependency's flags makes Cecil
+        // look up the assembly that defines the enum (BepInEx). Its default
+        // resolver only searches next to the game's executable, so point it at
+        // BepInEx, the game's managed assemblies and the plugins folder.
+        private static DefaultAssemblyResolver _resolver;
+
+        private static DefaultAssemblyResolver Resolver
+        {
+            get
+            {
+                if (_resolver == null)
+                {
+                    _resolver = new DefaultAssemblyResolver();
+                    foreach (string dir in new[] { Paths.BepInExAssemblyDirectory, Paths.ManagedPath, Paths.PluginPath, Paths.PatcherPluginPath })
+                    {
+                        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                        {
+                            _resolver.AddSearchDirectory(dir);
+                        }
+                    }
+                }
+                return _resolver;
+            }
+        }
+
         private static readonly HashSet<string> Reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         internal static List<Found> ScanPluginsFolder()
@@ -62,7 +87,7 @@ namespace DragNWash.ModFramework.Mods
                 }
 
                 var plugins = new List<Found>();
-                using (AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(path))
+                using (AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(path, new ReaderParameters { AssemblyResolver = Resolver }))
                 {
                     string description = AssemblyString(assembly, "System.Reflection.AssemblyDescriptionAttribute");
                     string company = AssemblyString(assembly, "System.Reflection.AssemblyCompanyAttribute");
