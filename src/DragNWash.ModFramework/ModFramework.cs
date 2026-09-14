@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BepInEx.Logging;
 
 namespace DragNWash.ModFramework
@@ -26,9 +27,10 @@ namespace DragNWash.ModFramework
         /// may still change between minor versions; from 1.0 on, breaking changes
         /// only come with a new major version. Keep in sync with the csproj.
         /// </summary>
-        public const string Version = "0.1.0";
+        public const string Version = "0.2.0";
 
         private static ManualLogSource _log;
+        private static readonly Dictionary<string, ModInfo> Infos = new Dictionary<string, ModInfo>(StringComparer.Ordinal);
 
         /// <summary>True once the framework has finished starting.</summary>
         public static bool IsReady { get; private set; }
@@ -55,6 +57,31 @@ namespace DragNWash.ModFramework
 
         private static Action _ready;
 
+        /// <summary>
+        /// Tells the Mods screen more about a mod than BepInEx knows: description,
+        /// authors and website. Registering again with the same GUID replaces the
+        /// earlier information.
+        /// </summary>
+        public static void Register(ModInfo info)
+        {
+            if (info == null || string.IsNullOrEmpty(info.Guid))
+            {
+                throw new ArgumentException("ModInfo.Guid is required.", nameof(info));
+            }
+            lock (Infos)
+            {
+                Infos[info.Guid] = info;
+            }
+        }
+
+        internal static ModInfo GetInfo(string guid)
+        {
+            lock (Infos)
+            {
+                return guid != null && Infos.TryGetValue(guid, out ModInfo info) ? info : null;
+            }
+        }
+
         internal static ManualLogSource Log => _log;
 
         internal static void Initialize(ManualLogSource log)
@@ -66,6 +93,15 @@ namespace DragNWash.ModFramework
 
             _log = log;
             _log.LogInfo($"{Name} {Version} on Unity {GameInfo.UnityVersion} / {GameInfo.GraphicsApi}");
+
+            Register(new ModInfo
+            {
+                Guid = Guid,
+                DisplayName = "Drag'n Wash ModFramework",
+                Description = "Shared tools for Drag'n Wash mods, including this Mods screen.",
+                Authors = new[] { "TomXV" },
+                Website = "https://github.com/TomXV/dragnwash-modframework",
+            });
 
             IsReady = true;
             Action handlers = _ready;

@@ -74,6 +74,17 @@ A mod cannot be unloaded from a running game, so the switch takes effect from th
 - The framework itself cannot be switched off from its own screen.
 - Switching off a mod that other mods depend on (`BepInDependency`) lists those mods and asks before doing it.
 
+### Mods that do not use the framework
+
+The Mods screen works for every BepInEx mod, not only mods built on the framework. Nothing is required of a mod; the API only adds to what can be found out anyway.
+
+- **Name, version and dependencies** come from the plugin's `[BepInPlugin]`, `[BepInDependency]` and `[BepInIncompatibility]` attributes.
+- **Description and authors** come from the DLL's `AssemblyDescription` and `AssemblyCompany` attributes, and from a Thunderstore `manifest.json` in the mod's folder (description, website).
+- DLLs are read with Mono.Cecil, which BepInEx itself ships, so no mod code runs and nothing extra is loaded into the game.
+- **Plugins that did not load** are listed too, with the reason when it can be told: a dependency that is not installed, or a mod it cannot run together with. Otherwise the screen points to `BepInEx/LogOutput.log`.
+- **Preloader patchers** in `BepInEx/patchers` are listed but cannot be switched off from the screen.
+- Anything registered with `ModFramework.Register(ModInfo)` takes priority over what was read from the files.
+
 ### For mod authors
 
 ```csharp
@@ -106,8 +117,8 @@ Most areas come from working code in the localization mod (file names refer to `
 
 ## Order of work
 
-1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (this version)
-2. **0.2 Mods screen.** The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
+1. **0.1 Skeleton.** Plugin, `ModFramework`, `GameInfo`, build and repository rules. (done)
+2. **0.2 Mods screen.** (done) The Mods button in the Options screen, the list and details of installed mods, `ModInfo`, and switching mods on and off with the preloader patcher.
 3. **0.3 Settings.** Settings pages on the Mods screen generated from BepInEx config, and the API for rows in the game's Options screen, with the localization mod's language picker as the first user.
 4. **0.4 Tool window.** The shared F1 window for developer tools, with cursor and input handling.
 5. **0.5 Text.** The text event.

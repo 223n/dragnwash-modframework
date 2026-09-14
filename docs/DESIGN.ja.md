@@ -74,6 +74,17 @@
 - フレームワーク自身は、自分の画面からはオフにできません
 - ほかの Mod が依存している（`BepInDependency`）Mod をオフにするときは、依存している Mod を一覧で示し、確認してから行います
 
+### フレームワークを使っていない Mod
+
+Mods 画面は、フレームワークで作られた Mod だけでなく、すべての BepInEx の Mod に対応します。Mod 側に必要なことは何もなく、API は「ファイルから分かること」に情報を足すだけです。
+
+- **名前、バージョン、依存関係**は、プラグインの `[BepInPlugin]`、`[BepInDependency]`、`[BepInIncompatibility]` 属性から取ります
+- **説明と作者**は、DLL の `AssemblyDescription` と `AssemblyCompany` 属性、それに Mod のフォルダにある Thunderstore の `manifest.json`（説明、Web サイト）から取ります
+- DLL は BepInEx 自身が同梱している Mono.Cecil で読むので、Mod のコードは実行されず、ゲームに余計なものも読み込まれません
+- **読み込まれなかったプラグイン**も一覧に出し、分かる場合は理由を示します（入っていない依存先、一緒に使えない Mod）。分からない場合は `BepInEx/LogOutput.log` を案内します
+- `BepInEx/patchers` の**プリローダーパッチャー**も一覧に出しますが、画面からはオフにできません
+- `ModFramework.Register(ModInfo)` で登録した情報は、ファイルから読んだ情報より優先します
+
 ### Mod を作る方へ
 
 ```csharp
@@ -106,8 +117,8 @@ Mods 画面に出る設定は、その Mod の BepInEx の設定項目から作�
 
 ## 作業の順番
 
-1. **0.1 骨組み。** プラグイン、`ModFramework`、`GameInfo`、ビルドとリポジトリのルール（このバージョン）
-2. **0.2 Mods 画面。** Options 画面の Mods ボタン、入っている Mod の一覧と詳細、`ModInfo`、プリローダーパッチャーによる Mod のオン・オフ
+1. **0.1 骨組み。** プラグイン、`ModFramework`、`GameInfo`、ビルドとリポジトリのルール（完了）
+2. **0.2 Mods 画面。**（完了） Options 画面の Mods ボタン、入っている Mod の一覧と詳細、`ModInfo`、プリローダーパッチャーによる Mod のオン・オフ
 3. **0.3 設定。** BepInEx の設定から作る Mods 画面の設定ページと、ゲームの Options 画面に行を足す API。最初の利用者は翻訳 Mod の言語設定
 4. **0.4 ツールウィンドウ。** 開発ツール用の共有 F1 ウィンドウ、カーソルと入力の扱い
 5. **0.5 テキスト。** テキストのイベント

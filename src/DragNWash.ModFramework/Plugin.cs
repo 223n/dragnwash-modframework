@@ -1,4 +1,5 @@
 using BepInEx;
+using HarmonyLib;
 
 namespace DragNWash.ModFramework
 {
@@ -11,6 +12,7 @@ namespace DragNWash.ModFramework
         private void Awake()
         {
             ModFramework.Initialize(Logger);
+            Mods.ModsScreen.Install(new Harmony(ModFramework.Guid));
         }
     }
 }
