@@ -1,0 +1,23 @@
+name: No game files
+
+# The repository must never contain the game's files or BepInEx binaries.
+# Reference assemblies stay in the ignored libs/ folder on each machine.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Look for binaries and game assets
+        run: |
+          found=$(git ls-files | grep -Ei '(^|/)libs/|\.(dll|pdb|exe|so|dylib|assets|ress|resource|bundle|unity3d)$' || true)
+          if [ -n "$found" ]; then
+            echo "These files must not be committed:"
+            echo "$found"
+            exit 1
+          fi
+          echo "OK"

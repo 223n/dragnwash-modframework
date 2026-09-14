@@ -1,0 +1,21 @@
+# build output
+bin/
+obj/
+*.dll
+*.pdb
+
+# release packaging
+release/
+*.zip
+
+# game reference assemblies copied locally for compiling against (never commit game files)
+libs/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store

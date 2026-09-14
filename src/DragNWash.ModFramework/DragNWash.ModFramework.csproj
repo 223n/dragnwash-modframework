@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>DragNWash.ModFramework</AssemblyName>
+    <RootNamespace>DragNWash.ModFramework</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <!-- Keep in sync with ModFramework.Version. -->
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0</FileVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    These reference assemblies are NOT committed (libs/ is ignored). Copy them from your
+    own game install with tools/copy-libs.ps1, or by hand:
+      libs/BepInEx.dll                 <- <Game>/BepInEx/core/BepInEx.dll
+      libs/0Harmony.dll                <- <Game>/BepInEx/core/0Harmony.dll
+      libs/UnityEngine.dll             <- <Game>/DragNWash_Data/Managed/UnityEngine.dll
+      libs/UnityEngine.CoreModule.dll  <- <Game>/DragNWash_Data/Managed/UnityEngine.CoreModule.dll
+    More are added as features move in; tools/copy-libs.ps1 lists them all.
+  -->
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>libs\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>libs\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>libs\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>libs\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
