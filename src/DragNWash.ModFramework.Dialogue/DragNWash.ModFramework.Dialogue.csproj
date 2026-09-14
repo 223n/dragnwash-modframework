@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>DragNWash.ModFramework.Dialogue</AssemblyName>
+    <RootNamespace>DragNWash.ModFramework.Dialogue</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <!-- A library on top of the core, with its own version. Keep in sync with GameDialogue.Version. -->
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0</FileVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DragNWash.ModFramework\DragNWash.ModFramework.csproj" Private="false" />
+  </ItemGroup>
+
+  <!-- Shares libs/ with the core project; see tools/copy-libs.ps1. -->
+  <ItemGroup>
+    <Reference Include="BepInEx"><HintPath>../DragNWash.ModFramework/libs/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>../DragNWash.ModFramework/libs/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextCoreFontEngineModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.TextCoreFontEngineModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="YarnSpinner"><HintPath>../DragNWash.ModFramework/libs/YarnSpinner.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="YarnSpinner.Unity"><HintPath>../DragNWash.ModFramework/libs/YarnSpinner.Unity.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Yarn.Google.Protobuf"><HintPath>../DragNWash.ModFramework/libs/Yarn.Google.Protobuf.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>../DragNWash.ModFramework/libs/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>
