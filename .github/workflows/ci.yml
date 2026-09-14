@@ -1,0 +1,43 @@
+name: CI
+
+# The core and the libraries compile against the game's own assemblies, which
+# this repository must never contain, so they are built locally only. CI runs
+# what needs no game files: consistency checks, and a build of the preloader
+# patcher, which only uses BepInEx.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Versions, GUIDs, changelog and documentation links
+        run: python tools/check-repo.py
+
+  preloader:
+    runs-on: ubuntu-latest
+    env:
+      BEPINEX_URL: https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5.zip
+      BEPINEX_SHA256: 82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Get BepInEx 5.4.23.5 (checked against a pinned SHA-256)
+        run: |
+          curl -fsSL -o bepinex.zip "$BEPINEX_URL"
+          echo "$BEPINEX_SHA256  bepinex.zip" | sha256sum -c -
+          mkdir -p src/DragNWash.ModFramework/libs
+          unzip -j -o bepinex.zip BepInEx/core/BepInEx.dll BepInEx/core/Mono.Cecil.dll -d src/DragNWash.ModFramework/libs
+      - name: Build the preloader patcher
+        run: dotnet build src/DragNWash.ModFramework.Preloader/DragNWash.ModFramework.Preloader.csproj -c Release -warnaserror
