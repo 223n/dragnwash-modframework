@@ -8,6 +8,7 @@ Versions of the core and of each library are separate. Nothing has been released
 
 The version was still 0.2.0 while the settings (0.3) and extension points (0.4) steps were done; it now matches the order of work in docs/DESIGN.md.
 
+- Mods screen: a thin white frame around the selected item in the list and details, and gamepad presses (A, R2, the trackpad click on the Steam Deck) click the selected button. Pressing a mod with the pad moves on to its buttons.
 - Mods screen: mod icons (`ModInfo.Icon`, `ModInfo.IconPath`) and a "Uses" line listing the mods each one depends on, with the minimum version when one is declared.
 - Mods screen: the list and the details keep their shares of the screen when the window is resized or switched to full screen, and the details are laid out again at the new size. Row labels are placed by their measured width, so a library tag no longer overlaps "On" in a narrow window.
 - Mods screen: detection of game methods patched by more than one mod, shown as a Conflict.
