@@ -27,11 +27,14 @@ namespace DragNWash.ModFramework.Mods
         private GameObject _framed;
         private int _clickedFrame = -1;
         private Button _listening;
+        private GameObject _selected;
+        private int _selectedFrame = -1;
         private bool _reported;
 
         private void OnDisable()
         {
             HideFrame();
+            _selected = null;
         }
 
         private void LateUpdate()
@@ -42,9 +45,15 @@ namespace DragNWash.ModFramework.Mods
                 if (selected == null || !selected.activeInHierarchy || !selected.transform.IsChildOf(Menu.transform))
                 {
                     HideFrame();
+                    _selected = null;
                     return;
                 }
                 ShowFrame(selected);
+                if (!ReferenceEquals(selected, _selected))
+                {
+                    _selected = selected;
+                    _selectedFrame = Time.frameCount;
+                }
 
                 Button button = selected.GetComponent<Button>();
                 if (button != null && !ReferenceEquals(button, _listening))
@@ -58,7 +67,10 @@ namespace DragNWash.ModFramework.Mods
                     return;
                 }
                 // The game's UI input clicks on the same frame; give it that frame.
-                if (_clickedFrame == Time.frameCount)
+                // A button that only became selected this frame was not the one the
+                // press was meant for: pressing Mods on the Options screen opens this
+                // screen and selects its Back button in that very frame.
+                if (_clickedFrame == Time.frameCount || _selectedFrame == Time.frameCount)
                 {
                     return;
                 }
