@@ -2,11 +2,14 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
-## Unreleased
+## 2026-09-15: hand-made icon
 
-### Core
+Released together with Drag'n Wash Localization v1.1.2. The libraries stay at 1.0.0.
 
-- The Mods screen icon is the "Dg" monogram from the new hand-made logo, replacing the AI-generated image.
+### Core 1.1.2
+
+- The Mods screen icon is the "Dg" monogram from the new hand-made logo, replacing the AI-generated image. The READMEs open with the hand-made logo too.
+- The preloader patcher is unchanged; its version follows the core.
 
 ## 2026-09-15: icon
 
