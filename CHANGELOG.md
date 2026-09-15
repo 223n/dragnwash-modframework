@@ -2,6 +2,12 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
+## Unreleased
+
+### Core
+
+- The Mods screen icon is the "Dg" monogram from the new hand-made logo, replacing the AI-generated image.
+
 ## 2026-09-15: icon
 
 Released together with Drag'n Wash Localization v1.1.1. The libraries stay at 1.0.0.
