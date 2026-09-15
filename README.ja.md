@@ -1,3 +1,5 @@
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="images/logo-white.svg"><img src="images/logo.svg" alt="Drag'n Wash ModFramework" width="320"></picture></p>
+
 # Drag'n Wash ModFramework
 
 [English](README.md)
