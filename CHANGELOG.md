@@ -8,7 +8,7 @@ Released together with Drag'n Wash Localization v1.1.2. The libraries stay at 1.
 
 ### Core 1.1.2
 
-- The Mods screen icon is the "Dg" monogram from the new hand-made logo, replacing the AI-generated image. The READMEs open with the hand-made logo too.
+- The Mods screen icon is the "Dg" monogram from the new hand-made logo. The READMEs open with the hand-made logo too.
 - The preloader patcher is unchanged; its version follows the core.
 
 ## 2026-09-15: icon
