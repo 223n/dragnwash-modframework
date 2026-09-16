@@ -2,7 +2,7 @@
 
 [日本語](MOD_RELOAD.ja.md)
 
-> **Design only.** Nothing here is built. It is on an experimental branch to be discussed; open an issue or comment on the pull request.
+> **Experimental.** Built in the core (1.2.0), on `main` but not yet in a release. Where the build differs from the design: `UnloadOwned` became `ModReload.Unloading`, an event each library handles for its own registrations (by GUID where it kept one, else by the old build's assembly with `ModReload.Prune`); an Options row is not removed but re-pointed when the new build adds it again; the Mods screen does not yet say a mod was reloaded (`mods` in the Console does).
 
 Building a mod, closing the game, starting it, clicking through the title screen, opening the shop: a minute per attempt, many attempts an hour. The Localization mod already reloads its *translation files* without a restart. This memo is about reloading the *mod itself*: after a build, the new DLL takes the place of the running one, while the game keeps running. A developer-tools feature (GUIDE rule 8), never something a player sees.
 

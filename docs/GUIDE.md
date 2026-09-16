@@ -67,6 +67,31 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 8. **Keep developer features behind the developer-tools switch.** Exports, hot reload, debug keys and windows run only while `DeveloperTools.Enabled` is true (`DeveloperTools.WhenEnabled` for features that start later), so that someone who only installed a mod never sees them. Tool window tabs already are.
 9. **Take the game's events from `GameEvents`.** A handler on `SceneManager.sceneLoaded` that throws stops every mod that subscribed after it, and nobody can tell which mod it was. `GameEvents.OnSceneLoaded(yourGuid, ...)` runs each mod's handler on its own, names the mod on the Mods screen when it fails, and switches a handler off after three failures in a row.
 
+10. **Say so before you rely on reloading.** A mod is reloaded while the game runs only when it sets `ModInfo.Reloadable = true` (or carries `[ReloadableMod]`), and then it promises the points under [Reloading your mod while the game runs](#reloading-your-mod-while-the-game-runs).
+
+## Reloading your mod while the game runs
+
+Experimental, core 1.2.0, and only while developer tools are on: build, and the new DLL takes the place of the running one without a restart (`[Developer] WatchMods`, or `mods reload <guid>` in the Console). Libraries are never reloaded. What your mod promises when it says it is reloadable:
+
+- Its Harmony ID is its GUID: `new Harmony(MyMod.Guid)`. That is how its patches are found and removed.
+- It registers through the framework (`ModFramework.Register`, `AddTab`, `AddCommand`, `AddRewriter`, `GameEvents`, `Services`, `GameOptions`) rather than through static fields of its own; what the framework does not know about, it cannot take out. Handlers on the libraries' events are taken out by assembly.
+- Anything it handed to the game (a coroutine, a `DontDestroyOnLoad` object, a file watcher) is cleaned up in `OnDestroy`.
+- Nothing in `Awake` that is unsafe mid-game on Direct3D 12 (a texture upload), or it is gated with `GameFonts.RuntimeUploadsAreSafe`.
+
+Copy the DLL into the game after each build, and the framework does the rest:
+
+```xml
+<!-- In the .csproj: after a build, the DLL goes to the game, and the running game reloads it. -->
+<PropertyGroup>
+  <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Drag'n Wash</GameDir>
+</PropertyGroup>
+<Target Name="CopyToGame" AfterTargets="Build" Condition="Exists('$(GameDir)')">
+  <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GameDir)\BepInEx\plugins\$(AssemblyName)" />
+</Target>
+```
+
+What stays: the old assembly (Mono never unloads one; a few hundred kilobytes per reload), and any object of the old build the game still holds. A reload that fails before the old build is taken down leaves it running; one that fails after says so in the log and needs a restart. Details in [MOD_RELOAD.md](MOD_RELOAD.md).
+
 ## Writing a library
 
 A library is an ordinary BepInEx plugin that other mods depend on. To make one:

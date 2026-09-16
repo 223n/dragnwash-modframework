@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using BepInEx.Configuration;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -44,6 +45,12 @@ namespace DragNWash.ModFramework
                     onEnabled();
                 }
             };
+        }
+
+        // On a mod's reload: the old build's handlers go.
+        internal static void Forget(Assembly assembly)
+        {
+            Changed = (Action)ModReload.Prune(Changed, assembly);
         }
 
         internal static void Install(ConfigFile config)

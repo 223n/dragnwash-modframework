@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TMPro;
 using UnityEngine;
 
@@ -261,6 +262,16 @@ namespace DragNWash.ModFramework.Text
                 }
             }
             return context.Text;
+        }
+
+        // On a mod's reload (ModReload.Unloading): its rewriters go.
+        internal static void RemoveOwned(string owner, Assembly assembly)
+        {
+            lock (Rewriters)
+            {
+                Rewriters.RemoveAll(r => r.Owner == owner || (assembly != null && r.Action.Method?.DeclaringType?.Assembly == assembly));
+                _snapshot = Rewriters.OrderBy(r => r.Order).ToArray();
+            }
         }
 
         private sealed class Removal : IDisposable

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -74,6 +75,24 @@ namespace DragNWash.ModFramework
                 _sceneUnloaded.RemoveAll(h => h.Owner == ownerGuid);
                 _gameStarted.RemoveAll(h => h.Owner == ownerGuid);
                 _quitting.RemoveAll(h => h.Owner == ownerGuid);
+            }
+        }
+
+        // Takes out every handler whose code lives in that assembly (a mod's old
+        // build on reload; see ModReload).
+        internal static void RemoveFrom(Assembly assembly)
+        {
+            if (assembly == null)
+            {
+                return;
+            }
+            bool From(Handler h) => h.Delegate.Method?.DeclaringType?.Assembly == assembly || (h.Delegate.Target != null && h.Delegate.Target.GetType().Assembly == assembly);
+            lock (Lock)
+            {
+                _sceneLoaded.RemoveAll(From);
+                _sceneUnloaded.RemoveAll(From);
+                _gameStarted.RemoveAll(From);
+                _quitting.RemoveAll(From);
             }
         }
 

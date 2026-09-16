@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace DragNWash.ModFramework
 {
@@ -23,7 +24,8 @@ namespace DragNWash.ModFramework
         }
 
         private static readonly Dictionary<Type, Registration> Registered = new Dictionary<Type, Registration>();
-        private static readonly Dictionary<Type, List<Action<object>>> Waiting = new Dictionary<Type, List<Action<object>>>();
+        // The callback as the mod gave it, next to the wrapper that casts for it.
+        private static readonly Dictionary<Type, List<KeyValuePair<Delegate, Action<object>>>> Waiting = new Dictionary<Type, List<KeyValuePair<Delegate, Action<object>>>>();
 
         /// <summary>
         /// Registers <paramref name="implementation"/> as the provider of
@@ -40,7 +42,7 @@ namespace DragNWash.ModFramework
             {
                 throw new ArgumentNullException(nameof(implementation));
             }
-            List<Action<object>> callbacks;
+            List<KeyValuePair<Delegate, Action<object>>> callbacks;
             lock (Registered)
             {
                 if (Registered.TryGetValue(typeof(T), out Registration existing))
@@ -55,9 +57,9 @@ namespace DragNWash.ModFramework
             ModFramework.Log.LogInfo($"Service {typeof(T).FullName} {version} provided by {ownerGuid ?? "a mod"}.");
             if (callbacks != null)
             {
-                foreach (Action<object> callback in callbacks)
+                foreach (KeyValuePair<Delegate, Action<object>> callback in callbacks)
                 {
-                    Invoke(callback, implementation);
+                    Invoke(callback.Value, implementation);
                 }
             }
             return true;
@@ -116,15 +118,42 @@ namespace DragNWash.ModFramework
                 now = Registered.TryGetValue(typeof(T), out Registration r) ? (T)r.Implementation : null;
                 if (now == null)
                 {
-                    if (!Waiting.TryGetValue(typeof(T), out List<Action<object>> list))
+                    if (!Waiting.TryGetValue(typeof(T), out List<KeyValuePair<Delegate, Action<object>>> list))
                     {
-                        Waiting[typeof(T)] = list = new List<Action<object>>();
+                        Waiting[typeof(T)] = list = new List<KeyValuePair<Delegate, Action<object>>>();
                     }
-                    list.Add(o => callback((T)o));
+                    list.Add(new KeyValuePair<Delegate, Action<object>>(callback, o => callback((T)o)));
                     return;
                 }
             }
             Invoke(o => callback((T)o), now);
+        }
+
+        // On a mod's reload (ModReload): its providers go, so the new build can
+        // register again, and its waiting callbacks go with its old assembly.
+        internal static void Forget(string ownerGuid, Assembly assembly)
+        {
+            lock (Registered)
+            {
+                var gone = new List<Type>();
+                foreach (KeyValuePair<Type, Registration> kv in Registered)
+                {
+                    bool mine = (ownerGuid != null && kv.Value.OwnerGuid == ownerGuid) || (assembly != null && kv.Value.Implementation.GetType().Assembly == assembly);
+                    if (mine)
+                    {
+                        gone.Add(kv.Key);
+                    }
+                }
+                foreach (Type t in gone)
+                {
+                    Registered.Remove(t);
+                    ModFramework.Log.LogInfo($"Service {t.FullName} of {ownerGuid} removed for reload; consumers keep the old instance until they ask again.");
+                }
+                foreach (List<KeyValuePair<Delegate, Action<object>>> list in Waiting.Values)
+                {
+                    list.RemoveAll(kv => assembly != null && (kv.Key.Method?.DeclaringType?.Assembly == assembly || (kv.Key.Target != null && kv.Key.Target.GetType().Assembly == assembly)));
+                }
+            }
         }
 
         private static void Invoke(Action<object> callback, object service)

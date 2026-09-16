@@ -55,5 +55,13 @@ namespace DragNWash.ModFramework
         /// Register from Awake so it loads at startup.
         /// </summary>
         public string IconPath { get; set; }
+
+        /// <summary>
+        /// True when the mod can be reloaded while the game runs (developer
+        /// tools, experimental; see <see cref="ModReload"/>): its Harmony ID is
+        /// its GUID, it registers through the framework, and it cleans up in
+        /// OnDestroy. False, the default, and it is never reloaded.
+        /// </summary>
+        public bool Reloadable { get; set; }
     }
 }

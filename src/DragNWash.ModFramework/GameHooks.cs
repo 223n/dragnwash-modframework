@@ -57,6 +57,18 @@ namespace DragNWash.ModFramework
             ModFramework.Log.LogWarning($"{ownerGuid ?? "A mod"}: \"{feature}\" is unavailable: {reason}.");
         }
 
+        // On a mod's reload: its records go, so the new build checks afresh.
+        internal static void Forget(string ownerGuid)
+        {
+            lock (Missing)
+            {
+                if (ownerGuid != null)
+                {
+                    Missing.Remove(ownerGuid);
+                }
+            }
+        }
+
         /// <summary>Features of <paramref name="ownerGuid"/> that failed a check on this game build.</summary>
         public static IReadOnlyList<string> UnavailableFeatures(string ownerGuid)
         {
