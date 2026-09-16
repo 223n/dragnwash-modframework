@@ -51,6 +51,7 @@ public class MyMod : BaseUnityPlugin
 | セーブスロットやフラグを読み書きする | `GameSaves`、`GameFlags`（ライブラリ **Flags and saves**） | `savegame.dgn` を自分で書き換えること |
 | ほかの Mod に API を提供する | `Services.Register<T>` と `Services.Get<T>` | リフレクションで探させる public static フィールド |
 | パッチを当てるゲームのメソッドがまだあるか確かめる | `GameHooks.Require` | とりあえずパッチを当てること |
+| シーンの読み込み時、ゲームの起動時、終了時に何かする | `GameEvents.OnSceneLoaded`、`OnGameStarted`、`OnQuitting`（実験的） | `SceneManager.sceneLoaded` や `Application.quitting` への直接の登録 |
 
 ## ルール
 
@@ -62,6 +63,7 @@ public class MyMod : BaseUnityPlugin
 6. **公開 API にゲームの型を出さない。** ほかの Mod のためのライブラリなら、独自の型を公開します。ゲームがアップデートされても、変わるのはライブラリの中身だけで済みます
 7. **ゲームのファイルを配布しない。** アセット、台本の文章、ゲームの DLL をリポジトリやリリースに入れないでください
 8. **開発者向けの機能は、開発者ツールのスイッチの内側に置く。** 書き出し、ホットリロード、デバッグ用のキーや窓は、`DeveloperTools.Enabled` が真のときだけ動かす（あとから始めるなら `DeveloperTools.WhenEnabled`）。Mod を入れただけの人には見えないようにするためです。Tool window のタブは、すでにそうなっています。
+9. **ゲームの出来事は `GameEvents` から受け取る。** `SceneManager.sceneLoaded` に直接つないだ処理が例外を投げると、あとから登録したすべての Mod の処理が止まり、どの Mod のせいかも分かりません。`GameEvents.OnSceneLoaded(自分のGUID, ...)` は Mod ごとに切り離して呼び、失敗した Mod を Mods 画面に名前つきで出し、3 回続けて失敗した処理をそのセッションでは止めます。
 
 ## ライブラリの作り方
 

@@ -150,7 +150,7 @@ namespace DragNWash.ModFramework.Assets
                 AssetsLibraryPlugin.Log.LogInfo($"{ByName.Count} texture replacement(s) loaded from mods.");
                 if (!_hooked)
                 {
-                    SceneManager.sceneLoaded += (scene, mode) => ApplyNow();
+                    GameEvents.OnSceneLoaded(GameFonts.Guid, (scene, mode) => ApplyNow());
                     ModFramework.Ready += () => ApplyNow();
                     _hooked = true;
                 }
