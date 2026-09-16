@@ -180,7 +180,12 @@ namespace DragNWash.ModFramework
                 handler.Failures++;
                 string what = $"{handler.Event} handler of {handler.Owner}";
                 ModFramework.Log.LogError($"{what} threw: {ex}");
-                GameHooks.Unavailable(handler.Owner, handler.Event + " handler", ex.GetType().Name + ": " + ex.Message);
+                // The Mods screen mark and its warning once per run of failures; every
+                // failure still gets the error line above with the full exception.
+                if (handler.Failures == 1)
+                {
+                    GameHooks.Unavailable(handler.Owner, handler.Event + " handler", ex.GetType().Name + ": " + ex.Message);
+                }
                 if (handler.Failures >= FailuresBeforeDrop)
                 {
                     ModFramework.Log.LogError($"{what} failed {handler.Failures} times in a row and is switched off for this session.");
