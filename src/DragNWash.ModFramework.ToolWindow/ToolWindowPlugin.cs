@@ -504,15 +504,22 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             else
             {
+                // Inside a group, so a tab drawn for a taller window is clipped
+                // at the body's edge instead of running over the footer line.
+                GUI.BeginGroup(body);
                 try
                 {
-                    _current.Draw(body);
+                    _current.Draw(new Rect(0, 0, body.width, body.height));
                 }
                 catch (Exception ex) when (!(ex is ExitGUIException))
                 {
                     _current.Failure = ex.GetType().Name + ": " + ex.Message;
                     Log.LogError($"The tool window tab \"{_current.Title}\" of {_current.Owner} threw and was turned off: {ex}");
                     Notice = $"\"{_current.Title}\" stopped working; see the log.";
+                }
+                finally
+                {
+                    GUI.EndGroup();
                 }
             }
 
