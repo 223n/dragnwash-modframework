@@ -138,6 +138,18 @@ namespace DragNWash.ModFramework.ToolWindow
             Request(pending);
         }
 
+        // Every character rasterised so far, so a caller that draws arbitrary
+        // text (the console) can tell what is safe to draw this frame.
+        private static readonly HashSet<char> Requested = new HashSet<char>();
+
+        internal static bool IsPrepared(char c)
+        {
+            lock (Requested)
+            {
+                return Requested.Contains(c);
+            }
+        }
+
         private static void Request(string characters)
         {
             if (Font == null)
@@ -146,6 +158,13 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             try
             {
+                lock (Requested)
+                {
+                    foreach (char c in characters)
+                    {
+                        Requested.Add(c);
+                    }
+                }
                 Font.RequestCharactersInTexture(characters, Size, FontStyle.Normal);
                 if (Bold)
                 {

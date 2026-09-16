@@ -240,9 +240,10 @@ namespace DragNWash.ModFramework.ToolWindow
         // Log lines carry any text, including Japanese from the localization
         // mod. Drawing a character the window font has not rasterised uploads
         // a new atlas in the middle of the frame, which crashes Direct3D 12
-        // (UUM-140564). So on Direct3D 12 anything beyond ASCII is drawn as
-        // '?'; elsewhere new characters are shown as '?' once and prepared for
-        // the next frame from Update, the way PrepareCharacters works.
+        // (UUM-140564). Characters some mod already prepared (the localization
+        // mod prepares its language's at startup) are drawn as they are. Others
+        // are drawn as '?': on Direct3D 12 for good, elsewhere once, and then
+        // prepared for the next frame from Update, the way PrepareCharacters works.
         private static readonly HashSet<char> Prepared = new HashSet<char>();
         private static readonly StringBuilder Pending = new StringBuilder();
         private static readonly bool NeverPrepare = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12;
@@ -253,7 +254,7 @@ namespace DragNWash.ModFramework.ToolWindow
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (c < 128 || (!NeverPrepare && Prepared.Contains(c)))
+                if (c < 128 || MenuFont.IsPrepared(c) || (!NeverPrepare && Prepared.Contains(c)))
                 {
                     sb?.Append(c);
                     continue;
