@@ -19,6 +19,9 @@ namespace DragNWash.ModFramework.Mods
             Toggle,
             Choice,
             Number,
+            // Anything BepInEx can write to the config file as text: strings,
+            // keyboard shortcuts, colours, vectors. Edited as that text.
+            Text,
             ReadOnly,
         }
 
@@ -35,6 +38,40 @@ namespace DragNWash.ModFramework.Mods
         internal string Description => Entry.Description?.Description;
 
         internal bool IsDefault => Equals(Entry.BoxedValue, Entry.DefaultValue);
+
+        internal bool IsShortcut => Entry.SettingType == typeof(KeyboardShortcut);
+
+        // The value as it stands in the config file: what the text field edits.
+        internal string SerializedText
+        {
+            get
+            {
+                try { return Entry.GetSerializedValue() ?? ""; }
+                catch (Exception) { return Format(Entry.BoxedValue); }
+            }
+        }
+
+        // Sets the value from text as the config file would give it. Returns
+        // null when it was accepted, otherwise why it was not.
+        internal string SetText(string text)
+        {
+            object value;
+            try
+            {
+                value = TomlTypeConverter.ConvertToValue(text ?? "", Entry.SettingType);
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+            Set(value);
+            return null;
+        }
+
+        internal void SetShortcut(KeyboardShortcut shortcut)
+        {
+            Set(shortcut);
+        }
 
         internal static List<ConfigItem> For(ModCatalog.Entry mod)
         {
@@ -124,6 +161,10 @@ namespace DragNWash.ModFramework.Mods
                     item.Max = Convert.ToDouble(acceptable.GetType().GetProperty("MaxValue").GetValue(acceptable, null), CultureInfo.InvariantCulture);
                 }
             }
+            else if (TomlTypeConverter.CanConvert(type))
+            {
+                item.Type = Kind.Text;
+            }
             return item;
         }
 
@@ -134,9 +175,21 @@ namespace DragNWash.ModFramework.Mods
                    t == typeof(ushort) || t == typeof(sbyte) || t == typeof(decimal);
         }
 
-        internal string ValueText => Format(Entry.BoxedValue);
+        internal string ValueText => Type == Kind.Text ? SerializedText : Format(Entry.BoxedValue);
 
-        internal string DefaultText => Format(Entry.DefaultValue);
+        internal string DefaultText => Type == Kind.Text ? SerializeDefault() : Format(Entry.DefaultValue);
+
+        private string SerializeDefault()
+        {
+            try
+            {
+                return Entry.DefaultValue == null ? "" : TomlTypeConverter.ConvertToString(Entry.DefaultValue, Entry.SettingType);
+            }
+            catch (Exception)
+            {
+                return Format(Entry.DefaultValue);
+            }
+        }
 
         // Toggle values use the same "On"/"Off" words as the rest of the screen,
         // so translation packs cover them.

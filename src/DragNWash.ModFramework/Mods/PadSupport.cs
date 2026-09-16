@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -63,6 +64,13 @@ namespace DragNWash.ModFramework.Mods
                 {
                     _selected = selected;
                     _selectedFrame = Time.frameCount;
+                }
+
+                // A text field takes the pad's presses itself (and, on the Steam
+                // Deck, the on-screen keyboard): nothing to click for it here.
+                if (selected.GetComponent<TMP_InputField>() != null)
+                {
+                    return;
                 }
 
                 Button button = selected.GetComponent<Button>();
