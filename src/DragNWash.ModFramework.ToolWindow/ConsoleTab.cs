@@ -22,6 +22,10 @@ namespace DragNWash.ModFramework.ToolWindow
         private static readonly List<string> History = new List<string>();
         private static int _historyIndex = -1;
         private static bool _focusInput;
+        // Whether the input had keyboard focus when it was last drawn. Asked
+        // before the field is drawn in a pass, GetNameOfFocusedControl does not
+        // know the name yet, so keys would fall through to the field itself.
+        private static bool _inputFocused;
         private static List<string> _suggestions = new List<string>();
         private static string _suggestedFor;
         private static int _selected;
@@ -130,7 +134,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 _suggestedFor = _input;
                 _selected = 0;
             }
-            float suggestionHeight = _suggestions.Count > 0 && GUI.GetNameOfFocusedControl() == InputControl ? _suggestions.Count * (row - 6) + 6 : 0;
+            float suggestionHeight = _suggestions.Count > 0 && _inputFocused ? _suggestions.Count * (row - 6) + 6 : 0;
 
             // The log, oldest first, following the end unless the player scrolled up.
             var view = new Rect(x, y, w, area.yMax - pad - y - row - 8 - suggestionHeight);
@@ -185,7 +189,7 @@ namespace DragNWash.ModFramework.ToolWindow
             // The command line. Enter runs; Tab fills in the selected suggestion;
             // up and down move through suggestions when there are any, else the history.
             Event ev = Event.current;
-            bool focused = GUI.GetNameOfFocusedControl() == InputControl;
+            bool focused = _inputFocused;
             bool suggesting = focused && _suggestions.Count > 0;
             // Enter arrives as a key code on some platforms and as the character
             // LF or CR on others; accept either so it always runs the line.
@@ -197,7 +201,7 @@ namespace DragNWash.ModFramework.ToolWindow
                     Submit();
                     ev.Use();
                 }
-                else if (ev.keyCode == KeyCode.Tab)
+                else if (ev.keyCode == KeyCode.Tab || ev.character == (char)9)
                 {
                     if (suggesting)
                     {
@@ -239,7 +243,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
             }
             // Tab must not leave the field: IMGUI would move focus on the KeyUp too.
-            if (focused && ev.type == EventType.KeyUp && ev.keyCode == KeyCode.Tab)
+            if (focused && ev.type == EventType.KeyUp && (ev.keyCode == KeyCode.Tab || ev.character == (char)9))
             {
                 ev.Use();
             }
@@ -269,6 +273,7 @@ namespace DragNWash.ModFramework.ToolWindow
             GUI.SetNextControlName(InputControl);
             var inputRect = new Rect(x + 20, y, w - 20 - 70, row);
             _input = GUI.TextField(inputRect, _input ?? "", s.TextField);
+            _inputFocused = GUI.GetNameOfFocusedControl() == InputControl;
             Underline(inputRect);
             if (_focusInput)
             {
