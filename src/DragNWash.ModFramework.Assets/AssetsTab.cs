@@ -25,6 +25,50 @@ namespace DragNWash.ModFramework.Assets
                 return;
             }
             _tab = TW.AddTab(GameFonts.Guid, "Assets", Draw, 50);
+            TW.AddCommand(GameFonts.Guid, "assets", "assets textures [filter] | assets replacements | assets apply | assets reload", Command);
+        }
+
+        private static string Command(string[] args)
+        {
+            string what = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+            switch (what)
+            {
+                case "textures":
+                {
+                    string filter = args.Length > 1 ? args[1] : null;
+                    var lines = new List<string>();
+                    foreach (TextureInfo t in AssetCatalog.Textures())
+                    {
+                        if (filter == null || t.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            lines.Add($"{t.Name}  {t.Width}x{t.Height} {t.Format}  {t.MaterialUsers} mat, {t.Sprites} sprite{(t.Replaced ? "  replacement" : "")}");
+                        }
+                    }
+                    return lines.Count == 0 ? "No texture matches." : string.Join("\n", lines);
+                }
+                case "replacements":
+                {
+                    var lines = new List<string>();
+                    foreach (TextureReplacement r in AssetReplacements.All)
+                    {
+                        lines.Add($"{r.Name}  from {r.Mod}  in {r.Applied} place(s)" + (r.Overrides.Count > 0 ? "  overrides " + string.Join(", ", r.Overrides) : "") + (r.Problem != null ? "  NOT reloaded: " + r.Problem : ""));
+                    }
+                    return lines.Count == 0 ? "No mod ships texture replacements." : string.Join("\n", lines);
+                }
+                case "apply":
+                    return $"Replacements applied in {AssetReplacements.ApplyNow()} place(s).";
+                case "reload":
+                {
+                    var lines = new List<string>();
+                    foreach (ReloadResult r in AssetReplacements.ReloadFiles())
+                    {
+                        lines.Add($"{r.Name}: {r.Status}");
+                    }
+                    return string.Join("\n", lines);
+                }
+                default:
+                    return "assets textures [filter] | assets replacements | assets apply | assets reload";
+            }
         }
 
         private static void Draw(Rect area)
