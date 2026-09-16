@@ -2,7 +2,7 @@
 
 [日本語](ASSET_TOOL.ja.md)
 
-> **Experimental.** In the Assets library from 1.1.0 on the `experimental/asset-tool` branch. What is here may still change before a release.
+> **Experimental.** In the Assets library from 1.1.0, on `main` but not yet in a release. What is here may still change before one.
 
 The framework provides tools for the game's assets; what people make with them is their own responsibility, in the way of REFramework and similar tools. Three things, in this order:
 

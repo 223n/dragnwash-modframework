@@ -7,6 +7,9 @@ Versions of the core and of each library are separate, and follow semantic versi
 ### Assets 1.1.0
 
 - Experimental. Texture replacements: a PNG at `BepInEx/plugins/<Mod>/assets/textures/<texture name>.png` takes the place of the game texture of that name in every material and sprite, read at startup and applied at each scene load; two mods replacing the same texture are both named, never overridden silently. `AssetCatalog` lists loaded textures, materials, meshes and shaders, and the Tool window gets an **Assets** tab. See [docs/ASSET_TOOL.md](docs/ASSET_TOOL.md).
+### Dialogue 1.1.0
+
+- Experimental. `LineKey` and `LineResolver`: keys for a line of dialogue that carry no text and survive a game update editing the line (line ID, exact hash, normalized hash, fingerprint), tried strongest first; matches by anything but the exact text are flagged for review. Same definitions in `tools/linekeys.py`, checked against `ci/linekey-vectors.json` in CI. See [docs/STABLE_LINE_KEYS.md](docs/STABLE_LINE_KEYS.md).
 
 ## 2026-09-15: hand-made icon
 
