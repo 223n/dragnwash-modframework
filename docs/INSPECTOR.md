@@ -1,0 +1,92 @@
+# Inspector (design)
+
+[日本語](INSPECTOR.ja.md)
+
+> **Design only.** Nothing here is built. It is on an experimental branch to be discussed; open an issue or comment on the pull request.
+
+An **Inspector** tab in the Tool window: the scene's objects and their components, the fields and properties of each, and the parameters of the loaded materials, readable and editable while the game runs. What Unity's own Inspector does in the editor, for a game one only has as a build. For people who make mods and want to know "what is this thing, what is it called, what value does it hold", and to try a change before writing a line of code. A developer-tools feature (GUIDE rule 8), never something a player sees.
+
+## What it is for, and what it is not
+
+- **Find out.** The name of the object behind a sign, the component that drives the door, the material of the counter and its shader, the field that holds the scrub speed. Everything a mod's `GameHooks.Require` or `AssetReplacements` needs a name for, found by looking instead of decompiling.
+- **Try.** Change a value and see it in the game at once. Nothing is saved: the change lives until the scene reloads or the game quits. Turning a set of changes into a mod is a later design (an overrides file the Assets library applies at startup, the same way texture replacements work); this one does not do it, on purpose, so the two can be judged separately.
+- **Not a RuntimeUnityEditor.** No REPL, no method calls with arguments, no adding or removing components, no instantiating prefabs, no gizmos. RuntimeUnityEditor does those well; it also opens its own IMGUI window and takes over the cursor and input, so it and the Tool window will fight. The FAQ will say that: one or the other, not both, until coexistence is tested.
+
+## Where it lives
+
+In the **Tool window** library (Tool window 1.2.0), as a tab. It needs nothing from the game and nothing from the other libraries: reflection and Unity's own scene and shader APIs are enough. The material part reads `AssetCatalog` from the Assets library when that is loaded, the way the Assets tab reads the Tool window today (soft dependency: checked through the chainloader, never a hard reference), and the Assets tab gets an **Inspect** button per material that jumps here.
+
+## The tab
+
+Three panes, left to right; in a narrow window they become three pages with a back button, like the Saves tab's rows do.
+
+1. **Hierarchy.** Every loaded scene, its root objects and their children as a tree, plus a **Search** box that filters by name (substring, case-insensitive) and flattens the tree to the matches with their paths. Inactive objects shown muted. The tree is built when the tab is opened, when **Refresh** is pressed or when a scene loads (`GameEvents.OnSceneLoaded`), never every frame: a scene has thousands of objects and `FindObjectsOfType` is not free.
+2. **Components.** The selected object's components in order, with the object's active flag, tag, layer and full path above. The **Materials** entry of a Renderer is listed like a component, so a material is one click from the object that shows it. Selecting a component opens it in the third pane.
+3. **Members.** The component's fields and properties, one row each: name, type, value. Public ones first, then non-public ones under a **Show private** toggle (off by default; a value set through a private field is the mod author's own risk, and the page says so once). Values are read on each Repaint for the selected component only, so the numbers move as the game runs; a **Freeze** toggle stops that for reading a value that changes every frame.
+
+## Editing
+
+A row whose type the tab knows gets a control; the others show the value as text and are read-only.
+
+| Type | Control |
+|---|---|
+| `bool` | toggle |
+| `int`, `float`, `double`, `long` and the other numbers | text field; Enter applies, a value the parser refuses is put back and the row says why (the same rule as the Mods screen's settings page) |
+| `string` | text field |
+| enums | choice, cycled with a button, or a list when it has many values |
+| `Vector2/3/4`, `Quaternion` (shown as Euler angles), `Rect`, `Bounds` | one text field per component |
+| `Color` | four text fields and a swatch |
+| `UnityEngine.Object` references (a Transform, a Material, a Texture, another component) | the object's name and a **Go** button that selects it; not editable |
+| lists and arrays of the above | expandable, each element a row; no adding or removing |
+| anything else | `ToString()`, read-only |
+
+A property is editable only when it has a setter. Every set runs in a try/catch: an exception from the game's setter is shown on the row, and the tab goes on. `Transform` gets the same rows as any component (`position`, `rotation`, `localScale`) and nothing special.
+
+## Materials and shaders
+
+For a material (from a Renderer, or from the Assets tab), the members pane lists the shader's properties by asking the shader itself (`Shader.GetPropertyCount`, `GetPropertyName`, `GetPropertyType`, and the range limits for Range properties), with the material's current value for each:
+
+| Property type | Control |
+|---|---|
+| Float, Range | text field; a Range shows its limits |
+| Color | four fields and a swatch |
+| Vector | four fields |
+| Texture | the texture's name, size and format, and **Go** to it in the Assets tab; not editable here (texture replacements already exist and go through their own safe path) |
+| Int | text field |
+
+Shader keywords (`_ALPHATEST_ON` and the like) are listed with a toggle each. Changing a material changes every renderer that shares it, which is what a mod's material override would do too; the pane says how many renderers share it.
+
+This part is the reason the tab is worth building even before it can save anything: a colour or a smoothness value found here is exactly what a later overrides file records, and a translator's texture work is a Go button away from the material that shows it.
+
+## Safety
+
+- **Developer tools only.** The tab exists only while the switch is on, like the rest of the window.
+- **No uploads.** Reading and editing values never creates or uploads a texture, so Direct3D 12 is not a concern here. A texture property is shown, never assigned.
+- **Names are drawn through the window's guard.** Object names can be anything; non-ASCII is shown as `?` on Direct3D 12 as the Console does.
+- **Destroyed objects.** A selected object or component that Unity has destroyed (`== null`) clears the selection with a note instead of throwing.
+- **No walking every frame.** The hierarchy is built on demand. Reflection member lists are cached per type. Only the selected component's values are read per Repaint.
+- **Nothing persists.** There is no file, no config, no replay at startup. The worst an edit can do is break the running session, which a restart fixes; the page says so once when the tab is first opened.
+- **Isolation.** Reflection failures, setter exceptions and shader queries that throw are caught per row and shown on that row.
+
+## Console
+
+- `inspect` lists the hierarchy's root objects; `inspect <name or path>` selects an object (path segments separated by `/`, the first match by name when there is no path) and opens the tab on it; `inspect <path> <component>` selects the component.
+- `inspect set <path> <component> <member> <value>` sets one value from the console, with the same parsing as the row. For scripts one runs by hand; there is still no scripting language.
+- Completion offers object names for the current search and, after a path, its component names.
+
+## For mod authors
+
+- `ToolWindow.Inspect(UnityEngine.Object target)` selects an object, component or material and opens the tab on it. A mod's own tab can put an **Inspect** button next to anything it lists.
+- Nothing to declare: every object and component is shown, including a mod's own. A `[HideInInspector]` attribute from Unity on a field is honoured; a mod that wants a field hidden uses that.
+- Custom drawers for a type (a nicer control than the default rows) are not in this design; if the need shows up, they would be registered by GUID like everything else.
+
+## Order of work
+
+1. Hierarchy with search and selection; components pane; members pane read-only. Useful on its own for finding names.
+2. Editing of the known types, with the per-row error rule.
+3. Materials: shader properties and keywords; the Inspect button in the Assets tab; Go from a texture property to the Assets tab.
+4. `inspect` console commands and completion; `ToolWindow.Inspect`.
+5. Private members behind the toggle; lists and arrays.
+6. FAQ note about RuntimeUnityEditor, and a coexistence test if anyone asks.
+
+Not in this design: saving edits (a later overrides design in the Assets library), method invocation, adding or removing components, prefabs, gizmos, a REPL.
