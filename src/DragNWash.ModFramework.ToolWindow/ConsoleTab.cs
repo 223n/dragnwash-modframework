@@ -26,6 +26,19 @@ namespace DragNWash.ModFramework.ToolWindow
         // before the field is drawn in a pass, GetNameOfFocusedControl does not
         // know the name yet, so keys would fall through to the field itself.
         private static bool _inputFocused;
+
+        // [Console] TraceInput: every key the tab sees and what it did with it,
+        // written to the log as DragNWash.ConsoleTrace, for debugging the input.
+        internal static bool Trace;
+        private static readonly ManualLogSource TraceLog = BepInEx.Logging.Logger.CreateLogSource("DragNWash.ConsoleTrace");
+
+        private static void T(string what)
+        {
+            if (Trace)
+            {
+                TraceLog.LogInfo(what);
+            }
+        }
         private static List<string> _suggestions = new List<string>();
         private static string _suggestedFor;
         private static int _selected;
@@ -191,6 +204,10 @@ namespace DragNWash.ModFramework.ToolWindow
             Event ev = Event.current;
             bool focused = _inputFocused;
             bool suggesting = focused && _suggestions.Count > 0;
+            if (ev.type == EventType.KeyDown || ev.type == EventType.KeyUp)
+            {
+                T($"{ev.type} key={ev.keyCode} ch={(int)ev.character} mods={ev.modifiers} focused={focused} named=\"{GUI.GetNameOfFocusedControl()}\" kb={GUIUtility.keyboardControl} input=\"{_input}\" suggestions={_suggestions.Count} selected={_selected} historyIndex={_historyIndex}");
+            }
             // Enter arrives as a key code on some platforms and as the character
             // LF or CR on others; accept either so it always runs the line.
             bool enter = ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == (char)10 || ev.character == (char)13;
@@ -198,6 +215,7 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 if (enter)
                 {
+                    T("-> Submit");
                     Submit();
                     ev.Use();
                 }
@@ -205,7 +223,12 @@ namespace DragNWash.ModFramework.ToolWindow
                 {
                     if (suggesting)
                     {
+                        T("-> Accept " + _suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)]);
                         Accept(_suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)]);
+                    }
+                    else
+                    {
+                        T("-> Tab with no suggestions");
                     }
                     _focusInput = true;
                     ev.Use();
@@ -217,6 +240,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
                 else if (ev.keyCode == KeyCode.UpArrow)
                 {
+                    T(suggesting ? "-> select up" : "-> history up");
                     if (suggesting)
                     {
                         _selected = (_selected - 1 + _suggestions.Count) % _suggestions.Count;
@@ -230,6 +254,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
                 else if (ev.keyCode == KeyCode.DownArrow)
                 {
+                    T(suggesting ? "-> select down" : "-> history down");
                     if (suggesting)
                     {
                         _selected = (_selected + 1) % _suggestions.Count;
@@ -272,8 +297,14 @@ namespace DragNWash.ModFramework.ToolWindow
             GUI.Label(new Rect(x, y, 20, row), ">", s.Label);
             GUI.SetNextControlName(InputControl);
             var inputRect = new Rect(x + 20, y, w - 20 - 70, row);
+            string before = _input;
             _input = GUI.TextField(inputRect, _input ?? "", s.TextField);
+            bool wasFocused = _inputFocused;
             _inputFocused = GUI.GetNameOfFocusedControl() == InputControl;
+            if (_input != before || _inputFocused != wasFocused)
+            {
+                T($"field: input=\"{_input}\" focused={_inputFocused} (event {ev.type})");
+            }
             Underline(inputRect);
             if (_focusInput)
             {
@@ -282,6 +313,7 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             if (GUI.Button(new Rect(area.xMax - pad - 64, y, 64, row), "Run", s.Button))
             {
+                T("-> Run button");
                 Submit();
             }
         }
@@ -305,6 +337,7 @@ namespace DragNWash.ModFramework.ToolWindow
         private static void Submit()
         {
             string line = (_input ?? "").Trim();
+            T($"Submit \"{line}\"");
             _input = "";
             _historyIndex = -1;
             _focusInput = true;

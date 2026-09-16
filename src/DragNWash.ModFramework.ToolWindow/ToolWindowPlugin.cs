@@ -26,6 +26,7 @@ namespace DragNWash.ModFramework.ToolWindow
         private ConfigEntry<string> _fontMode;
         private ConfigEntry<string> _consoleShow;
         private ConfigEntry<string> _consoleLevels;
+        private ConfigEntry<bool> _consoleTrace;
         private bool _savingConsole;
 
         internal bool ShowWindow;
@@ -90,6 +91,10 @@ namespace DragNWash.ModFramework.ToolWindow
                 "Levels the Console tab shows at all, comma separated: Fatal, Error, Warning, Message, Info, Debug. Everything is still written to BepInEx/LogOutput.log.");
             _consoleLevels = Config.Bind("Console", "Levels", "unity:Warning, default:Info",
                 "The least severe level shown per log source, comma separated, as source:level. 'unity' is Unity's own log, 'default' every source without its own entry, anything else a source name as the log prints it (e.g. DragNWash.ModFramework.Assets:Debug).");
+            _consoleTrace = Config.Bind("Console", "TraceInput", false,
+                "Writes every key the Console tab sees, and what it did with it, to the log as DragNWash.ConsoleTrace. For debugging the console's input.");
+            ConsoleTab.Trace = _consoleTrace.Value;
+            _consoleTrace.SettingChanged += (s, e) => ConsoleTab.Trace = _consoleTrace.Value;
             ApplyConsoleConfig();
             _consoleShow.SettingChanged += (s, e) => { if (!_savingConsole) ApplyConsoleConfig(); };
             _consoleLevels.SettingChanged += (s, e) => { if (!_savingConsole) ApplyConsoleConfig(); };
