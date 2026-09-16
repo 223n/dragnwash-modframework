@@ -2,7 +2,7 @@
 
 [日本語](STABLE_LINE_KEYS.ja.md)
 
-> **Experimental.** Shipped in the Dialogue library from 1.1.0 on the `experimental/stable-line-keys` branch. The definitions below may still change before a release.
+> **Experimental.** In the Dialogue library from 1.1.0, on `main` but not yet in a release. The definitions below may still change before one.
 
 A mod that keeps data about a line of dialogue (a translation, a bookmark, a chapter marker) needs to find that line again after a game update. Keying by the exact English text breaks on the smallest edit: the September 14, 2026 update fixed typos in 24 lines and every translation of them fell back to English. Keying by the Yarn line ID alone breaks when the developers re-tag or recreate lines. This library keys a line four ways and tries them strongest first.
 
