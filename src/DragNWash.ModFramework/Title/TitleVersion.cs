@@ -48,6 +48,8 @@ namespace DragNWash.ModFramework.Title
             {
                 ModFramework.Log.LogWarning($"Could not show the framework version on the title screen: {ex.Message}");
             }
+            // The title screen is up: the game has started, for GameEvents.
+            GameEvents.RaiseGameStarted();
         }
 
         internal static string Text()

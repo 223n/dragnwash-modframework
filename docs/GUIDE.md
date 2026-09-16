@@ -51,6 +51,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 | Read or change save slots and flags | `GameSaves`, `GameFlags` (library **Flags and saves**) | writing `savegame.dgn` yourself |
 | Share an API with other mods | `Services.Register<T>` and `Services.Get<T>` | public static fields another mod has to find by reflection |
 | Check that a game method you patch still exists | `GameHooks.Require` | patching and hoping |
+| Run something when a scene loads, when the game has started or when it quits | `GameEvents.OnSceneLoaded`, `OnGameStarted`, `OnQuitting` (experimental) | `SceneManager.sceneLoaded` and `Application.quitting` yourself |
 
 ## Rules
 
@@ -62,6 +63,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 6. **Keep game types out of your public API.** If your mod is a library for other mods, expose your own types, so a game update changes your internals and not every mod built on you.
 7. **Do not ship the game's files.** No assets, script text or game DLLs in your repository or releases.
 8. **Keep developer features behind the developer-tools switch.** Exports, hot reload, debug keys and windows run only while `DeveloperTools.Enabled` is true (`DeveloperTools.WhenEnabled` for features that start later), so that someone who only installed a mod never sees them. Tool window tabs already are.
+9. **Take the game's events from `GameEvents`.** A handler on `SceneManager.sceneLoaded` that throws stops every mod that subscribed after it, and nobody can tell which mod it was. `GameEvents.OnSceneLoaded(yourGuid, ...)` runs each mod's handler on its own, names the mod on the Mods screen when it fails, and switches a handler off after three failures in a row.
 
 ## Writing a library
 
