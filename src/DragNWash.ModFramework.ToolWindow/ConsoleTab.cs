@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using BepInEx.Logging;
 using UnityEngine;
 
@@ -45,6 +46,7 @@ namespace DragNWash.ModFramework.ToolWindow
         // Called from the plugin's Update: the badge on the tab button.
         internal static void Tick()
         {
+            FlushPending();
             if (_tab != null)
             {
                 _tab.Title = ConsoleLog.UnseenErrors > 0 ? Title + " !" : Title;
@@ -229,9 +231,55 @@ namespace DragNWash.ModFramework.ToolWindow
 
         private static string Line(ConsoleEntry e)
         {
-            return e.Source == ConsoleLog.CommandSource
+            string line = e.Source == ConsoleLog.CommandSource
                 ? e.Text
                 : $"{e.Time:HH:mm:ss} [{Short(e.Level)}] {e.Source}: {e.Text}";
+            return Drawable(line);
+        }
+
+        // Log lines carry any text, including Japanese from the localization
+        // mod. Drawing a character the window font has not rasterised uploads
+        // a new atlas in the middle of the frame, which crashes Direct3D 12
+        // (UUM-140564). So on Direct3D 12 anything beyond ASCII is drawn as
+        // '?'; elsewhere new characters are shown as '?' once and prepared for
+        // the next frame from Update, the way PrepareCharacters works.
+        private static readonly HashSet<char> Prepared = new HashSet<char>();
+        private static readonly StringBuilder Pending = new StringBuilder();
+        private static readonly bool NeverPrepare = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12;
+
+        private static string Drawable(string text)
+        {
+            StringBuilder sb = null;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c < 128 || (!NeverPrepare && Prepared.Contains(c)))
+                {
+                    sb?.Append(c);
+                    continue;
+                }
+                if (sb == null)
+                {
+                    sb = new StringBuilder(text.Length);
+                    sb.Append(text, 0, i);
+                }
+                sb.Append('?');
+                if (!NeverPrepare && Prepared.Add(c))
+                {
+                    Pending.Append(c);
+                }
+            }
+            return sb == null ? text : sb.ToString();
+        }
+
+        // From the plugin's Update: rasterise what the last frame could not draw.
+        private static void FlushPending()
+        {
+            if (Pending.Length > 0)
+            {
+                MenuFont.Prepare(Pending.ToString());
+                Pending.Length = 0;
+            }
         }
 
         private static string Short(LogLevel level)
