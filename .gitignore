@@ -19,3 +19,6 @@ libs/
 # OS
 Thumbs.db
 .DS_Store
+
+# Python bytecode from tools/
+__pycache__/

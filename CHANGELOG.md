@@ -2,6 +2,12 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
+## Unreleased
+
+### Assets 1.1.0
+
+- Experimental. Texture replacements: a PNG at `BepInEx/plugins/<Mod>/assets/textures/<texture name>.png` takes the place of the game texture of that name in every material and sprite, read at startup and applied at each scene load; two mods replacing the same texture are both named, never overridden silently. `AssetCatalog` lists loaded textures, materials, meshes and shaders, and the Tool window gets an **Assets** tab. See [docs/ASSET_TOOL.md](docs/ASSET_TOOL.md).
+
 ## 2026-09-15: hand-made icon
 
 Released together with Drag'n Wash Localization v1.1.2. The libraries stay at 1.0.0.

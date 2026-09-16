@@ -45,6 +45,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 | Add a debug or developer tool | `ToolWindow.AddTab` (library **Tool window**) | your own `OnGUI` window, cursor unlocking or input blocking |
 | Show text in scripts the game's fonts lack | `GameFonts.Prepare` and `GameFonts.SetLanguage` (library **Assets**) | adding to `TMP_Settings.fallbackFontAssets` yourself |
 | Load a texture or an asset bundle | `GameAssets.LoadTexture`, `GameAssets.LoadBundle` (library **Assets**), from `Awake` | loading while the game runs |
+| Replace a game texture with your own, or see what is loaded | `assets/textures/<name>.png` in your mod folder, `AssetCatalog` (library **Assets**, experimental; [ASSET_TOOL.md](ASSET_TOOL.md)) | swapping textures in materials yourself |
 | Read or change save slots and flags | `GameSaves`, `GameFlags` (library **Flags and saves**) | writing `savegame.dgn` yourself |
 | Share an API with other mods | `Services.Register<T>` and `Services.Get<T>` | public static fields another mod has to find by reflection |
 | Check that a game method you patch still exists | `GameHooks.Require` | patching and hoping |
