@@ -84,6 +84,26 @@ namespace DragNWash.ModFramework.Assets
             {
                 AssetReplacements.WatchFiles();
             }
+            // Turning it back on from the Mods screen takes effect at once and forgets the crashes.
+            AllowReload.SettingChanged += (sender, args) =>
+            {
+                if (AllowReload.Value)
+                {
+                    ReloadGuard.ResetCount();
+                    AssetReplacements.ReloadDisabled = false;
+                    AssetReplacements.ReloadDisabledReason = null;
+                    if (WatchFiles.Value)
+                    {
+                        AssetReplacements.WatchFiles();
+                    }
+                    Logger.LogMessage("Texture reload switched back on.");
+                }
+                else
+                {
+                    AssetReplacements.ReloadDisabled = true;
+                    AssetReplacements.ReloadDisabledReason = "switched off in the config ([Reload] AllowReload)";
+                }
+            };
         }
 
         private void Update()
