@@ -344,9 +344,11 @@ namespace DragNWash.ModFramework.Mods
             colors.selectedColor = Color.white;
             colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
             field.colors = colors;
-            field.text = item.SerializedText;
             field.onEndEdit.AddListener(value => ApplyText(item, field, value));
             go.SetActive(true);
+            // Only now: text given to the field while it was inactive was not shown.
+            field.text = item.SerializedText;
+            field.ForceLabelUpdate();
 
             if (shortcut)
             {
