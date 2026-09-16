@@ -125,7 +125,8 @@ namespace DragNWash.ModFramework.ToolWindow
             // Suggestions for what is typed, kept fresh here so keys below can use them.
             if (_suggestedFor != _input)
             {
-                _suggestions = ConsoleCommands.Suggest(_input ?? "", MaxSuggestionRows);
+                // Nothing typed yet: no list, so the log stays in view.
+                _suggestions = string.IsNullOrEmpty(_input) ? new List<string>() : ConsoleCommands.Suggest(_input, MaxSuggestionRows);
                 _suggestedFor = _input;
                 _selected = 0;
             }
@@ -186,9 +187,14 @@ namespace DragNWash.ModFramework.ToolWindow
             Event ev = Event.current;
             bool focused = GUI.GetNameOfFocusedControl() == InputControl;
             bool suggesting = focused && _suggestions.Count > 0;
+            // Enter arrives as a key code on some platforms and as the character
+            // '
+' or '' on others; accept either so it always runs the line.
+            bool enter = ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == '
+' || ev.character == '';
             if (focused && ev.type == EventType.KeyDown)
             {
-                if (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter)
+                if (enter)
                 {
                     Submit();
                     ev.Use();
