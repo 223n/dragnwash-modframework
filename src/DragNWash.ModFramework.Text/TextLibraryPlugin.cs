@@ -20,6 +20,7 @@ namespace DragNWash.ModFramework.Text
         private void Awake()
         {
             Log = Logger;
+            ModReload.Unloading += GameText.RemoveOwned;
             ModFramework.Register(new ModInfo
             {
                 Guid = GameText.Guid,

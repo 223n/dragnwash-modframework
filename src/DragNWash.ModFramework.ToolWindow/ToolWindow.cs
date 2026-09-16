@@ -224,6 +224,18 @@ namespace DragNWash.ModFramework.ToolWindow
             return VirtualClick.ApplyScroll(view, ref scroll);
         }
 
+        // On a mod's reload (ModReload.Unloading): its tabs, its commands and
+        // its OpenChanged handlers go, so the new build adds them back cleanly.
+        internal static void RemoveOwned(string owner, System.Reflection.Assembly assembly)
+        {
+            lock (Tabs)
+            {
+                Tabs.RemoveAll(t => t.Owner == owner);
+            }
+            ConsoleCommands.UnregisterOwned(owner);
+            OpenChanged = (Action<bool>)ModReload.Prune(OpenChanged, assembly);
+        }
+
         internal static void RaiseOpenChanged(bool open)
         {
             if (OpenChanged == null)

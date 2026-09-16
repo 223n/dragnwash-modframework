@@ -86,6 +86,14 @@ namespace DragNWash.ModFramework.ToolWindow
             }
         }
 
+        internal static void UnregisterOwned(string owner)
+        {
+            lock (Commands)
+            {
+                Commands.RemoveAll(c => c.Owner == owner);
+            }
+        }
+
         /// <summary>
         /// Runs one line as typed. Output goes to <see cref="ConsoleLog"/>; a
         /// command that throws prints the error and nothing else happens.
@@ -378,12 +386,31 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
                 return new string[0];
             });
-            Register(ToolWindow.Guid, "mods", "Loaded plugins, with features the framework found unavailable", args =>
+            Register(ToolWindow.Guid, "mods", "Loaded plugins, with features the framework found unavailable | mods reload <guid> | mods watch on|off", args =>
             {
+                if (args.Length > 0 && args[0].Equals("reload", StringComparison.OrdinalIgnoreCase))
+                {
+                    return args.Length < 2 ? "mods reload <guid>  (a reloadable mod; see mods)" : ModReload.Reload(args[1]);
+                }
+                if (args.Length > 0 && args[0].Equals("watch", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (args.Length > 1 && (args[1] == "on" || args[1] == "off"))
+                    {
+                        ModReload.Watching = args[1] == "on";
+                    }
+                    return ModReload.Watching
+                        ? "Reloadable mods are reloaded when their DLL changes."
+                        : DeveloperTools.Enabled ? "Automatic reload is off (mods watch on to turn it on)." : "Automatic reload needs developer tools on.";
+                }
                 var sb = new StringBuilder();
                 foreach (KeyValuePair<string, BepInEx.PluginInfo> kv in BepInEx.Bootstrap.Chainloader.PluginInfos)
                 {
                     sb.Append($"{kv.Value.Metadata.Name} {kv.Value.Metadata.Version} ({kv.Key})");
+                    if (ModReload.IsReloadable(kv.Key))
+                    {
+                        int n = ModReload.ReloadCount(kv.Key);
+                        sb.Append(n > 0 ? $" - reloadable, reloaded {n} time(s)" : " - reloadable");
+                    }
                     IReadOnlyList<string> missing = GameHooks.UnavailableFeatures(kv.Key);
                     if (missing.Count > 0)
                     {
@@ -392,6 +419,12 @@ namespace DragNWash.ModFramework.ToolWindow
                     sb.Append('\n');
                 }
                 return sb.ToString().TrimEnd();
+            }, args =>
+            {
+                if (args.Length == 1) return new[] { "reload", "watch" };
+                if (args.Length == 2 && args[0].Equals("reload", StringComparison.OrdinalIgnoreCase)) return ModReload.ReloadableMods();
+                if (args.Length == 2 && args[0].Equals("watch", StringComparison.OrdinalIgnoreCase)) return new[] { "on", "off" };
+                return new string[0];
             });
             Register(ToolWindow.Guid, "scene", "The scene that is loaded", args =>
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);

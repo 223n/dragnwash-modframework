@@ -27,6 +27,13 @@ namespace DragNWash.ModFramework.Dialogue
         private void Awake()
         {
             Log = Logger;
+            // A reloaded mod's old handlers go (ModReload); the new build subscribes again.
+            ModReload.Unloading += (guid, assembly) =>
+            {
+                ModReload.PruneEvent(typeof(GameDialogue), nameof(GameDialogue.NodeStarted), assembly);
+                ModReload.PruneEvent(typeof(GameDialogue), nameof(GameDialogue.LineShowing), assembly);
+                ModReload.PruneEvent(typeof(GameDialogue), nameof(GameDialogue.OptionShowing), assembly);
+            };
             ModFramework.Register(new ModInfo
             {
                 Guid = GameDialogue.Guid,

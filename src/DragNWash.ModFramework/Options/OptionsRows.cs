@@ -45,8 +45,15 @@ namespace DragNWash.ModFramework.Options
 
         internal static void Add(OptionsChoice choice)
         {
-            if (Choices.Any(c => c.Id == choice.Id))
+            OptionsChoice existing = Choices.FirstOrDefault(c => c.Id == choice.Id);
+            if (existing != null)
             {
+                // The same row again: a reloaded mod (ModReload) adding its row
+                // back. The row keeps its place; the callbacks are the new build's.
+                existing.GetSaved = choice.GetSaved;
+                existing.Save = choice.Save;
+                existing.Preview = choice.Preview;
+                existing.DefaultIndex = choice.DefaultIndex;
                 return;
             }
             Choices.Add(choice);

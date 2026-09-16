@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using BepInEx.Logging;
 
 namespace DragNWash.ModFramework
@@ -101,6 +102,17 @@ namespace DragNWash.ModFramework
             {
                 return Pages.Where(p => p.Guid == guid).ToList();
             }
+        }
+
+        // On a mod's reload: its Mods-screen pages and Ready handlers go. Its
+        // ModInfo stays; the new build's Register replaces it.
+        internal static void Forget(string guid, Assembly assembly)
+        {
+            lock (Pages)
+            {
+                Pages.RemoveAll(p => p.Guid == guid);
+            }
+            _ready = (Action)ModReload.Prune(_ready, assembly);
         }
 
         internal static ModInfo GetInfo(string guid)

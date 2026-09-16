@@ -18,6 +18,8 @@ namespace DragNWash.ModFramework.Saves
         private void Awake()
         {
             Log = Logger;
+            // A reloaded mod's old handlers go (ModReload); the new build subscribes again.
+            ModReload.Unloading += (guid, assembly) => ModReload.PruneEvent(typeof(GameSaves), nameof(GameSaves.SaveWritten), assembly);
             ModFramework.Register(new ModInfo
             {
                 Guid = GameSaves.Guid,

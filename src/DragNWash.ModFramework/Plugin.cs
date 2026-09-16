@@ -13,6 +13,7 @@ namespace DragNWash.ModFramework
         {
             ModFramework.Initialize(Logger);
             DeveloperTools.Install(Config);
+            ModReload.Install(Config, this);
             var harmony = new Harmony(ModFramework.Guid);
             Mods.ModsScreen.Install(harmony);
             Options.OptionsRows.Install(harmony);
@@ -24,6 +25,7 @@ namespace DragNWash.ModFramework
         {
             Options.OptionsRows.Tick();
             Title.TitleVersion.Tick();
+            ModReload.Tick();
         }
     }
 }

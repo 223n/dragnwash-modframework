@@ -27,6 +27,7 @@
   <ItemGroup>
     <Compile Include="..\DragNWash.ModFramework.Preloader\DisabledMods.cs" Link="Mods\DisabledMods.cs" />
     <Compile Include="..\DragNWash.ModFramework.Preloader\PendingUninstalls.cs" Link="Mods\PendingUninstalls.cs" />
+    <Compile Include="..\DragNWash.ModFramework.Preloader\PendingReloads.cs" Link="Mods\PendingReloads.cs" />
   </ItemGroup>
 
   <!--

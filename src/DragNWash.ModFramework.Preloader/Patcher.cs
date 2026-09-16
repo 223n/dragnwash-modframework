@@ -18,6 +18,15 @@ namespace DragNWash.ModFramework
             ManualLogSource log = Logger.CreateLogSource("ModFramework.Preloader");
             try
             {
+                // New builds delivered while the game ran (ModReload) become the real DLLs.
+                PendingReloads.Apply(Paths.PluginPath, message => log.LogInfo(message));
+            }
+            catch (Exception ex)
+            {
+                log.LogError($"Could not apply reloaded builds: {ex}");
+            }
+            try
+            {
                 // Uninstalls first: a removed mod has nothing left to switch.
                 PendingUninstalls.Apply(Paths.PluginPath, Paths.ConfigPath, message => log.LogInfo(message));
             }

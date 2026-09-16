@@ -67,6 +67,31 @@ public class MyMod : BaseUnityPlugin
 8. **開発者向けの機能は、開発者ツールのスイッチの内側に置く。** 書き出し、ホットリロード、デバッグ用のキーや窓は、`DeveloperTools.Enabled` が真のときだけ動かす（あとから始めるなら `DeveloperTools.WhenEnabled`）。Mod を入れただけの人には見えないようにするためです。Tool window のタブは、すでにそうなっています。
 9. **ゲームの出来事は `GameEvents` から受け取る。** `SceneManager.sceneLoaded` に直接つないだ処理が例外を投げると、あとから登録したすべての Mod の処理が止まり、どの Mod のせいかも分かりません。`GameEvents.OnSceneLoaded(自分のGUID, ...)` は Mod ごとに切り離して呼び、失敗した Mod を Mods 画面に名前つきで出し、3 回続けて失敗した処理をそのセッションでは止めます。
 
+10. **リロードに頼る前に、そう宣言する。** ゲームを動かしたまま Mod がリロードされるのは、`ModInfo.Reloadable = true` にした（または `[ReloadableMod]` を付けた）ときだけで、そのとき [ゲームを動かしたまま Mod をリロードする](#ゲームを動かしたまま-mod-をリロードする) の約束を守ることになります。
+
+## ゲームを動かしたまま Mod をリロードする
+
+実験的な機能で、中核 1.2.0 から、開発者ツールがオンの間だけ。ビルドすると、再起動なしで新しい DLL が動いている版と入れ替わります（`[Developer] WatchMods`、または Console の `mods reload <guid>`）。ライブラリはリロードされません。リロードできると宣言した Mod が守ること：
+
+- Harmony の ID は自分の GUID（`new Harmony(MyMod.Guid)`）。パッチはこれで見つけて外します。
+- 自前の static フィールドで抱えず、フレームワーク経由で登録する（`ModFramework.Register`、`AddTab`、`AddCommand`、`AddRewriter`、`GameEvents`、`Services`、`GameOptions`）。フレームワークが知らないものは外せません。ライブラリのイベントにつないだ処理はアセンブリ単位で外れます。
+- ゲームに渡したもの（コルーチン、`DontDestroyOnLoad` のオブジェクト、ファイルの監視）は `OnDestroy` で片付ける。
+- `Awake` に、Direct3D 12 でゲームの途中に走らせて危ないこと（テクスチャのアップロード）を置かない。置くなら `GameFonts.RuntimeUploadsAreSafe` で分ける。
+
+ビルドを、入っている DLL の隣に `<Mod>.dll.new` として届ければ、あとはフレームワークがやります。Windows では動いている DLL を Mono が掴んでいて上書きできないので、ゲームは `.new` からすぐ読み直し、次の起動時にプリローダーのパッチャーがそれを本物の DLL にします。
+
+```xml
+<!-- .csproj に。ビルド後に DLL が .dll.new としてゲームへ行き、動いているゲームがそれを読み直します。 -->
+<PropertyGroup>
+  <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Drag'n Wash</GameDir>
+</PropertyGroup>
+<Target Name="CopyToGame" AfterTargets="Build" Condition="Exists('$(GameDir)')">
+  <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(GameDir)\BepInEx\plugins\$(AssemblyName)\$(AssemblyName).dll.new" />
+</Target>
+```
+
+残るもの：古いアセンブリ（Mono は外せません。リロード 1 回あたり数百 KB）と、ゲームがまだ持っている古い版のオブジェクト。古い版を外す前に失敗したリロードは古い版を動かしたままにし、外したあとで失敗したものはログにそう出て、再起動が要ります。詳しくは [MOD_RELOAD.ja.md](MOD_RELOAD.ja.md)。
+
 ## ライブラリの作り方
 
 ライブラリは、ほかの Mod が依存する普通の BepInEx プラグインです。
