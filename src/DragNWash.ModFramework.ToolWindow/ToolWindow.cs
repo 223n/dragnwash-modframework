@@ -155,6 +155,22 @@ namespace DragNWash.ModFramework.ToolWindow
             ToolWindowPlugin.Instance?.SetOpen(true, tabTitle);
         }
 
+        /// <summary>
+        /// Selects <paramref name="target"/> (a GameObject, a Component or a
+        /// Material) in the Inspector tab and opens the window on it
+        /// (experimental, Tool window 1.1). Anything else is refused with a note
+        /// in the tab. Nothing happens while developer tools are off.
+        /// </summary>
+        public static void Inspect(UnityEngine.Object target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+            InspectorTab.Select(target);
+            Open(InspectorTab.Title);
+        }
+
         /// <summary>Closes the window.</summary>
         public static void Close()
         {

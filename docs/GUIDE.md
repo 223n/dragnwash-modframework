@@ -52,6 +52,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 | Read or change save slots and flags | `GameSaves`, `GameFlags` (library **Flags and saves**) | writing `savegame.dgn` yourself |
 | Share an API with other mods | `Services.Register<T>` and `Services.Get<T>` | public static fields another mod has to find by reflection |
 | Check that a game method you patch still exists | `GameHooks.Require` | patching and hoping |
+| See what an object, component or material holds, and try a value | the **Inspector** tab (F1) and `ToolWindow.Inspect(target)` (experimental) | a decompiler and a rebuild per guess |
 | Run something when a scene loads, when the game has started or when it quits | `GameEvents.OnSceneLoaded`, `OnGameStarted`, `OnQuitting` (experimental) | `SceneManager.sceneLoaded` and `Application.quitting` yourself |
 
 ## Rules

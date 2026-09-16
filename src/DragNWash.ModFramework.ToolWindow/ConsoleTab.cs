@@ -448,7 +448,7 @@ namespace DragNWash.ModFramework.ToolWindow
         private static readonly StringBuilder Pending = new StringBuilder();
         private static readonly bool NeverPrepare = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12;
 
-        private static string Drawable(string text)
+        internal static string Drawable(string text)
         {
             StringBuilder sb = null;
             for (int i = 0; i < text.Length; i++)

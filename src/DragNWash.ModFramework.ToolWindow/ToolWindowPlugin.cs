@@ -92,6 +92,7 @@ namespace DragNWash.ModFramework.ToolWindow
             ToolWindow.IsAvailable = true;
 
             Install("Console", SetUpConsole);
+            Install("Inspector", InspectorTab.Install);
         }
 
         // The console: every BepInEx log line with its level, the player's

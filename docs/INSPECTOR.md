@@ -2,7 +2,7 @@
 
 [日本語](INSPECTOR.ja.md)
 
-> **Design only.** Nothing here is built. It is on an experimental branch to be discussed; open an issue or comment on the pull request.
+> **Experimental.** Built in the Tool window library (1.1.0), on `main` but not yet in a release. Where the build differs from the design: a vector, colour, rect or bounds is one text field of comma-separated numbers rather than one field per component; a material's texture property has **Go** to the Assets tab but the tab does not yet jump to that texture; the Assets tab has no Inspect button yet.
 
 An **Inspector** tab in the Tool window: the scene's objects and their components, the fields and properties of each, and the parameters of the loaded materials, readable and editable while the game runs. What Unity's own Inspector does in the editor, for a game one only has as a build. For people who make mods and want to know "what is this thing, what is it called, what value does it hold", and to try a change before writing a line of code. A developer-tools feature (GUIDE rule 8), never something a player sees.
 

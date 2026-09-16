@@ -16,6 +16,9 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - Experimental. A **Console** tab: every BepInEx log line with its level and source, in colour, the last 2,000 kept; which levels and sources are shown is the player's choice, saved in the config and changeable from the tab, from commands (`log show`, `log level`, `log filter`) and from the Mods screen. Mods register commands with `ToolWindow.AddCommand`; built in: `help`, `log`, `mods`, `scene`, `clear` / `cls`. `ToolWindow.ErrorColor` and `WarningColor`. See [docs/CONSOLE.md](docs/CONSOLE.md).
 
+- Experimental. An **Inspector** tab: every loaded scene's objects as a tree with a name search, the selected object's components and its renderers' materials, and each one's fields and properties (private ones behind **Show private**), read as the game runs (**Freeze** stops that) and editable for booleans, numbers, strings, enums, vectors, colours, rects and lists of those; a material shows its shader's properties and keywords. Object references have a **Go** button. Nothing is saved; an edit lasts until the scene reloads or the game quits. `ToolWindow.Inspect(target)` opens it on an object from a mod's own tab; the `inspect` command selects and sets from the console. See [docs/INSPECTOR.md](docs/INSPECTOR.md).
+- `clear` / `cls` console commands.
+
 ### Assets 1.1.0
 
 - Experimental. Texture replacements: a PNG at `BepInEx/plugins/<Mod>/assets/textures/<texture name>.png` takes the place of the game texture of that name in every material and sprite, read at startup and applied at each scene load; two mods replacing the same texture are both named, never overridden silently. `AssetCatalog` lists loaded textures, materials, meshes and shaders, and the Tool window gets an **Assets** tab. See [docs/ASSET_TOOL.md](docs/ASSET_TOOL.md).
