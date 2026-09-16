@@ -116,23 +116,35 @@ namespace DragNWash.ModFramework.ToolWindow
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
             ConsoleLog.MarkSeen();
 
-            // Level toggles, then the source filter and Clear.
+            // Level toggles, wrapping onto more rows in a narrow window, then
+            // the source filter and Clear on a row of their own when the
+            // toggles leave no room beside them.
             float bx = x;
             foreach ((LogLevel level, string label) in Toggles)
             {
                 bool on = (ConsoleLog.Shown & level) != 0;
                 float bw = Mathf.Max(70, s.Button.CalcSize(new GUIContent(label)).x + 16);
+                if (bx + bw > x + w && bx > x)
+                {
+                    bx = x;
+                    y += row + 6;
+                }
                 if (GUI.Button(new Rect(bx, y, bw, row), label, on ? s.SelectedButton : s.Button))
                 {
                     ConsoleLog.Shown = on ? ConsoleLog.Shown & ~level : ConsoleLog.Shown | level;
                 }
                 bx += bw + 6;
             }
+            if (area.xMax - pad - 80 - (bx + 6) < 120)
+            {
+                bx = x;
+                y += row + 6;
+            }
             if (GUI.Button(new Rect(area.xMax - pad - 70, y, 70, row), "Clear", s.Button))
             {
                 ConsoleLog.Clear();
             }
-            var filterRect = new Rect(bx + 6, y, Mathf.Max(60, area.xMax - pad - 80 - (bx + 6)), row);
+            var filterRect = new Rect(bx + (bx > x ? 6 : 0), y, Mathf.Max(60, area.xMax - pad - 80 - bx), row);
             SourceFilter = GUI.TextField(filterRect, SourceFilter ?? "", s.TextField);
             Underline(filterRect);
             if (string.IsNullOrEmpty(SourceFilter))
@@ -143,8 +155,11 @@ namespace DragNWash.ModFramework.ToolWindow
 
             string note = (ConsoleLog.Shown & LogLevel.Error) == 0 ? "Errors are hidden.    " : "";
             note += $"Unity: {ConsoleLog.UnityMinimum} and above, others: {ConsoleLog.DefaultMinimum} and above (log level <source> <level>)";
-            GUI.Label(new Rect(x, y, w, row), note, s.MutedLabel);
-            y += row;
+            // Sized from the text: in a narrow window it takes two lines.
+            var noteContent = new GUIContent(note);
+            float noteHeight = Mathf.Max(row, s.WrappedLabel.CalcHeight(noteContent, w));
+            GUI.Label(new Rect(x, y, w, noteHeight), noteContent, s.WrappedLabel);
+            y += noteHeight;
 
             // The list is filled below, when a keystroke changes the field, and
             // emptied by Enter, Tab, Escape and the history keys: it appears while
@@ -152,7 +167,7 @@ namespace DragNWash.ModFramework.ToolWindow
             float suggestionHeight = _suggestions.Count > 0 && _inputFocused ? _suggestions.Count * (row - 6) + 6 : 0;
 
             // The log, oldest first, following the end unless the player scrolled up.
-            var view = new Rect(x, y, w, area.yMax - pad - y - row - 8 - suggestionHeight);
+            var view = new Rect(x, y, w, Mathf.Max(40, area.yMax - pad - y - row - 8 - suggestionHeight));
             ToolWindow.Fill(view, ToolWindow.InsetColor);
             List<ConsoleEntry> all = ConsoleLog.Snapshot();
             var shown = new List<ConsoleEntry>(all.Count);

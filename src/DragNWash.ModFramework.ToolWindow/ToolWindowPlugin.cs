@@ -338,7 +338,9 @@ namespace DragNWash.ModFramework.ToolWindow
             float width = Mathf.Max(1, screenWidth);
             float height = Mathf.Max(1, screenHeight);
             rect.width = Mathf.Clamp(rect.width, Mathf.Min(420, width), width);
-            rect.height = Mathf.Clamp(rect.height, Mathf.Min(340, height), height);
+            // Tall enough for two rows of tab buttons, a body of 80 and the
+            // footer line; shorter and the body would run into the footer.
+            rect.height = Mathf.Clamp(rect.height, Mathf.Min(400, height), height);
             rect.x = Mathf.Clamp(rect.x, 0, width - rect.width);
             rect.y = Mathf.Clamp(rect.y, 0, height - rect.height);
             return rect;
