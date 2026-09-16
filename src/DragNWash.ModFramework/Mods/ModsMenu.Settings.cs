@@ -19,9 +19,16 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextResetToDefault = "Reset to default";
         internal const string TextSavedAtOnce = "Saved right away. Some mods only use a change after a restart.";
         internal const string TextEditInFile = "Change this in the mod's config file in BepInEx/config.";
+        internal const string TextNotAccepted = "Not accepted: ";
+        internal const string TextCaptureKey = "Capture key";
+        internal const string TextPressKey = "Press a key...";
 
         private static readonly Color SettingsColor = new Color(0.3f, 0.42f, 0.62f, 1f);
         private static readonly Color StepColor = new Color(0.25f, 0.25f, 0.25f, 1f);
+        private static readonly Color FieldColor = new Color(0.12f, 0.12f, 0.14f, 1f);
+        private static readonly Color NoteErrorColor = new Color(1f, 0.55f, 0.5f, 1f);
+
+        private TMP_Text _settingNote;
 
         private ModCatalog.Entry _settingsFor;
         private List<ConfigItem> _items = new List<ConfigItem>();
@@ -184,6 +191,9 @@ namespace DragNWash.ModFramework.Mods
                     valueRect.anchorMax = new Vector2(0.62f, 0.33f);
                     MakeButton("Step+", ">", 0.62f, 0.74f, 0.2f, 0.33f, StepColor, () => Change(item, 1, "Step+"));
                     break;
+                case ConfigItem.Kind.Text:
+                    MakeTextField(item);
+                    break;
                 default:
                     TMP_Text shown = Label("Value", Escape(item.ValueText), UiText.ButtonSize, 0.26f, 0.34f, false);
                     shown.fontStyle |= FontStyles.Bold;
@@ -199,7 +209,115 @@ namespace DragNWash.ModFramework.Mods
                 saved.fontStyle |= FontStyles.Italic;
                 var savedRect = (RectTransform)saved.transform;
                 savedRect.anchorMin = new Vector2(0.5f, 0.03f);
+                _settingNote = saved;
             }
+        }
+
+        // A text field for values BepInEx reads as text (strings, shortcuts,
+        // colours...). Enter or leaving the field applies the text; a value the
+        // config parser refuses is put back and the reason shown. A keyboard
+        // shortcut also gets a Capture button that takes the next key pressed.
+        private void MakeTextField(ConfigItem item)
+        {
+            bool shortcut = item.IsShortcut;
+            GameObject go = Part("Text", 0.04f, shortcut ? 0.46f : 0.74f, 0.2f, 0.33f);
+            // Built inactive: the input field looks for its text component when
+            // it wakes, which must be set by then.
+            go.SetActive(false);
+            Image background = go.AddComponent<Image>();
+            background.color = FieldColor;
+
+            var area = new GameObject("Text Area", typeof(RectTransform));
+            var areaRect = (RectTransform)area.transform;
+            areaRect.SetParent(go.transform, false);
+            areaRect.anchorMin = Vector2.zero;
+            areaRect.anchorMax = Vector2.one;
+            areaRect.offsetMin = new Vector2(12f, 4f);
+            areaRect.offsetMax = new Vector2(-12f, -4f);
+            area.AddComponent<RectMask2D>();
+
+            TMP_Text text = UiText.Create(area.transform, "Text", "", UiText.ButtonSize);
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.enableAutoSizing = false;
+            text.fontSize = UiText.ButtonSize * 0.8f;
+            text.richText = false;
+
+            TMP_InputField field = go.AddComponent<TMP_InputField>();
+            field.targetGraphic = background;
+            field.textViewport = areaRect;
+            field.textComponent = text;
+            field.lineType = TMP_InputField.LineType.SingleLine;
+            field.richText = false;
+            field.customCaretColor = true;
+            field.caretColor = Color.white;
+            field.selectionColor = new Color(0.55f, 0.75f, 1f, 0.5f);
+            ColorBlock colors = field.colors;
+            colors.normalColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+            colors.highlightedColor = Color.white;
+            colors.selectedColor = Color.white;
+            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+            field.colors = colors;
+            field.onEndEdit.AddListener(value => ApplyText(item, field, value));
+            go.SetActive(true);
+            // Only now: text given to the field while it was inactive was not shown.
+            field.text = item.SerializedText;
+            field.ForceLabelUpdate();
+
+            if (shortcut)
+            {
+                MakeButton("Capture", TextCaptureKey, 0.5f, 0.74f, 0.2f, 0.33f, StepColor, () => ToggleCapture(item));
+            }
+        }
+
+        private void ApplyText(ConfigItem item, TMP_InputField field, string value)
+        {
+            if (item == null || !ReferenceEquals(item, _item) || value == item.SerializedText)
+            {
+                return;
+            }
+            string error = item.SetText(value);
+            if (error != null)
+            {
+                field.text = item.SerializedText;
+                if (_settingNote != null)
+                {
+                    _settingNote.text = TextNotAccepted + error;
+                    _settingNote.color = NoteErrorColor;
+                }
+                return;
+            }
+            RebuildList();
+            RebuildDetails(false);
+            Focus("Reset");
+        }
+
+        // Starts taking the next key for a shortcut, or stops if already taking one.
+        private void ToggleCapture(ConfigItem item)
+        {
+            GameObject button = _detailParts.FirstOrDefault(p => p != null && p.name == "Capture");
+            if (button == null)
+            {
+                return;
+            }
+            ShortcutCapture running = button.GetComponent<ShortcutCapture>();
+            if (running != null)
+            {
+                running.Cancel();
+                return;
+            }
+            ShortcutCapture capture = button.AddComponent<ShortcutCapture>();
+            capture.Menu = this;
+            capture.Item = item;
+            capture.Label = button.GetComponentInChildren<TMP_Text>();
+        }
+
+        internal void AfterCapture()
+        {
+            RebuildList();
+            RebuildDetails(false);
+            Focus("Capture");
         }
 
         private void Change(ConfigItem item, int direction, string focus)
