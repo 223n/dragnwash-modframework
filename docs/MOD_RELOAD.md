@@ -15,7 +15,7 @@ Building a mod, closing the game, starting it, clicking through the title screen
 
 ## How it works
 
-1. **Watch.** While developer tools are on, the framework watches `BepInEx/plugins/<Mod>/*.dll` for the mods that opted in (below). A changed file fires after half a second of quiet, so a build's copy step has finished.
+1. **Watch.** While developer tools are on and the game window has focus (Unity runs no Update while the game is in the background, so a build delivered then is picked up when the window comes back), the framework watches `BepInEx/plugins/<Mod>/*.dll` for the mods that opted in (below). A changed file fires after half a second of quiet, so a build's copy step has finished.
 2. **Check the new build first.** Load the new DLL from bytes (the file stays unlocked for the next build) and find its `BaseUnityPlugin`. If that fails, print why in the Console and leave the old build running. Nothing is taken down that cannot be replaced.
 3. **Take the old build out**, in this order:
    - `ModFramework.UnloadOwned(guid)`: everything registered with that GUID goes. Tool window tabs and commands, text rewriters, `GameEvents` handlers, `ModInfo`, services, `GameHooks` records, Options rows.
