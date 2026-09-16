@@ -32,7 +32,7 @@ Defaults: mods show Info and above, Unity's own log shows Warning and above, Deb
 
 ## Commands
 
-Type in the line at the bottom and press Enter; up and down walk the history. Built in:
+Type in the line at the bottom and press Enter. While you type, what could come next is listed above the line: command names for the first word, then what the command offers for its arguments (levels and sources for `log`, `textures` / `reload` and so on for `assets`). **Tab** fills in the highlighted one, up and down move through the list, Escape hides it; with no list, up and down walk the history. Built in:
 
 | Command | Does |
 |---|---|
@@ -55,6 +55,7 @@ ToolWindow.AddCommand(MyGuid, "tl", "tl reload | tl find <text>", args =>
 });
 ```
 
+- Pass a fifth argument to offer completions: it gets the words typed after the name (the last one partial, or "" right after a space) and returns what could stand there.
 - One lower-case word for the name. When another mod registered the same name first, yours runs only as `yourguid:name` (the short form after the last dot also works), and `help` lists both.
 - Return what to print; `\n` separates lines. Anything a person should not act on without care (changing a save, for example) should ask for a `--yes` argument.
 - Print from elsewhere with `ConsoleLog.Print(text, LogLevel)`. Your normal BepInEx logging already appears with your mod's name.
