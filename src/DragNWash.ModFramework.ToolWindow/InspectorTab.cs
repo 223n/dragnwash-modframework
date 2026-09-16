@@ -166,8 +166,10 @@ namespace DragNWash.ModFramework.ToolWindow
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
             Event ev = Event.current;
 
-            // A destroyed selection is dropped, not thrown on.
-            if (_object != null && !_object)
+            // A destroyed selection is dropped, not thrown on. Unity's == null is
+            // already true for a destroyed object, so the reference itself is
+            // tested first and the object's liveness second.
+            if (!ReferenceEquals(_object, null) && !_object)
             {
                 _object = null;
                 SetTarget(null);
@@ -297,7 +299,7 @@ namespace DragNWash.ModFramework.ToolWindow
                                 _dirty = true;
                             }
                         }
-                        bool selected = _object != null && _object == n.Transform.gameObject;
+                        bool selected = !ReferenceEquals(_object, null) && ReferenceEquals(_object, n.Transform.gameObject);
                         var label = new Rect(indent + 22, ry, inner - indent - 22, row);
                         string text = _results != null ? n.Path : n.Name;
                         if (GUI.Button(label, Drawable(text), selected ? _accentCell : (n.Active ? _cell : _mutedCell)))
@@ -316,7 +318,7 @@ namespace DragNWash.ModFramework.ToolWindow
         private static void DrawComponents(Rect pane, ToolWindowStyles s, float row)
         {
             ToolWindow.Fill(pane, ToolWindow.InsetColor);
-            if (_object == null)
+            if (ReferenceEquals(_object, null) || !_object)
             {
                 GUI.Label(new Rect(pane.x + 8, pane.y + 4, pane.width - 16, row), "Select an object.", s.MutedLabel);
                 return;
@@ -374,7 +376,7 @@ namespace DragNWash.ModFramework.ToolWindow
             // Header: what is selected, the toggles.
             string heading = _target is Material mat
                 ? $"{mat.name}  ({mat.shader?.name})"
-                : _target is GameObject ? _object.name + "  (GameObject)" : $"{_target.GetType().Name}";
+                : _target is GameObject go ? go.name + "  (GameObject)" : $"{_target.GetType().Name}";
             GUI.Label(new Rect(x, y, w, row), Drawable(heading), _cell);
             y += row;
             if (_target is Material m2)
