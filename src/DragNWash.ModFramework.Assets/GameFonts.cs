@@ -83,6 +83,21 @@ namespace DragNWash.ModFramework.Assets
             "Noto Sans TC",
         };
 
+        // Thai is in none of the faces above (Segoe UI and Noto Sans have no
+        // Thai), so the Thai pack needs its own.
+        private static readonly string[] ThaiCandidates =
+        {
+            "Leelawadee UI",
+            "Leelawadee",
+            "Tahoma",
+            // macOS
+            "Thonburi",
+            // Linux / Steam Deck
+            "Noto Sans Thai",
+            "Garuda",
+            "Loma",
+        };
+
         // No CJK font carries Hebrew, so the Hebrew pack needs its own.
         private static readonly string[] HebrewCandidates =
         {
@@ -156,13 +171,14 @@ namespace DragNWash.ModFramework.Assets
         private const string GroupTraditional = "Traditional Chinese";
         private const string GroupKorean = "Korean";
         private const string GroupHebrew = "Hebrew";
+        private const string GroupThai = "Thai";
         private const string GroupWestern = "Latin and Cyrillic";
 
         // The order faces follow each other in, after the ones the current
         // locale puts first. Warming and the runtime chain must agree on it.
         private static readonly string[] CanonicalOrder =
         {
-            GroupJapanese, GroupSimplified, GroupTraditional, GroupKorean, GroupHebrew, GroupWestern,
+            GroupJapanese, GroupSimplified, GroupTraditional, GroupKorean, GroupHebrew, GroupThai, GroupWestern,
         };
 
         /// <summary>BepInEx GUID of the assets library.</summary>
@@ -277,7 +293,7 @@ namespace DragNWash.ModFramework.Assets
         private static void PrepareLocale(string locale, IEnumerable<string> texts)
         {
             var chars = new HashSet<char>();
-            bool kana = false, han = false, hangul = false, hebrew = false, western = false;
+            bool kana = false, han = false, hangul = false, hebrew = false, thai = false, western = false;
             if (texts != null)
             {
                 foreach (string text in texts)
@@ -288,11 +304,16 @@ namespace DragNWash.ModFramework.Assets
                         // ASCII is covered by the game's own font assets and
                         // never reaches the fallback chain.
                         if (c <= 0x7F) continue;
+                        // The zero-width space marks a line-break opportunity
+                        // (the Thai pack has one between words); TextMeshPro
+                        // lays it out without a glyph, so it is never rasterized.
+                        if (c == '\u200B') continue;
                         chars.Add(c);
                         if (c >= 0x3040 && c <= 0x30FF) kana = true;
                         else if ((c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) || (c >= 0xF900 && c <= 0xFAFF)) han = true;
                         else if ((c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x1100 && c <= 0x11FF) || (c >= 0x3130 && c <= 0x318F)) hangul = true;
                         else if (c >= 0x0590 && c <= 0x05FF) hebrew = true;
+                        else if (c >= 0x0E00 && c <= 0x0E7F) thai = true;
                         else if ((c >= 0x3000 && c <= 0x303F) || (c >= 0xFF00 && c <= 0xFFEF)) han = true;
                         else western = true;
                     }
@@ -311,6 +332,7 @@ namespace DragNWash.ModFramework.Assets
             if (han) Need(PreferredHanGroup(locale));
             if (hangul) Need(GroupKorean);
             if (hebrew) Need(GroupHebrew);
+            if (thai) Need(GroupThai);
             // A CJK face carries accented Latin and usually Cyrillic too; only
             // ask for a Latin face up front when nothing else is involved.
             if (western && groups.Count == 0) Need(GroupWestern);
@@ -465,6 +487,7 @@ namespace DragNWash.ModFramework.Assets
                 case GroupTraditional: candidates = TraditionalCandidates; files = TraditionalFiles; ttcFace = 3; break;
                 case GroupKorean: candidates = KoreanCandidates; files = KoreanFiles; ttcFace = 1; break;
                 case GroupHebrew: candidates = HebrewCandidates; files = HebrewFiles; ttcFace = 0; break;
+                case GroupThai: candidates = ThaiCandidates; files = ThaiFiles; ttcFace = 0; break;
                 default: candidates = WesternCandidates; files = WesternFiles; ttcFace = 0; break;
             }
 
@@ -550,6 +573,20 @@ namespace DragNWash.ModFramework.Assets
             "/System/Library/Fonts/Helvetica.ttc",
             "C:/Windows/Fonts/segoeui.ttf",
             "C:/Windows/Fonts/arial.ttf",
+        };
+
+        private static readonly string[] ThaiFiles =
+        {
+            "fonts/*th*.ttf", "fonts/*th*.otf",
+            "/run/host/fonts/noto/NotoSansThai-Regular.ttf",
+            "/usr/share/fonts/noto/NotoSansThai-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
+            "/usr/share/fonts/TTF/Garuda.ttf",
+            "/usr/share/fonts/truetype/tlwg/Garuda.ttf",
+            "/System/Library/Fonts/Thonburi.ttc",
+            "C:/Windows/Fonts/LeelawUI.ttf",
+            "C:/Windows/Fonts/leelawad.ttf",
+            "C:/Windows/Fonts/tahoma.ttf",
         };
 
         private static readonly string[] HebrewFiles =
