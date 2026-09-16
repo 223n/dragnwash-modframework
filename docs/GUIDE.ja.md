@@ -46,6 +46,7 @@ public class MyMod : BaseUnityPlugin
 | 開発・デバッグ用ツールを足す | `ToolWindow.AddTab`（ライブラリ **Tool window**） | 独自の `OnGUI` ウィンドウ、カーソルの解放、入力の遮断 |
 | ゲームのフォントにない文字を表示する | `GameFonts.Prepare` と `GameFonts.SetLanguage`（ライブラリ **Assets**） | `TMP_Settings.fallbackFontAssets` への直接の追加 |
 | テクスチャやアセットバンドルを読み込む | `GameAssets.LoadTexture`、`GameAssets.LoadBundle`（ライブラリ **Assets**）を `Awake` から | ゲーム中の読み込み |
+| ゲームのテクスチャを自分のものに差し替える、何が読み込まれているか見る | Mod フォルダの `assets/textures/<名前>.png`、`AssetCatalog`（ライブラリ **Assets**、実験的。[ASSET_TOOL.ja.md](ASSET_TOOL.ja.md)） | マテリアルのテクスチャを自分で入れ替える |
 | セーブスロットやフラグを読み書きする | `GameSaves`、`GameFlags`（ライブラリ **Flags and saves**） | `savegame.dgn` を自分で書き換えること |
 | ほかの Mod に API を提供する | `Services.Register<T>` と `Services.Get<T>` | リフレクションで探させる public static フィールド |
 | パッチを当てるゲームのメソッドがまだあるか確かめる | `GameHooks.Require` | とりあえずパッチを当てること |
