@@ -41,7 +41,6 @@ namespace DragNWash.ModFramework.ToolWindow
             }
         }
         private static List<string> _suggestions = new List<string>();
-        private static string _suggestedFor;
         private static int _selected;
         private const int MaxSuggestionRows = 6;
         private static Dictionary<LogLevel, GUIStyle> _levelStyles;
@@ -140,14 +139,9 @@ namespace DragNWash.ModFramework.ToolWindow
             GUI.Label(new Rect(x, y, w, row), note, s.MutedLabel);
             y += row;
 
-            // Suggestions for what is typed, kept fresh here so keys below can use them.
-            if (_suggestedFor != _input)
-            {
-                // Nothing typed yet: no list, so the log stays in view.
-                _suggestions = string.IsNullOrEmpty(_input) ? new List<string>() : ConsoleCommands.Suggest(_input, MaxSuggestionRows);
-                _suggestedFor = _input;
-                _selected = 0;
-            }
+            // The list is filled below, when a keystroke changes the field, and
+            // emptied by Enter, Tab, Escape and the history keys: it appears while
+            // the player is typing and never on its own.
             float suggestionHeight = _suggestions.Count > 0 && _inputFocused ? _suggestions.Count * (row - 6) + 6 : 0;
 
             // The log, oldest first, following the end unless the player scrolled up.
@@ -315,6 +309,14 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 _inputFocused = GUIUtility.keyboardControl == _inputControlId;
             }
+            if (_input != inputBefore)
+            {
+                // Typed (or erased) in the field: offer completions for the new
+                // text. History and Accept change _input above this point, so
+                // they do not count as typing and bring no list of their own.
+                _suggestions = string.IsNullOrEmpty(_input) ? new List<string>() : ConsoleCommands.Suggest(_input, MaxSuggestionRows);
+                _selected = 0;
+            }
             if (_input != inputBefore || _inputFocused != wasFocused)
             {
                 T($"field: input=\"{_input}\" focused={_inputFocused} (event {ev.type})");
@@ -345,7 +347,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
             }
             _input = line.Substring(0, cut) + suggestion + " ";
-            _suggestedFor = null;
+            _suggestions = new List<string>();
         }
 
         private static void Submit()
@@ -354,6 +356,7 @@ namespace DragNWash.ModFramework.ToolWindow
             T($"Submit \"{line}\"");
             _input = "";
             _historyIndex = -1;
+            _suggestions = new List<string>();
             _focusInput = true;
             _follow = true;
             if (line.Length == 0)
