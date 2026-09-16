@@ -282,25 +282,14 @@ namespace DragNWash.ModFramework.ToolWindow
                     ev.Use();
                 }
             }
+            // The list sits above the field but is drawn after it (below). IMGUI
+            // numbers controls in drawing order, and keyboard focus is that
+            // number: buttons drawn before the field gave it a different number
+            // whenever the list appeared, so the focus fell off the field on
+            // every other pass, keystrokes were dropped and the list flickered.
+            var box = new Rect(x + 20, y, w - 20 - 70, suggestionHeight);
             if (suggesting)
             {
-                var box = new Rect(x + 20, y, w - 20 - 70, suggestionHeight);
-                ToolWindow.Fill(box, ToolWindow.PanelColor);
-                float sy = box.y + 3;
-                for (int i = 0; i < _suggestions.Count; i++)
-                {
-                    var line = new Rect(box.x + 6, sy, box.width - 12, row - 6);
-                    if (i == _selected)
-                    {
-                        ToolWindow.Fill(line, ToolWindow.InsetColor);
-                    }
-                    if (GUI.Button(line, _suggestions[i], i == _selected ? s.Label : s.MutedLabel))
-                    {
-                        Accept(_suggestions[i]);
-                        _focusInput = true;
-                    }
-                    sy += row - 6;
-                }
                 y = box.yMax + 2;
             }
             GUI.Label(new Rect(x, y, 20, row), ">", s.Label);
@@ -354,6 +343,25 @@ namespace DragNWash.ModFramework.ToolWindow
                 T($"field: input=\"{_input}\" focused={_inputFocused} (event {ev.type})");
             }
             Underline(inputRect);
+            if (suggesting)
+            {
+                ToolWindow.Fill(box, ToolWindow.PanelColor);
+                float sy = box.y + 3;
+                for (int i = 0; i < _suggestions.Count; i++)
+                {
+                    var line = new Rect(box.x + 6, sy, box.width - 12, row - 6);
+                    if (i == _selected)
+                    {
+                        ToolWindow.Fill(line, ToolWindow.InsetColor);
+                    }
+                    if (GUI.Button(line, _suggestions[i], i == _selected ? s.Label : s.MutedLabel))
+                    {
+                        Accept(_suggestions[i]);
+                        _focusInput = true;
+                    }
+                    sy += row - 6;
+                }
+            }
             if (GUI.Button(new Rect(area.xMax - pad - 64, y, 64, row), "Run", s.Button))
             {
                 T("-> Run button");
