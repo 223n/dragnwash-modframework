@@ -1,0 +1,79 @@
+[
+ {
+  "text": "",
+  "key": "e3b0c44298fc1c14",
+  "normalized": "",
+  "normalized_key": "e3b0c44298fc1c14",
+  "fingerprint": "0000000000000000"
+ },
+ {
+  "text": "Hi",
+  "key": "3639efcd08abb273",
+  "normalized": "hi",
+  "normalized_key": "8f434346648f6b96",
+  "fingerprint": "08ba5f07b55ec3da"
+ },
+ {
+  "text": "Hello, world!",
+  "key": "315f5bdb76d078c4",
+  "normalized": "hello world",
+  "normalized_key": "b94d27b9934d3e08",
+  "fingerprint": "125ab51929a9e33c"
+ },
+ {
+  "text": "hello world",
+  "key": "b94d27b9934d3e08",
+  "normalized": "hello world",
+  "normalized_key": "b94d27b9934d3e08",
+  "fingerprint": "125ab51929a9e33c"
+ },
+ {
+  "text": "<i>Hello</i>,   WORLD...",
+  "key": "b8da2d35ce3f7993",
+  "normalized": "hello world",
+  "normalized_key": "b94d27b9934d3e08",
+  "fingerprint": "125ab51929a9e33c"
+ },
+ {
+  "text": "Ryan: The sponge is on the top shelf.",
+  "key": "0f2181a7d0532822",
+  "normalized": "ryan the sponge is on the top shelf",
+  "normalized_key": "f52391dbb81c47ab",
+  "fingerprint": "c298e01965e3e77a"
+ },
+ {
+  "text": "Ryan: The sponge is on the top shelf",
+  "key": "ba415367e3df3e2c",
+  "normalized": "ryan the sponge is on the top shelf",
+  "normalized_key": "f52391dbb81c47ab",
+  "fingerprint": "c298e01965e3e77a"
+ },
+ {
+  "text": "The sponge is on the top shelf. Grab it before the water gets cold!",
+  "key": "15b62d74a4536d2c",
+  "normalized": "the sponge is on the top shelf grab it before the water gets cold",
+  "normalized_key": "e6bb1d4d1efa7062",
+  "fingerprint": "c299a01945e3ef32"
+ },
+ {
+  "text": "The sponge is on the top-shelf. Grab it before the water gets cold!!",
+  "key": "787d2003d6d9071f",
+  "normalized": "the sponge is on the topshelf grab it before the water gets cold",
+  "normalized_key": "b27d24f1329a277b",
+  "fingerprint": "c298a01945e1e932"
+ },
+ {
+  "text": "こんにちは、世界！",
+  "key": "81cf0fb2f41dab4e",
+  "normalized": "こんにちは世界",
+  "normalized_key": "c6a304536826fb57",
+  "fingerprint": "aa39de1f7cc4c29d"
+ },
+ {
+  "text": "Numbers 123 and symbols #$% stay apart",
+  "key": "1b89ff47d09e2cf9",
+  "normalized": "numbers 123 and symbols stay apart",
+  "normalized_key": "6aea87f148de67bc",
+  "fingerprint": "c2578e190552ee7f"
+ }
+]
