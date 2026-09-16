@@ -27,6 +27,13 @@ namespace DragNWash.ModFramework.ToolWindow
         // know the name yet, so keys would fall through to the field itself.
         private static bool _inputFocused;
         private static int _inputControlId;
+        // Set when the line was changed from code (Accept, history, Submit):
+        // the field keeps its old caret index, so the caret is moved to the end.
+        private static bool _cursorToEnd;
+        // Frame in which Enter or Tab was acted on. Unity delivers one key as
+        // two KeyDown events, the key code first and then the character (LF,
+        // CR or HT); the second must be swallowed, not acted on again.
+        private static int _actedFrame = -1;
 
         // [Console] TraceInput: every key the tab sees and what it did with it,
         // written to the log as DragNWash.ConsoleTrace, for debugging the input.
@@ -108,32 +115,6 @@ namespace DragNWash.ModFramework.ToolWindow
             float row = ToolWindow.RowHeight, pad = ToolWindow.Padding;
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
             ConsoleLog.MarkSeen();
-
-            // Tab belongs to the command line, wherever the cursor is. IMGUI
-            // moves the keyboard focus to the next control on any Tab that is
-            // still unused when OnGUI ends, so the key is taken here, before any
-            // control is drawn: with a list it fills in the highlighted entry,
-            // otherwise it just puts (or keeps) the cursor in the command line.
-            Event ev = Event.current;
-            bool tab = ev.keyCode == KeyCode.Tab || ev.character == (char)9;
-            if (tab && (ev.type == EventType.KeyDown || ev.type == EventType.KeyUp))
-            {
-                if (ev.type == EventType.KeyDown)
-                {
-                    if (_inputFocused && _suggestions.Count > 0)
-                    {
-                        string pick = _suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)];
-                        T("-> Accept " + pick);
-                        Accept(pick);
-                    }
-                    else
-                    {
-                        T(_inputFocused ? "-> Tab with no suggestions" : "-> Tab: focus the command line");
-                    }
-                    _focusInput = true;
-                }
-                ev.Use();
-            }
 
             // Level toggles, then the source filter and Clear.
             float bx = x;
@@ -220,23 +201,49 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             y = view.yMax + 6;
 
-            // The command line. Enter runs; Tab fills in the selected suggestion;
-            // up and down move through suggestions when there are any, else the history.
+            // The command line. Enter runs; Tab fills in the selected suggestion
+            // or brings the cursor here; up and down move through suggestions
+            // when there are any, else the history. Keys are handled before the
+            // field is drawn, so the field never sees them; a single-line
+            // TextField leaves Enter and Tab unused anyway, and an unused Tab
+            // is what makes IMGUI move the focus to the next control.
+            Event ev = Event.current;
             bool focused = _inputFocused;
             bool suggesting = focused && _suggestions.Count > 0;
             if (ev.type == EventType.KeyDown || ev.type == EventType.KeyUp)
             {
                 T($"{ev.type} key={ev.keyCode} ch={(int)ev.character} mods={ev.modifiers} focused={focused} named=\"{GUI.GetNameOfFocusedControl()}\" kb={GUIUtility.keyboardControl} input=\"{_input}\" suggestions={_suggestions.Count} selected={_selected} historyIndex={_historyIndex}");
             }
-            // Enter arrives as a key code on some platforms and as the character
-            // LF or CR on others; accept either so it always runs the line.
             bool enter = ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == (char)10 || ev.character == (char)13;
-            if (focused && ev.type == EventType.KeyDown)
+            bool tab = ev.keyCode == KeyCode.Tab || ev.character == (char)9;
+            if (ev.type == EventType.KeyDown && (enter || tab) && _actedFrame == Time.frameCount)
+            {
+                // The character half of a key already acted on this frame.
+                ev.Use();
+            }
+            else if (ev.type == EventType.KeyDown && tab)
+            {
+                if (suggesting)
+                {
+                    string pick = _suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)];
+                    T("-> Accept " + pick);
+                    Accept(pick);
+                }
+                else
+                {
+                    T(focused ? "-> Tab with no suggestions" : "-> Tab: focus the command line");
+                }
+                _focusInput = true;
+                _actedFrame = Time.frameCount;
+                ev.Use();
+            }
+            else if (focused && ev.type == EventType.KeyDown)
             {
                 if (enter)
                 {
                     T("-> Submit");
                     Submit();
+                    _actedFrame = Time.frameCount;
                     ev.Use();
                 }
                 else if (ev.keyCode == KeyCode.Escape && suggesting)
@@ -255,6 +262,7 @@ namespace DragNWash.ModFramework.ToolWindow
                     {
                         _historyIndex = _historyIndex < 0 ? History.Count - 1 : Mathf.Max(0, _historyIndex - 1);
                         _input = History[_historyIndex];
+                        _cursorToEnd = true;
                     }
                     ev.Use();
                 }
@@ -269,6 +277,7 @@ namespace DragNWash.ModFramework.ToolWindow
                     {
                         _historyIndex = _historyIndex + 1 < History.Count ? _historyIndex + 1 : -1;
                         _input = _historyIndex < 0 ? "" : History[_historyIndex];
+                        _cursorToEnd = true;
                     }
                     ev.Use();
                 }
@@ -300,15 +309,33 @@ namespace DragNWash.ModFramework.ToolWindow
             string inputBefore = _input;
             _input = GUI.TextField(inputRect, _input ?? "", s.TextField);
             bool wasFocused = _inputFocused;
-            // Only the repaint pass knows the focused control's name; during a
-            // Layout pass GetNameOfFocusedControl answers "" (seen in the trace),
-            // and a key event arrives right after a Layout pass. So the answer is
-            // taken from repaints only, and the control id is kept as a second
-            // witness that survives every pass.
+            // Focus is given and read in repaint passes only. The trace showed
+            // that GetNameOfFocusedControl answers "" in a Layout pass, and that
+            // GUI.FocusControl in a KeyDown pass leaves keyboardControl at 0, so
+            // the focus was lost after every Tab. RuntimeUnityEditor's REPL does
+            // the same: FocusControl from Repaint, then read the name back. The
+            // control id is kept as the witness for every other pass.
             if (ev.type == EventType.Repaint)
             {
+                if (_focusInput)
+                {
+                    GUI.FocusControl(InputControl);
+                    _focusInput = false;
+                }
                 _inputFocused = GUI.GetNameOfFocusedControl() == InputControl;
                 _inputControlId = _inputFocused ? GUIUtility.keyboardControl : 0;
+                // The line was replaced from code: put the caret after it. Done
+                // on the second repaint with focus, after the field has settled
+                // its own caret for the new focus.
+                if (_cursorToEnd && wasFocused && _inputFocused)
+                {
+                    var editor = GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl) as TextEditor;
+                    if (editor != null)
+                    {
+                        editor.MoveTextEnd();
+                    }
+                    _cursorToEnd = false;
+                }
             }
             else if (_inputControlId != 0)
             {
@@ -327,11 +354,6 @@ namespace DragNWash.ModFramework.ToolWindow
                 T($"field: input=\"{_input}\" focused={_inputFocused} (event {ev.type})");
             }
             Underline(inputRect);
-            if (_focusInput)
-            {
-                GUI.FocusControl(InputControl);
-                _focusInput = false;
-            }
             if (GUI.Button(new Rect(area.xMax - pad - 64, y, 64, row), "Run", s.Button))
             {
                 T("-> Run button");
@@ -353,6 +375,7 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             _input = line.Substring(0, cut) + suggestion + " ";
             _suggestions = new List<string>();
+            _cursorToEnd = true;
         }
 
         private static void Submit()
@@ -362,6 +385,7 @@ namespace DragNWash.ModFramework.ToolWindow
             _input = "";
             _historyIndex = -1;
             _suggestions = new List<string>();
+            _cursorToEnd = true;
             _focusInput = true;
             _follow = true;
             if (line.Length == 0)
