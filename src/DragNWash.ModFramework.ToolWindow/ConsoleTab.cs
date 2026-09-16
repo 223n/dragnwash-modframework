@@ -340,7 +340,9 @@ namespace DragNWash.ModFramework.ToolWindow
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
-                if (c < 128 || MenuFont.IsPrepared(c) || (!NeverPrepare && Prepared.Contains(c)))
+                // On Direct3D 12 even a character that was requested once is not
+                // safe: the dynamic font can drop it and rebuild its atlas mid-frame.
+                if (c < 128 || (!NeverPrepare && (MenuFont.IsPrepared(c) || Prepared.Contains(c))))
                 {
                     sb?.Append(c);
                     continue;
