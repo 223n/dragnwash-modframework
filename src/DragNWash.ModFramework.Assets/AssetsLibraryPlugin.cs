@@ -51,6 +51,8 @@ namespace DragNWash.ModFramework.Assets
         // Reloading uploads textures while the game runs, which Direct3D 12 can
         // crash on; the guard notices a crash at the next start and switches
         // reloading off until the player turns it back on.
+        private const string ToolsOffReason = "developer tools are off (Options > Mods > Drag'n Wash ModFramework)";
+
         private void SetUpReload()
         {
             AllowReload = Config.Bind("Reload", "AllowReload", true,
@@ -80,16 +82,49 @@ namespace DragNWash.ModFramework.Assets
             {
                 GameHooks.Unavailable(GameFonts.Guid, "Texture reload", AssetReplacements.ReloadDisabledReason);
             }
+            else if (!DeveloperTools.Enabled)
+            {
+                // Not a fault, so nothing on the Mods screen: a player who never
+                // turned the tools on simply has no reloading.
+                AssetReplacements.ReloadDisabled = true;
+                AssetReplacements.ReloadDisabledReason = ToolsOffReason;
+            }
             if (!AssetReplacements.ReloadDisabled && WatchFiles.Value)
             {
                 AssetReplacements.WatchFiles();
             }
+            DeveloperTools.Changed += () =>
+            {
+                if (DeveloperTools.Enabled)
+                {
+                    if (AssetReplacements.ReloadDisabled && AssetReplacements.ReloadDisabledReason == ToolsOffReason)
+                    {
+                        AssetReplacements.ReloadDisabled = false;
+                        AssetReplacements.ReloadDisabledReason = null;
+                        if (WatchFiles.Value)
+                        {
+                            AssetReplacements.WatchFiles();
+                        }
+                    }
+                }
+                else if (!AssetReplacements.ReloadDisabled)
+                {
+                    AssetReplacements.ReloadDisabled = true;
+                    AssetReplacements.ReloadDisabledReason = ToolsOffReason;
+                }
+            };
             // Turning it back on from the Mods screen takes effect at once and forgets the crashes.
             AllowReload.SettingChanged += (sender, args) =>
             {
                 if (AllowReload.Value)
                 {
                     ReloadGuard.ResetCount();
+                    if (!DeveloperTools.Enabled)
+                    {
+                        AssetReplacements.ReloadDisabled = true;
+                        AssetReplacements.ReloadDisabledReason = ToolsOffReason;
+                        return;
+                    }
                     AssetReplacements.ReloadDisabled = false;
                     AssetReplacements.ReloadDisabledReason = null;
                     if (WatchFiles.Value)
