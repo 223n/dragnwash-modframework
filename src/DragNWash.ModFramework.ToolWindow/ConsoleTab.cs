@@ -397,7 +397,10 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
             }
             _input = line.Substring(0, cut) + suggestion + " ";
-            _suggestions = new List<string>();
+            // What can follow the accepted word, at once: the arguments of a
+            // command, or nothing when it offers none.
+            _suggestions = ConsoleCommands.Suggest(_input, MaxSuggestionRows);
+            _selected = 0;
             _cursorToEnd = true;
         }
 
