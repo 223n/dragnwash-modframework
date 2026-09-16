@@ -373,6 +373,10 @@ namespace DragNWash.ModFramework.Assets
         // From the plugin's Update: runs the reload a watcher asked for.
         internal static void Tick()
         {
+            if (ReloadDisabled)
+            {
+                _reloadRequested = false;
+            }
             if (!_reloadRequested)
             {
                 _reloadRequestedAt = 0f;

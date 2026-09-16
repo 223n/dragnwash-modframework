@@ -61,7 +61,16 @@ namespace DragNWash.ModFramework.ToolWindow
             });
 
             _toggleKey = Config.Bind("General", "ToggleKey", new KeyboardShortcut(KeyCode.F1),
-                "Shows and hides the tool window.");
+                "Shows and hides the tool window. Only while Developer tools are on (Options > Mods > Drag'n Wash ModFramework).");
+            // A developer tool: it closes when the switch goes off, and SetOpen
+            // and the key refuse to open it while the switch is off.
+            DeveloperTools.Changed += () =>
+            {
+                if (!DeveloperTools.Enabled && ShowWindow)
+                {
+                    ShowWindow = false;
+                }
+            };
             _fontMode = Config.Bind("General", "FontMode", "auto",
                 "Font for the tool window: auto (an OS font with Japanese and Chinese, else the bundled one), builtin (Unity's built-in font, ASCII only), skin (the IMGUI skin's font).");
 
@@ -186,6 +195,10 @@ namespace DragNWash.ModFramework.ToolWindow
 
         internal void SetOpen(bool open, string tabTitle)
         {
+            if (open && !ToolsOn())
+            {
+                return;
+            }
             ShowWindow = open;
             if (open && tabTitle != null)
             {
@@ -198,6 +211,24 @@ namespace DragNWash.ModFramework.ToolWindow
                     }
                 }
             }
+        }
+
+        private bool _saidToolsOff;
+
+        // False while developer tools are off, saying why once per switch-off.
+        private bool ToolsOn()
+        {
+            if (DeveloperTools.Enabled)
+            {
+                _saidToolsOff = false;
+                return true;
+            }
+            if (!_saidToolsOff)
+            {
+                _saidToolsOff = true;
+                Log.LogMessage("The Tool window stays closed: developer tools are off. Turn them on in Options > Mods > Drag'n Wash ModFramework > Developer tools.");
+            }
+            return false;
         }
 
         private void Select(ToolTab tab)
@@ -214,7 +245,7 @@ namespace DragNWash.ModFramework.ToolWindow
             MenuFont.FlushQueued();
             ConsoleTab.Tick();
 
-            if (_toggleKey.Value.IsDown())
+            if (_toggleKey.Value.IsDown() && (ShowWindow || ToolsOn()))
             {
                 ShowWindow = !ShowWindow;
             }

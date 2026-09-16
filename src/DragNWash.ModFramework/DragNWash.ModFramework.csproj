@@ -6,7 +6,7 @@
     <RootNamespace>DragNWash.ModFramework</RootNamespace>
     <LangVersion>latest</LangVersion>
     <!-- Keep in sync with ModFramework.Version. -->
-    <Version>1.1.2</Version>
+    <Version>1.2.0</Version>
     <FileVersion>1.1.2</FileVersion>
     <Nullable>disable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

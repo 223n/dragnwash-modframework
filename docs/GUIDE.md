@@ -61,6 +61,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 5. **Do not replace another mod's service.** `Services.Register` refuses a second provider for the same interface. Ask for the service with `Services.TryGet<T>(out var service, minimumVersion)` and handle it being absent.
 6. **Keep game types out of your public API.** If your mod is a library for other mods, expose your own types, so a game update changes your internals and not every mod built on you.
 7. **Do not ship the game's files.** No assets, script text or game DLLs in your repository or releases.
+8. **Keep developer features behind the developer-tools switch.** Exports, hot reload, debug keys and windows run only while `DeveloperTools.Enabled` is true (`DeveloperTools.WhenEnabled` for features that start later), so that someone who only installed a mod never sees them. Tool window tabs already are.
 
 ## Writing a library
 
