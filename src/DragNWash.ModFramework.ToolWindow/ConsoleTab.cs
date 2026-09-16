@@ -188,10 +188,8 @@ namespace DragNWash.ModFramework.ToolWindow
             bool focused = GUI.GetNameOfFocusedControl() == InputControl;
             bool suggesting = focused && _suggestions.Count > 0;
             // Enter arrives as a key code on some platforms and as the character
-            // '
-' or '' on others; accept either so it always runs the line.
-            bool enter = ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == '
-' || ev.character == '';
+            // LF or CR on others; accept either so it always runs the line.
+            bool enter = ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter || ev.character == (char)10 || ev.character == (char)13;
             if (focused && ev.type == EventType.KeyDown)
             {
                 if (enter)
