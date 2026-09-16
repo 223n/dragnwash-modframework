@@ -40,6 +40,7 @@ public class MyMod : BaseUnityPlugin
 |---|---|---|
 | Mod の説明をプレイヤーに見せる | `ModFramework.Register(ModInfo)` | なし（普通のプラグインも一覧に出ますが、情報が少なくなります） |
 | プレイヤーに設定を用意する | BepInEx の `Config.Bind`（Mods 画面が設定ページを作ります）、ゲームの Options 画面には `GameOptions.AddChoice` / `AddToggle` | 独自の設定メニュー |
+| 設定の並び順、上級者向けの項目を隠す、表示名、再起動が必要な印 | `ConfigDescription` のタグに `SettingMeta` / `SectionMeta`（実験的） | なし（省略するとセクション名とキー名の順に並びます） |
 | 表示前のテキストを変える | `GameText.AddRewriter`（ライブラリ **Text**） | `TMP_Text.text` や `SetText` へのパッチ |
 | 表示中の台詞と話者を知る | `GameDialogue.LineShowing`、`OptionShowing`、`TryGetLine`（ライブラリ **Dialogue**） | Yarn Spinner の表示部品へのパッチ |
 | ゲームの更新で本文が変わった台詞のデータを見つけ直す | `LineKey`、`LineResolver`（ライブラリ **Dialogue**、実験的。[STABLE_LINE_KEYS.ja.md](STABLE_LINE_KEYS.ja.md)） | 英文だけをキーにする |

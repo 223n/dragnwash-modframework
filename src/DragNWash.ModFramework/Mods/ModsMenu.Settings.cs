@@ -22,6 +22,9 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextNotAccepted = "Not accepted: ";
         internal const string TextCaptureKey = "Capture key";
         internal const string TextPressKey = "Press a key...";
+        internal const string TextShowAdvanced = "Show advanced settings";
+        internal const string TextRestart = "Takes effect after the game restarts.";
+        private bool _showAdvanced;
 
         private static readonly Color SettingsColor = new Color(0.3f, 0.42f, 0.62f, 1f);
         private static readonly Color StepColor = new Color(0.25f, 0.25f, 0.25f, 1f);
@@ -42,7 +45,8 @@ namespace DragNWash.ModFramework.Mods
                 return;
             }
             _settingsFor = entry;
-            _item = _items[0];
+            _showAdvanced = false;
+            _item = Shown().FirstOrDefault() ?? _items[0];
             RebuildList();
             RebuildDetails(false);
             Focus("Step+", "Toggle", "Reset");
@@ -68,33 +72,108 @@ namespace DragNWash.ModFramework.Mods
             RebuildDetails(false);
         }
 
+        // The settings on the page: advanced ones only when asked for.
+        private IEnumerable<ConfigItem> Shown()
+        {
+            return _items.Where(i => _showAdvanced || !i.Advanced);
+        }
+
         private void BuildSettingsList()
         {
+            if (_items.Any(i => i.Advanced))
+            {
+                _rows.Add(CreateAdvancedRow());
+            }
             string section = null;
-            foreach (ConfigItem item in _items)
+            foreach (ConfigItem item in Shown())
             {
                 if (item.Section != section)
                 {
                     section = item.Section;
-                    _rows.Add(CreateSectionRow(section));
+                    _rows.Add(CreateSectionRow(item));
                 }
                 _rows.Add(CreateSettingRow(item));
             }
         }
 
-        private GameObject CreateSectionRow(string section)
+        private GameObject CreateSectionRow(ConfigItem first)
         {
-            var row = new GameObject("Section " + section, typeof(RectTransform));
+            bool described = !string.IsNullOrEmpty(first.SectionDescription);
+            float height = described ? 84f : 56f;
+            var row = new GameObject("Section " + first.Section, typeof(RectTransform));
             row.transform.SetParent(Content, false);
             LayoutElement layout = row.AddComponent<LayoutElement>();
-            layout.minHeight = 56f;
-            layout.preferredHeight = 56f;
-            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 56f);
+            layout.minHeight = height;
+            layout.preferredHeight = height;
+            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, height);
             layout.flexibleWidth = 1f;
-            TMP_Text label = UiText.Create(row.transform, "Label", Escape(section), UiText.BodySize);
+            TMP_Text label = UiText.Create(row.transform, "Label", Escape(first.SectionTitle), UiText.BodySize);
             label.alignment = TextAlignmentOptions.BottomLeft;
             label.fontStyle |= FontStyles.Bold;
-            ((RectTransform)label.transform).offsetMin = new Vector2(110f, 0f);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.offsetMin = new Vector2(110f, described ? 28f : 0f);
+            if (described)
+            {
+                TMP_Text note = UiText.Create(row.transform, "Description", Escape(first.SectionDescription), UiText.BodySize * 0.8f);
+                note.alignment = TextAlignmentOptions.TopLeft;
+                note.textWrappingMode = TextWrappingModes.NoWrap;
+                note.overflowMode = TextOverflowModes.Ellipsis;
+                note.color = new Color(note.color.r, note.color.g, note.color.b, 0.75f);
+                var noteRect = (RectTransform)note.transform;
+                noteRect.offsetMin = new Vector2(110f, 0f);
+                noteRect.offsetMax = new Vector2(-20f, -30f);
+            }
+            return row;
+        }
+
+        // A row at the top of the page that shows or hides the advanced settings.
+        private GameObject CreateAdvancedRow()
+        {
+            var row = new GameObject("Advanced", typeof(RectTransform));
+            row.transform.SetParent(Content, false);
+            LayoutElement layout = row.AddComponent<LayoutElement>();
+            layout.minHeight = 72f;
+            layout.preferredHeight = 72f;
+            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 72f);
+            layout.flexibleWidth = 1f;
+
+            var band = new GameObject("Band", typeof(RectTransform));
+            var bandRect = (RectTransform)band.transform;
+            bandRect.SetParent(row.transform, false);
+            bandRect.anchorMin = Vector2.zero;
+            bandRect.anchorMax = Vector2.one;
+            bandRect.offsetMin = new Vector2(90f, 4f);
+            bandRect.offsetMax = new Vector2(0f, -4f);
+            Image image = band.AddComponent<Image>();
+            image.color = BandColor;
+            Button button = band.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.colors = ListColors(button.colors);
+            button.onClick.AddListener(() =>
+            {
+                _showAdvanced = !_showAdvanced;
+                if (_item != null && _item.Advanced && !_showAdvanced)
+                {
+                    _item = Shown().FirstOrDefault() ?? _item;
+                }
+                RebuildList();
+                RebuildDetails(false);
+            });
+
+            TMP_Text key = UiText.Create(band.transform, "Key", TextShowAdvanced, UiText.BodySize);
+            key.alignment = TextAlignmentOptions.MidlineLeft;
+            key.fontStyle |= FontStyles.Italic;
+            key.textWrappingMode = TextWrappingModes.NoWrap;
+            key.overflowMode = TextOverflowModes.Ellipsis;
+            var keyRect = (RectTransform)key.transform;
+            keyRect.anchorMax = new Vector2(0.62f, 1f);
+            keyRect.offsetMin = new Vector2(20f, 0f);
+
+            TMP_Text value = UiText.Create(band.transform, "Value", _showAdvanced ? TextOn : TextOff, UiText.BodySize);
+            value.alignment = TextAlignmentOptions.MidlineRight;
+            var valueRect = (RectTransform)value.transform;
+            valueRect.anchorMin = new Vector2(0.62f, 0f);
+            valueRect.offsetMax = new Vector2(-20f, 0f);
             return row;
         }
 
@@ -132,7 +211,7 @@ namespace DragNWash.ModFramework.Mods
                 }
             });
 
-            TMP_Text key = UiText.Create(band.transform, "Key", Escape(item.Key), UiText.BodySize);
+            TMP_Text key = UiText.Create(band.transform, "Key", Escape(item.Title), UiText.BodySize);
             key.alignment = TextAlignmentOptions.MidlineLeft;
             key.textWrappingMode = TextWrappingModes.NoWrap;
             key.overflowMode = TextOverflowModes.Ellipsis;
@@ -164,12 +243,18 @@ namespace DragNWash.ModFramework.Mods
             bandImage.raycastTarget = false;
 
             Label("Mod", Escape(_settingsFor.DisplayName), UiText.BodySize, 0.91f, 0.98f, false);
-            Label("Key", Escape(item.Key), UiText.TitleSize * 0.55f, 0.81f, 0.91f, false);
-            Label("Section", Escape(item.Section), UiText.BodySize * 0.85f, 0.75f, 0.81f, false).fontStyle |= FontStyles.Italic;
+            Label("Key", Escape(item.Title), UiText.TitleSize * 0.55f, 0.81f, 0.91f, false);
+            string section = item.SectionTitle + (item.Title != item.Key ? "   " + item.Key : "");
+            Label("Section", Escape(section), UiText.BodySize * 0.85f, 0.75f, 0.81f, false).fontStyle |= FontStyles.Italic;
 
-            if (!string.IsNullOrEmpty(item.Description))
+            string description = item.Description ?? "";
+            if (item.RequiresRestart)
             {
-                TMP_Text d = Label("Description", item.Description, UiText.BodySize, 0.45f, 0.74f, true);
+                description += (description.Length > 0 ? "\n\n" : "") + TextRestart;
+            }
+            if (description.Length > 0)
+            {
+                TMP_Text d = Label("Description", description, UiText.BodySize, 0.45f, 0.74f, true);
                 d.alignment = TextAlignmentOptions.TopLeft;
             }
 
