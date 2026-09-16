@@ -297,11 +297,11 @@ namespace DragNWash.ModFramework.ToolWindow
             GUI.Label(new Rect(x, y, 20, row), ">", s.Label);
             GUI.SetNextControlName(InputControl);
             var inputRect = new Rect(x + 20, y, w - 20 - 70, row);
-            string before = _input;
+            string inputBefore = _input;
             _input = GUI.TextField(inputRect, _input ?? "", s.TextField);
             bool wasFocused = _inputFocused;
             _inputFocused = GUI.GetNameOfFocusedControl() == InputControl;
-            if (_input != before || _inputFocused != wasFocused)
+            if (_input != inputBefore || _inputFocused != wasFocused)
             {
                 T($"field: input=\"{_input}\" focused={_inputFocused} (event {ev.type})");
             }
