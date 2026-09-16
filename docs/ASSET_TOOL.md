@@ -32,6 +32,14 @@ When two mods replace the same texture, the mod whose folder sorts last wins, an
 
 Not yet: meshes, shaders, and a `replace.json` for targeting by anything but the name. Skinned meshes (characters) are out of scope for now.
 
+### Reloading while the game runs
+
+**Reload files** in the Assets tab reads every replacement PNG again, swaps in the ones whose content changed, and applies them; **Apply replacements** only re-points materials and sprites at textures that are already loaded. With `[Reload] WatchFiles = true` in the library's config, a PNG that changes on disk is reloaded by itself half a second after the last write (never on Direct3D 12).
+
+A reload uploads textures while the game runs, which on Direct3D 12 can crash it (Unity UUM-140564). Because a native crash cannot be caught, the library writes a marker file (`BepInEx/config/<assets GUID>.reload-in-progress`) before uploading and removes it afterwards. A marker still there at the next start means the last reload took the game down: the log and the Mods screen say so, `[Reload] AllowReload` is switched off until you turn it back on, and after two such crashes on Direct3D 12 the button stays off. Working with `-force-d3d11` in the game's launch options avoids all of this.
+
+Failures the library can see are handled per file and never stop the rest: a PNG that is not an image, or that an editor is still saving (retried three times), keeps its previous texture and is listed under **Show replacements** with the reason.
+
 ## Export
 
 Planned: PNG for textures (read back from the GPU, so it works for the game's compressed textures too), OBJ for meshes, JSON for material and shader properties, written under `BepInEx/exports/<game build>/` with a `NOTICE.txt` that says what the files are and that they stay on your machine.

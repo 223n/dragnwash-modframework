@@ -104,6 +104,52 @@ namespace DragNWash.ModFramework.Assets
             }
         }
 
+        // Reads a file into a new texture every time, without the cache, so a
+        // reload sees the new content. A file an editor is still writing is
+        // retried a few times. On failure the reason is returned and nothing is
+        // created, so the caller keeps what it had.
+        internal static Texture2D LoadTextureFresh(string path, out string error)
+        {
+            error = null;
+            byte[] data = null;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    data = File.ReadAllBytes(path);
+                    break;
+                }
+                catch (IOException ex)
+                {
+                    error = ex.Message;
+                    System.Threading.Thread.Sleep(150);
+                }
+            }
+            if (data == null)
+            {
+                error = "the file could not be read (still being saved?): " + error;
+                return null;
+            }
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = Path.GetFileNameWithoutExtension(path) };
+            try
+            {
+                if (!LoadImage(texture, data))
+                {
+                    UnityEngine.Object.Destroy(texture);
+                    error = "not an image the game can read";
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Object.Destroy(texture);
+                error = ex.Message;
+                return null;
+            }
+            texture.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            return texture;
+        }
+
         // ImageConversion lives in a module whose reference assembly targets
         // netstandard 2.1, which a net472 plugin cannot compile against.
         private static System.Reflection.MethodInfo _loadImage;
