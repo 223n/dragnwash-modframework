@@ -1,0 +1,68 @@
+name: Build
+
+# Builds the release zip on GitHub instead of on a maintainer's machine.
+#
+# The core and the libraries compile against the game's own assemblies, which
+# this public repository must never contain. They live in the private
+# repository TomXV/dragnwash-libs and are fetched with LIBS_TOKEN, a
+# fine-grained token with read access to that repository only, kept as an
+# Actions secret. This workflow runs only on pushes to main, on tags and by
+# hand, never for pull requests, so a fork can never reach the token.
+#
+# Every run uploads release/DragNWash.ModFramework-<version>.zip as a workflow
+# artifact. A v* tag also creates a DRAFT GitHub release with the zip attached;
+# publishing it stays a person's decision.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the reference assemblies (private, never committed here)
+        uses: actions/checkout@v4
+        with:
+          repository: TomXV/dragnwash-libs
+          token: ${{ secrets.LIBS_TOKEN }}
+          path: .libs-private
+
+      - name: Put them where the projects expect them
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src/DragNWash.ModFramework/libs | Out-Null
+          Copy-Item .libs-private/modframework/*.dll src/DragNWash.ModFramework/libs/
+          Remove-Item -Recurse -Force .libs-private
+          (Get-ChildItem src/DragNWash.ModFramework/libs).Count
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build and pack
+        shell: pwsh
+        run: pwsh tools/pack.ps1
+
+      - name: Keep the zip as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DragNWash.ModFramework
+          path: release/*.zip
+          if-no-files-found: error
+
+      - name: Draft a release for the tag (a person publishes it)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zip = (Get-ChildItem release/*.zip | Select-Object -First 1).FullName
+          gh release create $tag $zip --draft --title "Drag'n Wash ModFramework $($tag.TrimStart('v'))" --notes "Draft made by the Build workflow. Replace these notes before publishing."

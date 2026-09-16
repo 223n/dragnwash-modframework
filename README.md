@@ -70,6 +70,10 @@ public class MyMod : BaseUnityPlugin
 
 Each DLL goes to its project's `bin/Release/`. To try them, copy each plugin DLL to its own folder, `<Game>/BepInEx/plugins/<assembly name>/`, and `DragNWash.ModFramework.Preloader.dll` to `<Game>/BepInEx/patchers/`.
 
+### Building on GitHub
+
+The **Build** workflow (Actions) builds the release zip on GitHub: on every push to `main`, on a `v*` tag, or by hand. It fetches the reference assemblies from a private repository (`TomXV/dragnwash-libs`, never public) with the `LIBS_TOKEN` secret, runs `tools/pack.ps1` on a Windows runner and uploads `release/DragNWash.ModFramework-<version>.zip` as a workflow artifact. A tag also creates a **draft** release with the zip attached; a person writes the notes and publishes it. The workflow never runs for pull requests, so a fork cannot reach the token. After a game update, refresh the private repository from a game install with `tools/copy-libs.ps1`.
+
 ## Rules for this repository
 
 - Never commit the game's files, BepInEx binaries or anything from `libs/`. A check on every push and pull request enforces it.

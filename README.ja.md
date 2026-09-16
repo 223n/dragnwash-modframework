@@ -70,6 +70,10 @@ public class MyMod : BaseUnityPlugin
 
 DLL はそれぞれのプロジェクトの `bin/Release/` にできます。試すときは、プラグインの DLL を 1 つずつ `<ゲーム>/BepInEx/plugins/<アセンブリ名>/` に、`DragNWash.ModFramework.Preloader.dll` を `<ゲーム>/BepInEx/patchers/` にコピーしてください。
 
+### GitHub でビルドする
+
+Actions の **Build** ワークフローが、リリース用の zip を GitHub 上で作ります。`main` への push、`v*` のタグ、手動実行のときに動き、参照アセンブリを非公開リポジトリ（`TomXV/dragnwash-libs`。公開はしません）から `LIBS_TOKEN` シークレットで取り、Windows の runner で `tools/pack.ps1` を回して、`release/DragNWash.ModFramework-<version>.zip` を成果物として残します。タグのときは、zip を添えた **下書き** のリリースも作ります。ノートを書いて公開するのは人の手です。PR では動かないので、フォークからトークンには触れません。ゲームが更新されたら、`tools/copy-libs.ps1` でゲームから取り直して、非公開リポジトリを更新してください。
+
 ## このリポジトリのルール
 
 - ゲームのファイル、BepInEx のバイナリ、`libs/` の中身は絶対にコミットしません。プッシュとプルリクエストのたびに自動でチェックします
