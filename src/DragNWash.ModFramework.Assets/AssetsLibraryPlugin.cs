@@ -15,6 +15,8 @@ namespace DragNWash.ModFramework.Assets
     {
         internal static ManualLogSource Log;
         internal static ConfigEntry<int> AtlasPointSize;
+        internal static ConfigEntry<bool> AllowReload;
+        internal static ConfigEntry<bool> WatchFiles;
 
         private void Awake()
         {
@@ -37,6 +39,7 @@ namespace DragNWash.ModFramework.Assets
             // Experimental: texture replacements from every mod's assets/textures folder,
             // read now while uploads are safe, and the Assets tab when the Tool window is there.
             AssetReplacements.LoadAll();
+            SetUpReload();
             if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey(global::DragNWash.ModFramework.ToolWindow.ToolWindow.Guid))
             {
                 InstallTab();
@@ -46,6 +49,46 @@ namespace DragNWash.ModFramework.Assets
             {
                 Logger.LogInfo($"Direct3D 12 on Unity {Application.unityVersion}: fonts, textures and asset bundles should be loaded at startup (Unity issue UUM-140564). If the game still crashes, add -force-d3d11 to its Steam launch options.");
             }
+        }
+
+        // Reloading uploads textures while the game runs, which Direct3D 12 can
+        // crash on; the guard notices a crash at the next start and switches
+        // reloading off until the player turns it back on.
+        private void SetUpReload()
+        {
+            AllowReload = Config.Bind("Reload", "AllowReload", true,
+                "Lets the Assets tab reload texture replacements from disk while the game runs. Switched off by itself when the game crashed during a reload; turn it back on to try again. On Direct3D 12 a reload can crash the game (Unity issue UUM-140564); -force-d3d11 in the Steam launch options avoids that.");
+            WatchFiles = Config.Bind("Reload", "WatchFiles", false,
+                "Reloads a texture replacement by itself when its PNG changes on disk. Never active on Direct3D 12.");
+
+            bool crashed = ReloadGuard.CheckAtStartup();
+            if (crashed)
+            {
+                Logger.LogError($"The game did not come back from the last texture reload ({ReloadGuard.LastCrash}). Reloading is switched off; set [Reload] AllowReload to true to try again" +
+                                (GameFonts.RuntimeUploadsAreSafe ? "." : ", or add -force-d3d11 to the game's launch options and work there."));
+                AllowReload.Value = false;
+            }
+            bool refused = !GameFonts.RuntimeUploadsAreSafe && ReloadGuard.CrashCount >= 2;
+            if (!AllowReload.Value)
+            {
+                AssetReplacements.ReloadDisabled = true;
+                AssetReplacements.ReloadDisabledReason = crashed ? "switched off: the game crashed during the last reload" : "switched off in the config ([Reload] AllowReload)";
+            }
+            else if (refused)
+            {
+                AssetReplacements.ReloadDisabled = true;
+                AssetReplacements.ReloadDisabledReason = $"refused on Direct3D 12 after {ReloadGuard.CrashCount} crashes; use -force-d3d11";
+            }
+            GameHooks.Require(GameFonts.Guid, "Texture reload", !AssetReplacements.ReloadDisabled, AssetReplacements.ReloadDisabledReason ?? "");
+            if (!AssetReplacements.ReloadDisabled && WatchFiles.Value)
+            {
+                AssetReplacements.WatchFiles();
+            }
+        }
+
+        private void Update()
+        {
+            AssetReplacements.Tick();
         }
 
         // In its own method so the Tool window types are only loaded when it is installed.

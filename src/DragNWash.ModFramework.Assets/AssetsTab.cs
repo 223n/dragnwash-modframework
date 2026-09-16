@@ -49,8 +49,23 @@ namespace DragNWash.ModFramework.Assets
                 _showReplacements = !_showReplacements;
                 _scroll = Vector2.zero;
             }
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = !AssetReplacements.ReloadDisabled;
+            if (GUI.Button(new Rect(x + 440, y, 110, row), "Reload files", s.Button))
+            {
+                int n = 0, bad = 0;
+                foreach (ReloadResult r in AssetReplacements.ReloadFiles())
+                {
+                    if (r.Status == "reloaded") n++;
+                    else if (r.Status != "unchanged") bad++;
+                }
+                _status = $"Reloaded {n} file(s)" + (bad > 0 ? $", {bad} with problems (see Show replacements)" : "") + ".";
+                _showReplacements = bad > 0 || _showReplacements;
+                _textures = null;
+            }
+            GUI.enabled = wasEnabled;
             // The text field blends into the panel; an underline and a placeholder show where it is.
-            var filterRect = new Rect(x + 440, y, Mathf.Max(80, w - 440), row);
+            var filterRect = new Rect(x + 560, y, Mathf.Max(80, w - 560), row);
             _filter = GUI.TextField(filterRect, _filter ?? "", s.TextField);
             Color was = GUI.color;
             GUI.color = TW.AccentColor;
@@ -68,6 +83,13 @@ namespace DragNWash.ModFramework.Assets
                 summary += $", {AssetReplacements.ConflictCount} overridden by another mod";
             }
             GUI.Label(new Rect(x, y, w, row), _status + "    |    " + summary, s.MutedLabel);
+            y += row;
+            string reloadNote = AssetReplacements.ReloadDisabled
+                ? "Reload files: " + AssetReplacements.ReloadDisabledReason
+                : GameFonts.RuntimeUploadsAreSafe
+                    ? "Reload files re-reads changed PNGs and uploads them; Apply replacements only re-points materials and sprites."
+                    : "Reload files uploads textures while the game runs, which can crash it on Direct3D 12; Apply replacements is always safe. Work with -force-d3d11 to reload freely.";
+            GUI.Label(new Rect(x, y, w, row), reloadNote, s.MutedLabel);
             y += row;
 
             var view = new Rect(x, y, w, area.yMax - pad - y);
@@ -136,6 +158,10 @@ namespace DragNWash.ModFramework.Assets
                 if (r.Overrides.Count > 0)
                 {
                     note += " - overrides " + string.Join(", ", r.Overrides);
+                }
+                if (r.Problem != null)
+                {
+                    note = "NOT reloaded: " + r.Problem;
                 }
                 GUI.Label(new Rect(inner * 0.7f, ry, inner * 0.3f, row), note, s.MutedLabel);
                 ry += row;
