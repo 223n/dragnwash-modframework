@@ -4,6 +4,10 @@ name: CI
 # this repository must never contain, so they are built locally only. CI runs
 # what needs no game files: consistency checks, and a build of the preloader
 # patcher, which only uses BepInEx.
+#
+# A failure's reason is an annotation on the run (and on the file it names,
+# in a pull request's Files tab). The checks run locally the same way:
+#   python tools/check-repo.py      python tools/linekeys.py --check
 on:
   pull_request:
   push:

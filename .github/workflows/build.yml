@@ -12,6 +12,10 @@ name: Build
 # Every run uploads release/DragNWash.ModFramework-<version>.zip as a workflow
 # artifact. A v* tag also creates a DRAFT GitHub release with the zip attached;
 # publishing it stays a person's decision.
+#
+# When a run fails, the reason is in the run's annotations (the red lines at
+# the top of the summary page) and in the job summary; each step below says
+# what to do about the failure it can see.
 on:
   push:
     branches: [main]
@@ -26,6 +30,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check that the LIBS_TOKEN secret exists
+        shell: pwsh
+        env:
+          HAS_TOKEN: ${{ secrets.LIBS_TOKEN != '' }}
+        run: |
+          if ($env:HAS_TOKEN -ne 'true') {
+            Write-Host "::error title=LIBS_TOKEN is not set::The Build workflow needs the LIBS_TOKEN secret to read the private TomXV/dragnwash-libs repository. Add it under Settings > Secrets and variables > Actions > New repository secret, with a fine-grained personal access token that has Contents: Read-only on dragnwash-libs only."
+            "### Build failed: LIBS_TOKEN is not set`n`nAdd the secret under **Settings > Secrets and variables > Actions** (name ``LIBS_TOKEN``, a fine-grained token with *Contents: Read-only* on ``TomXV/dragnwash-libs``). A token that expired fails the next step instead, with a 'repository not found' message." | Out-File -Append $env:GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          Write-Host "LIBS_TOKEN is set."
 
       - name: Get the reference assemblies (private, never committed here)
         uses: actions/checkout@v4
@@ -42,13 +58,47 @@ jobs:
           Remove-Item -Recurse -Force .libs-private
           (Get-ChildItem src/DragNWash.ModFramework/libs).Count
 
+      - name: Check that every referenced assembly is there
+        shell: pwsh
+        run: |
+          # Every <HintPath>../.../libs/X.dll</HintPath> in the projects must exist after the copy above.
+          $missing = @()
+          foreach ($csproj in Get-ChildItem src/*/*.csproj) {
+            $text = Get-Content -Raw $csproj
+            foreach ($m in [regex]::Matches($text, 'libs/([A-Za-z0-9.]+\.dll)')) {
+              $dll = $m.Groups[1].Value
+              if (-not (Test-Path "src/DragNWash.ModFramework/libs/$dll")) {
+                $missing += "$dll (referenced by $($csproj.Name))"
+              }
+            }
+          }
+          $missing = $missing | Sort-Object -Unique
+          if ($missing) {
+            foreach ($m in $missing) { Write-Host "::error title=Reference assembly missing::$m is not in dragnwash-libs/modframework. Copy it there from a game install (tools/copy-libs.ps1) and push that repository." }
+            "### Build failed: reference assemblies missing from dragnwash-libs/modframework`n`n" + (($missing | ForEach-Object { "- ``$_``" }) -join "`n") | Out-File -Append $env:GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          Write-Host "All referenced assemblies are present."
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
       - name: Build and pack
         shell: pwsh
-        run: pwsh tools/pack.ps1
+        run: |
+          # Compiler errors are annotated by the .NET problem matcher; pack.ps1's own
+          # checks throw with a reason, which is turned into an annotation here.
+          try {
+            pwsh tools/pack.ps1
+            if ($LASTEXITCODE -ne 0) { throw "tools/pack.ps1 exited with $LASTEXITCODE (see the lines above for the build error)." }
+          } catch {
+            Write-Host "::error title=Build and pack failed::$($_.Exception.Message)"
+            "### Build failed`n`n$($_.Exception.Message)`n`nCompiler errors, if any, are listed as annotations on this run." | Out-File -Append $env:GITHUB_STEP_SUMMARY
+            exit 1
+          }
+          $zip = Get-ChildItem release/*.zip | Select-Object -First 1
+          "### Built ``$($zip.Name)`` ($([math]::Round($zip.Length / 1KB)) KB) from ``$env:GITHUB_REF_NAME`` at ``$($env:GITHUB_SHA.Substring(0, 7))``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
 
       - name: Keep the zip as a workflow artifact
         uses: actions/upload-artifact@v4
@@ -66,3 +116,8 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $zip = (Get-ChildItem release/*.zip | Select-Object -First 1).FullName
           gh release create $tag $zip --draft --title "Drag'n Wash ModFramework $($tag.TrimStart('v'))" --notes "Draft made by the Build workflow. Replace these notes before publishing."
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error title=Draft release not created::gh release create failed for $tag. A release for this tag may already exist (delete the draft and re-run), or the workflow token lacks contents: write."
+            exit 1
+          }
+          "Draft release **$tag** created with ``$(Split-Path -Leaf $zip)``; publish it by hand." | Out-File -Append $env:GITHUB_STEP_SUMMARY

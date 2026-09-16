@@ -126,11 +126,15 @@ def main(argv):
         vectors = json.loads(VECTORS.read_text(encoding="utf-8"))
         bad = [v["text"] for v in vectors if keys_for(v["text"]) != v]
         if bad:
-            print("MISMATCH:", bad)
+            print(f"::error file=tools/linekeys.py::{len(bad)} vector(s) in ci/linekey-vectors.json no longer match this file. "
+                  "Either the key definitions changed (then LineKey.cs in the framework must change the same way and the vectors be rewritten with --write-vectors) "
+                  "or this copy drifted from the framework's.")
+            for text in bad:
+                print(f"  mismatch for: {text!r}")
             return 1
         far = distance(fingerprint(SAMPLES[7]), fingerprint(SAMPLES[8]))
         if far > MAX_FUZZY_DISTANCE:
-            print(f"fingerprints of the similar samples are {far} bits apart, more than {MAX_FUZZY_DISTANCE}")
+            print(f"::error file=tools/linekeys.py::fingerprints of the similar samples are {far} bits apart, more than {MAX_FUZZY_DISTANCE}: the fuzzy match would miss an edited line.")
             return 1
         print(f"OK: {len(vectors)} vectors, similar samples {far} bits apart.")
         return 0

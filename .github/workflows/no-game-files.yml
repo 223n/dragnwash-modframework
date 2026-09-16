@@ -18,6 +18,9 @@ jobs:
           if [ -n "$found" ]; then
             echo "These files must not be committed:"
             echo "$found"
+            while IFS= read -r f; do
+              echo "::error file=$f,title=Game or binary file committed::$f must not be in the repository (game files and BepInEx binaries stay in the ignored libs/ folder). Remove it with git rm --cached and commit."
+            done <<< "$found"
             exit 1
           fi
           echo "OK"
