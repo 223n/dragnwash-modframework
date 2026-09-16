@@ -111,7 +111,9 @@ namespace DragNWash.ModFramework.Mods
             label.alignment = TextAlignmentOptions.BottomLeft;
             label.fontStyle |= FontStyles.Bold;
             var labelRect = (RectTransform)label.transform;
-            labelRect.offsetMin = new Vector2(110f, described ? 28f : 0f);
+            // With a description the heading takes the upper part of the row and
+            // the description the lower; the two must not overlap.
+            labelRect.offsetMin = new Vector2(110f, described ? 44f : 0f);
             if (described)
             {
                 TMP_Text note = UiText.Create(row.transform, "Description", Escape(first.SectionDescription), UiText.BodySize * 0.8f);
@@ -120,8 +122,8 @@ namespace DragNWash.ModFramework.Mods
                 note.overflowMode = TextOverflowModes.Ellipsis;
                 note.color = new Color(note.color.r, note.color.g, note.color.b, 0.75f);
                 var noteRect = (RectTransform)note.transform;
-                noteRect.offsetMin = new Vector2(110f, 0f);
-                noteRect.offsetMax = new Vector2(-20f, -30f);
+                noteRect.offsetMin = new Vector2(110f, 4f);
+                noteRect.offsetMax = new Vector2(-20f, -44f);
             }
             return row;
         }
