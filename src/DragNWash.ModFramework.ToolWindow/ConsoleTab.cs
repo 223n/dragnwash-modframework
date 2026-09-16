@@ -109,6 +109,32 @@ namespace DragNWash.ModFramework.ToolWindow
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
             ConsoleLog.MarkSeen();
 
+            // Tab belongs to the command line, wherever the cursor is. IMGUI
+            // moves the keyboard focus to the next control on any Tab that is
+            // still unused when OnGUI ends, so the key is taken here, before any
+            // control is drawn: with a list it fills in the highlighted entry,
+            // otherwise it just puts (or keeps) the cursor in the command line.
+            Event ev = Event.current;
+            bool tab = ev.keyCode == KeyCode.Tab || ev.character == (char)9;
+            if (tab && (ev.type == EventType.KeyDown || ev.type == EventType.KeyUp))
+            {
+                if (ev.type == EventType.KeyDown)
+                {
+                    if (_inputFocused && _suggestions.Count > 0)
+                    {
+                        string pick = _suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)];
+                        T("-> Accept " + pick);
+                        Accept(pick);
+                    }
+                    else
+                    {
+                        T(_inputFocused ? "-> Tab with no suggestions" : "-> Tab: focus the command line");
+                    }
+                    _focusInput = true;
+                }
+                ev.Use();
+            }
+
             // Level toggles, then the source filter and Clear.
             float bx = x;
             foreach ((LogLevel level, string label) in Toggles)
@@ -196,7 +222,6 @@ namespace DragNWash.ModFramework.ToolWindow
 
             // The command line. Enter runs; Tab fills in the selected suggestion;
             // up and down move through suggestions when there are any, else the history.
-            Event ev = Event.current;
             bool focused = _inputFocused;
             bool suggesting = focused && _suggestions.Count > 0;
             if (ev.type == EventType.KeyDown || ev.type == EventType.KeyUp)
@@ -212,20 +237,6 @@ namespace DragNWash.ModFramework.ToolWindow
                 {
                     T("-> Submit");
                     Submit();
-                    ev.Use();
-                }
-                else if (ev.keyCode == KeyCode.Tab || ev.character == (char)9)
-                {
-                    if (suggesting)
-                    {
-                        T("-> Accept " + _suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)]);
-                        Accept(_suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)]);
-                    }
-                    else
-                    {
-                        T("-> Tab with no suggestions");
-                    }
-                    _focusInput = true;
                     ev.Use();
                 }
                 else if (ev.keyCode == KeyCode.Escape && suggesting)
@@ -262,12 +273,6 @@ namespace DragNWash.ModFramework.ToolWindow
                     ev.Use();
                 }
             }
-            // Tab must not leave the field: IMGUI would move focus on the KeyUp too.
-            if (focused && ev.type == EventType.KeyUp && (ev.keyCode == KeyCode.Tab || ev.character == (char)9))
-            {
-                ev.Use();
-            }
-
             if (suggesting)
             {
                 var box = new Rect(x + 20, y, w - 20 - 70, suggestionHeight);
