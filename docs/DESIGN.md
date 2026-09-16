@@ -4,6 +4,8 @@
 
 Status: September 2026. The core is released as 1.1.2 and the libraries as 1.0.0; parts marked planned or future are not done yet. Open an issue to discuss any part of it.
 
+Design memos for features not built yet: [MOD_RELOAD.md](MOD_RELOAD.md) (a mod's DLL reloaded while the game runs) and [INSPECTOR.md](INSPECTOR.md) (an Inspector tab in the Tool window). Built since 1.1.2 and on `main`: [CONSOLE.md](CONSOLE.md), [ASSET_TOOL.md](ASSET_TOOL.md), [STABLE_LINE_KEYS.md](STABLE_LINE_KEYS.md).
+
 ## Why a framework
 
 [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) had to build a lot of machinery to hook into the game: a setting in the game's Options screen, an in-game menu that works with a gamepad and on the Steam Deck, a hook on every text component, the Yarn line that is about to be shown, fonts that do not crash Direct3D 12, save snapshots. Most of that is not specific to translation. Any other mod would have to build it again, and every one of them would break separately when the game updates.

@@ -4,6 +4,8 @@
 
 状態: 2026 年 9 月。中核は 1.1.2、ライブラリは 1.0.0 としてリリースしました。予定や将来と書いた部分はまだ実装していません。どの部分についても、Issue で議論してください。
 
+まだ作っていない機能の設計メモ：[MOD_RELOAD.ja.md](MOD_RELOAD.ja.md)（ゲームを動かしたまま Mod の DLL を読み直す）と [INSPECTOR.ja.md](INSPECTOR.ja.md)（Tool window の Inspector タブ）。1.1.2 以降に作って `main` にあるもの：[CONSOLE.ja.md](CONSOLE.ja.md)、[ASSET_TOOL.ja.md](ASSET_TOOL.ja.md)、[STABLE_LINE_KEYS.ja.md](STABLE_LINE_KEYS.ja.md)。
+
 ## なぜフレームワークを作るのか
 
 [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) は、ゲームに入り込むために多くの仕組みを作ってきました。ゲームの Options 画面への設定の追加、ゲームパッドや Steam Deck でも操作できるゲーム内メニュー、すべてのテキスト部品へのフック、これから表示される Yarn の台詞の把握、Direct3D 12 でクラッシュしないフォント、セーブのスナップショットなどです。その多くは翻訳に限った話ではありません。ほかの Mod も同じものを作り直すことになり、ゲームがアップデートされるたびに、それぞれが別々に壊れます。
