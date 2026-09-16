@@ -33,7 +33,7 @@ namespace DragNWash.ModFramework.ToolWindow
         public const string Guid = "com.tomxv.dragnwash.modframework.toolwindow";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
 
         /// <summary>Height of one row of controls, in pixels.</summary>
         public const float RowHeight = 30f;
@@ -52,6 +52,12 @@ namespace DragNWash.ModFramework.ToolWindow
 
         /// <summary>Colour of secondary text.</summary>
         public static readonly Color MutedColor = new Color(0.60f, 0.66f, 0.73f);
+
+        /// <summary>Errors in the console.</summary>
+        public static readonly Color ErrorColor = new Color(0.96f, 0.45f, 0.40f);
+
+        /// <summary>Warnings in the console.</summary>
+        public static readonly Color WarningColor = new Color(0.93f, 0.75f, 0.30f);
 
         internal static readonly List<ToolTab> Tabs = new List<ToolTab>();
         private static int _nextSerial;
@@ -97,6 +103,50 @@ namespace DragNWash.ModFramework.ToolWindow
                 Tabs.Sort((a, b) => a.Order != b.Order ? a.Order.CompareTo(b.Order) : a.Serial.CompareTo(b.Serial));
             }
             return new Removal(tab);
+        }
+
+        /// <summary>
+        /// Adds a command to the Console tab (experimental, Tool window 1.1).
+        /// <paramref name="run"/> gets the words typed after the name and returns
+        /// what to print, one line per '\n'. An exception is printed in red with
+        /// the owner and stops nothing else. When another mod already registered
+        /// the same name, this one is reachable as <c>owner:name</c> only. Dispose
+        /// the returned object to remove the command.
+        /// </summary>
+        /// <param name="owner">GUID of the mod adding the command.</param>
+        /// <param name="name">One lower-case word, e.g. "tl".</param>
+        /// <param name="description">One line for <c>help</c>.</param>
+        /// <param name="run">Runs the command.</param>
+        public static IDisposable AddCommand(string owner, string name, string description, Func<string[], string> run)
+        {
+            return AddCommand(owner, name, description, run, null);
+        }
+
+        /// <summary>
+        /// As <see cref="AddCommand(string, string, string, Func{string[], string})"/>, with
+        /// completions: <paramref name="complete"/> gets the words typed after the
+        /// name so far, the last one possibly partial (or "" right after a space),
+        /// and returns what could stand there. The console shows them as the
+        /// person types and fills them in on Tab.
+        /// </summary>
+        public static IDisposable AddCommand(string owner, string name, string description, Func<string[], string> run, Func<string[], IEnumerable<string>> complete)
+        {
+            ConsoleCommand command = ConsoleCommands.Register(owner, name, description, run, complete);
+            return new CommandRemoval(command);
+        }
+
+        private sealed class CommandRemoval : IDisposable
+        {
+            private ConsoleCommand _command;
+            public CommandRemoval(ConsoleCommand command) { _command = command; }
+            public void Dispose()
+            {
+                if (_command != null)
+                {
+                    ConsoleCommands.Unregister(_command);
+                    _command = null;
+                }
+            }
         }
 
         /// <summary>Opens the window, on the tab with this title when one is given.</summary>

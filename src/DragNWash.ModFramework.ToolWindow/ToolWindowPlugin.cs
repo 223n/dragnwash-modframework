@@ -24,6 +24,10 @@ namespace DragNWash.ModFramework.ToolWindow
 
         private ConfigEntry<KeyboardShortcut> _toggleKey;
         private ConfigEntry<string> _fontMode;
+        private ConfigEntry<string> _consoleShow;
+        private ConfigEntry<string> _consoleLevels;
+        private ConfigEntry<bool> _consoleTrace;
+        private bool _savingConsole;
 
         internal bool ShowWindow;
         internal string Notice = string.Empty;
@@ -75,6 +79,97 @@ namespace DragNWash.ModFramework.ToolWindow
             GameHooks.Require(ToolWindow.Guid, "Free cursor while open", AccessTools.TypeByName("GameStateManager") != null, "GameStateManager");
             Install("Free cursor while open", () => CursorUnlock.Install(harmony));
             ToolWindow.IsAvailable = true;
+
+            Install("Console", SetUpConsole);
+        }
+
+        // The console: every BepInEx log line with its level, the player's
+        // choice of what to show (kept in the config), and commands.
+        private void SetUpConsole()
+        {
+            _consoleShow = Config.Bind("Console", "Show", "Error,Warning,Message,Info",
+                "Levels the Console tab shows at all, comma separated: Fatal, Error, Warning, Message, Info, Debug. Everything is still written to BepInEx/LogOutput.log.");
+            _consoleLevels = Config.Bind("Console", "Levels", "unity:Warning, default:Info",
+                "The least severe level shown per log source, comma separated, as source:level. 'unity' is Unity's own log, 'default' every source without its own entry, anything else a source name as the log prints it (e.g. DragNWash.ModFramework.Assets:Debug).");
+            _consoleTrace = Config.Bind("Console", "TraceInput", false,
+                "Writes every key the Console tab sees, and what it did with it, to the log as DragNWash.ConsoleTrace. For debugging the console's input.");
+            ConsoleTab.Trace = _consoleTrace.Value;
+            _consoleTrace.SettingChanged += (s, e) => ConsoleTab.Trace = _consoleTrace.Value;
+            ApplyConsoleConfig();
+            _consoleShow.SettingChanged += (s, e) => { if (!_savingConsole) ApplyConsoleConfig(); };
+            _consoleLevels.SettingChanged += (s, e) => { if (!_savingConsole) ApplyConsoleConfig(); };
+            ConsoleLog.Changed += SaveConsoleConfig;
+
+            BepInEx.Logging.Logger.Listeners.Add(new ConsoleLog.Listener());
+            ConsoleCommands.RegisterBuiltIns();
+            ConsoleTab.Install();
+        }
+
+        private void ApplyConsoleConfig()
+        {
+            LogLevel shown = LogLevel.None;
+            foreach (string part in (_consoleShow.Value ?? "").Split(','))
+            {
+                if (ConsoleLog.TryParseLevel(part, out LogLevel level))
+                {
+                    shown |= level;
+                    if (level == LogLevel.Error) shown |= LogLevel.Fatal;
+                }
+            }
+            _savingConsole = true;
+            try
+            {
+                ConsoleLog.Shown = shown;
+                var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string part in (_consoleLevels.Value ?? "").Split(','))
+                {
+                    string[] kv = part.Split(':');
+                    if (kv.Length != 2 || !ConsoleLog.TryParseLevel(kv[1], out LogLevel minimum))
+                    {
+                        continue;
+                    }
+                    string source = kv[0].Trim();
+                    if (source.Equals("unity", StringComparison.OrdinalIgnoreCase)) ConsoleLog.UnityMinimum = minimum;
+                    else if (source.Equals("default", StringComparison.OrdinalIgnoreCase)) ConsoleLog.DefaultMinimum = minimum;
+                    else { ConsoleLog.SetMinimum(source, minimum); keep.Add(source); }
+                }
+                foreach (KeyValuePair<string, LogLevel> kv in ConsoleLog.Minimums)
+                {
+                    if (!keep.Contains(kv.Key)) ConsoleLog.SetMinimum(kv.Key, null);
+                }
+            }
+            finally
+            {
+                _savingConsole = false;
+            }
+        }
+
+        private void SaveConsoleConfig()
+        {
+            if (_savingConsole)
+            {
+                return;
+            }
+            _savingConsole = true;
+            try
+            {
+                var show = new List<string>();
+                foreach (LogLevel l in new[] { LogLevel.Fatal, LogLevel.Error, LogLevel.Warning, LogLevel.Message, LogLevel.Info, LogLevel.Debug })
+                {
+                    if ((ConsoleLog.Shown & l) != 0 && l != LogLevel.Fatal) show.Add(l.ToString());
+                }
+                _consoleShow.Value = string.Join(",", show);
+                var levels = new List<string> { "unity:" + ConsoleLog.UnityMinimum, "default:" + ConsoleLog.DefaultMinimum };
+                foreach (KeyValuePair<string, LogLevel> kv in ConsoleLog.Minimums)
+                {
+                    levels.Add(kv.Key + ":" + kv.Value);
+                }
+                _consoleLevels.Value = string.Join(", ", levels);
+            }
+            finally
+            {
+                _savingConsole = false;
+            }
         }
 
         private static void Install(string feature, Action install)
@@ -117,6 +212,7 @@ namespace DragNWash.ModFramework.ToolWindow
         private void Update()
         {
             MenuFont.FlushQueued();
+            ConsoleTab.Tick();
 
             if (_toggleKey.Value.IsDown())
             {
@@ -373,15 +469,22 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             else
             {
+                // Inside a group, so a tab drawn for a taller window is clipped
+                // at the body's edge instead of running over the footer line.
+                GUI.BeginGroup(body);
                 try
                 {
-                    _current.Draw(body);
+                    _current.Draw(new Rect(0, 0, body.width, body.height));
                 }
                 catch (Exception ex) when (!(ex is ExitGUIException))
                 {
                     _current.Failure = ex.GetType().Name + ": " + ex.Message;
                     Log.LogError($"The tool window tab \"{_current.Title}\" of {_current.Owner} threw and was turned off: {ex}");
                     Notice = $"\"{_current.Title}\" stopped working; see the log.";
+                }
+                finally
+                {
+                    GUI.EndGroup();
                 }
             }
 

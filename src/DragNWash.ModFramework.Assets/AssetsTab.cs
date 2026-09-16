@@ -12,6 +12,19 @@ namespace DragNWash.ModFramework.Assets
     internal static class AssetsTab
     {
         private static IDisposable _tab;
+        // One line per row: the window's label styles wrap, and a long texture
+        // name in a narrow window ran into the rows below it.
+        private static GUIStyle _cell, _mutedCell;
+
+        private static void EnsureCells(ToolWindowStyles s)
+        {
+            if (_cell != null)
+            {
+                return;
+            }
+            _cell = new GUIStyle(s.Label) { wordWrap = false, clipping = TextClipping.Clip };
+            _mutedCell = new GUIStyle(s.MutedLabel) { wordWrap = false, clipping = TextClipping.Clip };
+        }
         private static List<TextureInfo> _textures;
         private static string _filter = "";
         private static Vector2 _scroll;
@@ -25,11 +38,57 @@ namespace DragNWash.ModFramework.Assets
                 return;
             }
             _tab = TW.AddTab(GameFonts.Guid, "Assets", Draw, 50);
+            TW.AddCommand(GameFonts.Guid, "assets", "assets textures [filter] | assets replacements | assets apply | assets reload", Command,
+                args => args.Length == 1 ? new[] { "textures", "replacements", "apply", "reload" } : new string[0]);
+        }
+
+        private static string Command(string[] args)
+        {
+            string what = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+            switch (what)
+            {
+                case "textures":
+                {
+                    string filter = args.Length > 1 ? args[1] : null;
+                    var lines = new List<string>();
+                    foreach (TextureInfo t in AssetCatalog.Textures())
+                    {
+                        if (filter == null || t.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            lines.Add($"{t.Name}  {t.Width}x{t.Height} {t.Format}  {t.MaterialUsers} mat, {t.Sprites} sprite{(t.Replaced ? "  replacement" : "")}");
+                        }
+                    }
+                    return lines.Count == 0 ? "No texture matches." : string.Join("\n", lines);
+                }
+                case "replacements":
+                {
+                    var lines = new List<string>();
+                    foreach (TextureReplacement r in AssetReplacements.All)
+                    {
+                        lines.Add($"{r.Name}  from {r.Mod}  in {r.Applied} place(s)" + (r.Overrides.Count > 0 ? "  overrides " + string.Join(", ", r.Overrides) : "") + (r.Problem != null ? "  NOT reloaded: " + r.Problem : ""));
+                    }
+                    return lines.Count == 0 ? "No mod ships texture replacements." : string.Join("\n", lines);
+                }
+                case "apply":
+                    return $"Replacements applied in {AssetReplacements.ApplyNow()} place(s).";
+                case "reload":
+                {
+                    var lines = new List<string>();
+                    foreach (ReloadResult r in AssetReplacements.ReloadFiles())
+                    {
+                        lines.Add($"{r.Name}: {r.Status}");
+                    }
+                    return string.Join("\n", lines);
+                }
+                default:
+                    return "assets textures [filter] | assets replacements | assets apply | assets reload";
+            }
         }
 
         private static void Draw(Rect area)
         {
             ToolWindowStyles s = TW.Styles;
+            EnsureCells(s);
             float row = TW.RowHeight, pad = TW.Padding;
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
 
@@ -127,12 +186,12 @@ namespace DragNWash.ModFramework.Assets
             {
                 if (ry + row >= _scroll.y && ry <= _scroll.y + view.height)
                 {
-                    GUI.Label(new Rect(0, ry, inner * 0.45f, row), t.Name, s.Label);
-                    GUI.Label(new Rect(inner * 0.45f, ry, inner * 0.2f, row), $"{t.Width}x{t.Height} {t.Format}", s.MutedLabel);
-                    GUI.Label(new Rect(inner * 0.65f, ry, inner * 0.2f, row), $"{t.MaterialUsers} mat, {t.Sprites} sprite", s.MutedLabel);
+                    GUI.Label(new Rect(0, ry, inner * 0.45f - 6, row), t.Name, _cell);
+                    GUI.Label(new Rect(inner * 0.45f, ry, inner * 0.2f - 6, row), $"{t.Width}x{t.Height} {t.Format}", _mutedCell);
+                    GUI.Label(new Rect(inner * 0.65f, ry, inner * 0.2f - 6, row), $"{t.MaterialUsers} mat, {t.Sprites} sprite", _mutedCell);
                     if (t.Replaced)
                     {
-                        GUI.Label(new Rect(inner * 0.85f, ry, inner * 0.15f, row), "replacement", s.MutedLabel);
+                        GUI.Label(new Rect(inner * 0.85f, ry, inner * 0.15f, row), "replacement", _mutedCell);
                     }
                 }
                 ry += row;
@@ -154,8 +213,8 @@ namespace DragNWash.ModFramework.Assets
             float ry = 0;
             foreach (TextureReplacement r in all)
             {
-                GUI.Label(new Rect(0, ry, inner * 0.4f, row), r.Name, s.Label);
-                GUI.Label(new Rect(inner * 0.4f, ry, inner * 0.3f, row), r.Mod, s.MutedLabel);
+                GUI.Label(new Rect(0, ry, inner * 0.4f - 6, row), r.Name, _cell);
+                GUI.Label(new Rect(inner * 0.4f, ry, inner * 0.3f - 6, row), r.Mod, _mutedCell);
                 string note = $"{r.Texture.width}x{r.Texture.height}, in {r.Applied} place(s)";
                 if (r.Overrides.Count > 0)
                 {
@@ -165,7 +224,7 @@ namespace DragNWash.ModFramework.Assets
                 {
                     note = "NOT reloaded: " + r.Problem;
                 }
-                GUI.Label(new Rect(inner * 0.7f, ry, inner * 0.3f, row), note, s.MutedLabel);
+                GUI.Label(new Rect(inner * 0.7f, ry, inner * 0.3f, row), note, _mutedCell);
                 ry += row;
             }
             GUI.EndScrollView();

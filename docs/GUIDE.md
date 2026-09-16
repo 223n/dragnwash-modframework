@@ -44,6 +44,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 | Know which line of dialogue is shown, and who says it | `GameDialogue.LineShowing`, `OptionShowing`, `TryGetLine` (library **Dialogue**) | patching Yarn Spinner's presenters |
 | Find your data for a line after a game update edited it | `LineKey`, `LineResolver` (library **Dialogue**, experimental; [STABLE_LINE_KEYS.md](STABLE_LINE_KEYS.md)) | keying by the English text alone |
 | Add a debug or developer tool | `ToolWindow.AddTab` (library **Tool window**) | your own `OnGUI` window, cursor unlocking or input blocking |
+| Give people a command to type, or watch the log in the game | `ToolWindow.AddCommand`, the **Console** tab (library **Tool window**, experimental; [CONSOLE.md](CONSOLE.md)) | your own console |
 | Show text in scripts the game's fonts lack | `GameFonts.Prepare` and `GameFonts.SetLanguage` (library **Assets**) | adding to `TMP_Settings.fallbackFontAssets` yourself |
 | Load a texture or an asset bundle | `GameAssets.LoadTexture`, `GameAssets.LoadBundle` (library **Assets**), from `Awake` | loading while the game runs |
 | Replace a game texture with your own, or see what is loaded | `assets/textures/<name>.png` in your mod folder, `AssetCatalog` (library **Assets**, experimental; [ASSET_TOOL.md](ASSET_TOOL.md)) | swapping textures in materials yourself |

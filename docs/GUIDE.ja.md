@@ -44,6 +44,7 @@ public class MyMod : BaseUnityPlugin
 | 表示中の台詞と話者を知る | `GameDialogue.LineShowing`、`OptionShowing`、`TryGetLine`（ライブラリ **Dialogue**） | Yarn Spinner の表示部品へのパッチ |
 | ゲームの更新で本文が変わった台詞のデータを見つけ直す | `LineKey`、`LineResolver`（ライブラリ **Dialogue**、実験的。[STABLE_LINE_KEYS.ja.md](STABLE_LINE_KEYS.ja.md)） | 英文だけをキーにする |
 | 開発・デバッグ用ツールを足す | `ToolWindow.AddTab`（ライブラリ **Tool window**） | 独自の `OnGUI` ウィンドウ、カーソルの解放、入力の遮断 |
+| 打ち込めるコマンドを用意する、ゲーム内でログを見る | `ToolWindow.AddCommand`、**Console** タブ（ライブラリ **Tool window**、実験的。[CONSOLE.ja.md](CONSOLE.ja.md)） | 独自のコンソール |
 | ゲームのフォントにない文字を表示する | `GameFonts.Prepare` と `GameFonts.SetLanguage`（ライブラリ **Assets**） | `TMP_Settings.fallbackFontAssets` への直接の追加 |
 | テクスチャやアセットバンドルを読み込む | `GameAssets.LoadTexture`、`GameAssets.LoadBundle`（ライブラリ **Assets**）を `Awake` から | ゲーム中の読み込み |
 | ゲームのテクスチャを自分のものに差し替える、何が読み込まれているか見る | Mod フォルダの `assets/textures/<名前>.png`、`AssetCatalog`（ライブラリ **Assets**、実験的。[ASSET_TOOL.ja.md](ASSET_TOOL.ja.md)） | マテリアルのテクスチャを自分で入れ替える |
