@@ -37,6 +37,19 @@ namespace DragNWash.ModFramework.Mods
         internal string Key => Entry.Definition.Key;
         internal string Description => Entry.Description?.Description;
 
+        // From a SettingMeta (or a look-alike) in the entry's tags.
+        internal string DisplayName;
+        internal int Order;
+        internal bool Advanced;
+        internal bool RequiresRestart;
+        internal string Title => string.IsNullOrEmpty(DisplayName) ? Key : DisplayName;
+
+        // From a SectionMeta in the tags of any entry of the section.
+        internal string SectionDisplayName;
+        internal string SectionDescription;
+        internal int SectionOrder;
+        internal string SectionTitle => string.IsNullOrEmpty(SectionDisplayName) ? Section : SectionDisplayName;
+
         internal bool IsDefault => Equals(Entry.BoxedValue, Entry.DefaultValue);
 
         internal bool IsShortcut => Entry.SettingType == typeof(KeyboardShortcut);
@@ -94,10 +107,96 @@ namespace DragNWash.ModFramework.Mods
                 }
                 items.Add(Describe(entry));
             }
+            // A SectionMeta on one entry speaks for its whole section.
+            foreach (IGrouping<string, ConfigItem> section in items.GroupBy(i => i.Section))
+            {
+                ConfigItem described = section.FirstOrDefault(i => i.SectionDisplayName != null || i.SectionDescription != null || i.SectionOrder != 0);
+                if (described == null)
+                {
+                    continue;
+                }
+                foreach (ConfigItem item in section)
+                {
+                    item.SectionDisplayName = described.SectionDisplayName;
+                    item.SectionDescription = described.SectionDescription;
+                    item.SectionOrder = described.SectionOrder;
+                }
+            }
             return items
-                .OrderBy(i => i.Section, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(i => i.SectionOrder)
+                .ThenBy(i => i.Section, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(i => i.Order)
                 .ThenBy(i => i.Key, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        // Reads SettingMeta and SectionMeta, and any other tag that carries the
+        // same member names (ConfigurationManager's attribute uses IsAdvanced,
+        // DispName and Order), so a mod need not reference the framework.
+        private static void ReadMeta(ConfigItem item, ConfigEntryBase entry)
+        {
+            object[] tags = entry.Description?.Tags;
+            if (tags == null)
+            {
+                return;
+            }
+            foreach (object tag in tags)
+            {
+                if (tag == null)
+                {
+                    continue;
+                }
+                if (tag is SettingMeta meta)
+                {
+                    item.DisplayName = meta.DisplayName;
+                    item.Order = meta.Order;
+                    item.Advanced = meta.Advanced;
+                    item.RequiresRestart = meta.RequiresRestart;
+                    continue;
+                }
+                if (tag is SectionMeta section)
+                {
+                    item.SectionDisplayName = section.DisplayName;
+                    item.SectionDescription = section.Description;
+                    item.SectionOrder = section.Order;
+                    continue;
+                }
+                if (tag is string)
+                {
+                    continue;
+                }
+                string name = Member(tag, "DisplayName") as string ?? Member(tag, "DispName") as string;
+                if (!string.IsNullOrEmpty(name))
+                {
+                    item.DisplayName = name;
+                }
+                if (Member(tag, "Order") is int order)
+                {
+                    item.Order = order;
+                }
+                object advancedTag = Member(tag, "Advanced") ?? Member(tag, "IsAdvanced");
+                if (advancedTag is bool advanced)
+                {
+                    item.Advanced = advanced;
+                }
+                if (Member(tag, "RequiresRestart") is bool restart)
+                {
+                    item.RequiresRestart = restart;
+                }
+            }
+        }
+
+        private static object Member(object tag, string name)
+        {
+            try
+            {
+                Type type = tag.GetType();
+                return type.GetField(name)?.GetValue(tag) ?? type.GetProperty(name)?.GetValue(tag, null);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         // Plugins that support BepInEx.ConfigurationManager can hide an entry with
@@ -127,6 +226,7 @@ namespace DragNWash.ModFramework.Mods
         private static ConfigItem Describe(ConfigEntryBase entry)
         {
             var item = new ConfigItem { Entry = entry, Type = Kind.ReadOnly };
+            ReadMeta(item, entry);
             Type type = entry.SettingType;
             AcceptableValueBase acceptable = entry.Description?.AcceptableValues;
 

@@ -61,7 +61,8 @@ namespace DragNWash.ModFramework.ToolWindow
             });
 
             _toggleKey = Config.Bind("General", "ToggleKey", new KeyboardShortcut(KeyCode.F1),
-                "Shows and hides the tool window. Only while Developer tools are on (Options > Mods > Drag'n Wash ModFramework).");
+                new ConfigDescription("Shows and hides the tool window. Only while Developer tools are on (Options > Mods > Drag'n Wash ModFramework).",
+                    null, new SettingMeta { DisplayName = "Open / close key", Order = -10 }));
             // A developer tool: it closes when the switch goes off, and SetOpen
             // and the key refuse to open it while the switch is off.
             DeveloperTools.Changed += () =>
@@ -72,7 +73,8 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
             };
             _fontMode = Config.Bind("General", "FontMode", "auto",
-                "Font for the tool window: auto (an OS font with Japanese and Chinese, else the bundled one), builtin (Unity's built-in font, ASCII only), skin (the IMGUI skin's font).");
+                new ConfigDescription("Font for the tool window: auto (an OS font with Japanese and Chinese, else the bundled one), builtin (Unity's built-in font, ASCII only), skin (the IMGUI skin's font).",
+                    new AcceptableValueList<string>("auto", "builtin", "skin"), new SettingMeta { DisplayName = "Font", Advanced = true, RequiresRestart = true }));
 
             // Built now rather than when the window first opens: Texture2D.Apply
             // uploads to the GPU, and doing that on the frame the window opens is
@@ -97,11 +99,13 @@ namespace DragNWash.ModFramework.ToolWindow
         private void SetUpConsole()
         {
             _consoleShow = Config.Bind("Console", "Show", "Error,Warning,Message,Info",
-                "Levels the Console tab shows at all, comma separated: Fatal, Error, Warning, Message, Info, Debug. Everything is still written to BepInEx/LogOutput.log.");
+                new ConfigDescription("Levels the Console tab shows at all, comma separated: Fatal, Error, Warning, Message, Info, Debug. Everything is still written to BepInEx/LogOutput.log.",
+                    null, new SettingMeta { DisplayName = "Levels shown" }, new SectionMeta { DisplayName = "Console tab", Description = "Which log lines the Console tab shows; also changeable from the tab.", Order = 10 }));
             _consoleLevels = Config.Bind("Console", "Levels", "unity:Warning, default:Info",
                 "The least severe level shown per log source, comma separated, as source:level. 'unity' is Unity's own log, 'default' every source without its own entry, anything else a source name as the log prints it (e.g. DragNWash.ModFramework.Assets:Debug).");
             _consoleTrace = Config.Bind("Console", "TraceInput", false,
-                "Writes every key the Console tab sees, and what it did with it, to the log as DragNWash.ConsoleTrace. For debugging the console's input.");
+                new ConfigDescription("Writes every key the Console tab sees, and what it did with it, to the log as DragNWash.ConsoleTrace. For debugging the console's input.",
+                    null, new SettingMeta { DisplayName = "Trace input", Advanced = true }));
             ConsoleTab.Trace = _consoleTrace.Value;
             _consoleTrace.SettingChanged += (s, e) => ConsoleTab.Trace = _consoleTrace.Value;
             ApplyConsoleConfig();

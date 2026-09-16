@@ -32,7 +32,8 @@ namespace DragNWash.ModFramework.Assets
             });
 
             AtlasPointSize = Config.Bind("Fonts", "AtlasPointSize", 80,
-                "Point size glyphs are rasterized at for the fallback fonts. Higher is sharper. Glyphs are rasterized when a mod prepares its text, usually at startup, so raising this costs loading time rather than performance during play.");
+                new ConfigDescription("Point size glyphs are rasterized at for the fallback fonts. Higher is sharper. Glyphs are rasterized when a mod prepares its text, usually at startup, so raising this costs loading time rather than performance during play.",
+                    new AcceptableValueRange<int>(24, 160), new SettingMeta { DisplayName = "Font atlas point size", Advanced = true, RequiresRestart = true }));
 
             GameFonts.AddFontFolder(Path.Combine(Path.GetDirectoryName(Info.Location) ?? "", "fonts"));
 
@@ -58,7 +59,8 @@ namespace DragNWash.ModFramework.Assets
             AllowReload = Config.Bind("Reload", "AllowReload", true,
                 "Lets the Assets tab reload texture replacements from disk while the game runs. Switched off by itself when the game crashed during a reload; turn it back on to try again. On Direct3D 12 a reload can crash the game (Unity issue UUM-140564); -force-d3d11 in the Steam launch options avoids that.");
             WatchFiles = Config.Bind("Reload", "WatchFiles", false,
-                "Reloads a texture replacement by itself when its PNG changes on disk. Never active on Direct3D 12.");
+                new ConfigDescription("Reloads a texture replacement by itself when its PNG changes on disk. Never active on Direct3D 12.",
+                    null, new SettingMeta { DisplayName = "Watch texture files", Advanced = true }));
 
             bool crashed = ReloadGuard.CheckAtStartup();
             if (crashed)

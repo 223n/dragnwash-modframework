@@ -49,7 +49,8 @@ namespace DragNWash.ModFramework
         internal static void Install(ConfigFile config)
         {
             _enabled = config.Bind("Developer", "Tools", false,
-                "Turns on the tools for mod makers and translators: the Tool window (F1) with the Console and Assets tabs, texture reloading, and mods' own exports and hot reload. Off, nothing of that runs. On Direct3D 12 the Tool window can crash the game (Unity issue UUM-140564); add -force-d3d11 to the game's Steam launch options when you work with it.");
+                new ConfigDescription("Turns on the tools for mod makers and translators: the Tool window (F1) with the Console and Assets tabs, texture reloading, and mods' own exports and hot reload. Off, nothing of that runs. On Direct3D 12 the Tool window can crash the game (Unity issue UUM-140564); add -force-d3d11 to the game's Steam launch options when you work with it.",
+                    null, new SettingMeta { DisplayName = "Developer tools" }, new SectionMeta { DisplayName = "Developer", Order = -10 }));
             _enabled.SettingChanged += (sender, args) => Announce(changed: true);
             Announce(changed: false);
         }
