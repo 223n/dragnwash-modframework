@@ -22,6 +22,10 @@ namespace DragNWash.ModFramework.ToolWindow
         private static readonly List<string> History = new List<string>();
         private static int _historyIndex = -1;
         private static bool _focusInput;
+        private static List<string> _suggestions = new List<string>();
+        private static string _suggestedFor;
+        private static int _selected;
+        private const int MaxSuggestionRows = 6;
         private static Dictionary<LogLevel, GUIStyle> _levelStyles;
         private static GUIStyle _dot;
 
@@ -118,8 +122,17 @@ namespace DragNWash.ModFramework.ToolWindow
             GUI.Label(new Rect(x, y, w, row), note, s.MutedLabel);
             y += row;
 
+            // Suggestions for what is typed, kept fresh here so keys below can use them.
+            if (_suggestedFor != _input)
+            {
+                _suggestions = ConsoleCommands.Suggest(_input ?? "", MaxSuggestionRows);
+                _suggestedFor = _input;
+                _selected = 0;
+            }
+            float suggestionHeight = _suggestions.Count > 0 && GUI.GetNameOfFocusedControl() == InputControl ? _suggestions.Count * (row - 6) + 6 : 0;
+
             // The log, oldest first, following the end unless the player scrolled up.
-            var view = new Rect(x, y, w, area.yMax - pad - y - row - 8);
+            var view = new Rect(x, y, w, area.yMax - pad - y - row - 8 - suggestionHeight);
             ToolWindow.Fill(view, ToolWindow.InsetColor);
             List<ConsoleEntry> all = ConsoleLog.Snapshot();
             var shown = new List<ConsoleEntry>(all.Count);
@@ -168,9 +181,11 @@ namespace DragNWash.ModFramework.ToolWindow
             }
             y = view.yMax + 6;
 
-            // The command line. Enter runs, up and down walk the history.
+            // The command line. Enter runs; Tab fills in the selected suggestion;
+            // up and down move through suggestions when there are any, else the history.
             Event ev = Event.current;
             bool focused = GUI.GetNameOfFocusedControl() == InputControl;
+            bool suggesting = focused && _suggestions.Count > 0;
             if (focused && ev.type == EventType.KeyDown)
             {
                 if (ev.keyCode == KeyCode.Return || ev.keyCode == KeyCode.KeypadEnter)
@@ -178,18 +193,73 @@ namespace DragNWash.ModFramework.ToolWindow
                     Submit();
                     ev.Use();
                 }
-                else if (ev.keyCode == KeyCode.UpArrow && History.Count > 0)
+                else if (ev.keyCode == KeyCode.Tab)
                 {
-                    _historyIndex = _historyIndex < 0 ? History.Count - 1 : Mathf.Max(0, _historyIndex - 1);
-                    _input = History[_historyIndex];
+                    if (suggesting)
+                    {
+                        Accept(_suggestions[Mathf.Clamp(_selected, 0, _suggestions.Count - 1)]);
+                    }
+                    _focusInput = true;
                     ev.Use();
                 }
-                else if (ev.keyCode == KeyCode.DownArrow && _historyIndex >= 0)
+                else if (ev.keyCode == KeyCode.Escape && suggesting)
                 {
-                    _historyIndex = _historyIndex + 1 < History.Count ? _historyIndex + 1 : -1;
-                    _input = _historyIndex < 0 ? "" : History[_historyIndex];
+                    _suggestions = new List<string>();
                     ev.Use();
                 }
+                else if (ev.keyCode == KeyCode.UpArrow)
+                {
+                    if (suggesting)
+                    {
+                        _selected = (_selected - 1 + _suggestions.Count) % _suggestions.Count;
+                    }
+                    else if (History.Count > 0)
+                    {
+                        _historyIndex = _historyIndex < 0 ? History.Count - 1 : Mathf.Max(0, _historyIndex - 1);
+                        _input = History[_historyIndex];
+                    }
+                    ev.Use();
+                }
+                else if (ev.keyCode == KeyCode.DownArrow)
+                {
+                    if (suggesting)
+                    {
+                        _selected = (_selected + 1) % _suggestions.Count;
+                    }
+                    else if (_historyIndex >= 0)
+                    {
+                        _historyIndex = _historyIndex + 1 < History.Count ? _historyIndex + 1 : -1;
+                        _input = _historyIndex < 0 ? "" : History[_historyIndex];
+                    }
+                    ev.Use();
+                }
+            }
+            // Tab must not leave the field: IMGUI would move focus on the KeyUp too.
+            if (focused && ev.type == EventType.KeyUp && ev.keyCode == KeyCode.Tab)
+            {
+                ev.Use();
+            }
+
+            if (suggesting)
+            {
+                var box = new Rect(x + 20, y, w - 20 - 70, suggestionHeight);
+                ToolWindow.Fill(box, ToolWindow.PanelColor);
+                float sy = box.y + 3;
+                for (int i = 0; i < _suggestions.Count; i++)
+                {
+                    var line = new Rect(box.x + 6, sy, box.width - 12, row - 6);
+                    if (i == _selected)
+                    {
+                        ToolWindow.Fill(line, ToolWindow.InsetColor);
+                    }
+                    if (GUI.Button(line, _suggestions[i], i == _selected ? s.Label : s.MutedLabel))
+                    {
+                        Accept(_suggestions[i]);
+                        _focusInput = true;
+                    }
+                    sy += row - 6;
+                }
+                y = box.yMax + 2;
             }
             GUI.Label(new Rect(x, y, 20, row), ">", s.Label);
             GUI.SetNextControlName(InputControl);
@@ -205,6 +275,22 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 Submit();
             }
+        }
+
+        // Puts the suggestion in place of the word being typed, with a space after it.
+        private static void Accept(string suggestion)
+        {
+            string line = _input ?? "";
+            int cut = line.Length;
+            if (cut > 0 && !char.IsWhiteSpace(line[cut - 1]))
+            {
+                while (cut > 0 && !char.IsWhiteSpace(line[cut - 1]))
+                {
+                    cut--;
+                }
+            }
+            _input = line.Substring(0, cut) + suggestion + " ";
+            _suggestedFor = null;
         }
 
         private static void Submit()

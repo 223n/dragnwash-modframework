@@ -119,7 +119,19 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <param name="run">Runs the command.</param>
         public static IDisposable AddCommand(string owner, string name, string description, Func<string[], string> run)
         {
-            ConsoleCommand command = ConsoleCommands.Register(owner, name, description, run);
+            return AddCommand(owner, name, description, run, null);
+        }
+
+        /// <summary>
+        /// As <see cref="AddCommand(string, string, string, Func{string[], string})"/>, with
+        /// completions: <paramref name="complete"/> gets the words typed after the
+        /// name so far, the last one possibly partial (or "" right after a space),
+        /// and returns what could stand there. The console shows them as the
+        /// person types and fills them in on Tab.
+        /// </summary>
+        public static IDisposable AddCommand(string owner, string name, string description, Func<string[], string> run, Func<string[], IEnumerable<string>> complete)
+        {
+            ConsoleCommand command = ConsoleCommands.Register(owner, name, description, run, complete);
             return new CommandRemoval(command);
         }
 

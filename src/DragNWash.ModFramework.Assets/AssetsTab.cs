@@ -25,7 +25,8 @@ namespace DragNWash.ModFramework.Assets
                 return;
             }
             _tab = TW.AddTab(GameFonts.Guid, "Assets", Draw, 50);
-            TW.AddCommand(GameFonts.Guid, "assets", "assets textures [filter] | assets replacements | assets apply | assets reload", Command);
+            TW.AddCommand(GameFonts.Guid, "assets", "assets textures [filter] | assets replacements | assets apply | assets reload", Command,
+                args => args.Length == 1 ? new[] { "textures", "replacements", "apply", "reload" } : new string[0]);
         }
 
         private static string Command(string[] args)

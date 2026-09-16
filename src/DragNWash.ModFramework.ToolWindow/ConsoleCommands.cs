@@ -5,15 +5,16 @@ using BepInEx.Logging;
 
 namespace DragNWash.ModFramework.ToolWindow
 {
-    /// <summary>A command a mod registered with <see cref="ToolWindow.AddCommand"/>.</summary>
+    /// <summary>A command a mod registered with <see cref="ToolWindow.AddCommand(string, string, string, Func{string[], string})"/>.</summary>
     public sealed class ConsoleCommand
     {
-        internal ConsoleCommand(string owner, string name, string description, Func<string[], string> run)
+        internal ConsoleCommand(string owner, string name, string description, Func<string[], string> run, Func<string[], IEnumerable<string>> complete)
         {
             Owner = owner;
             Name = name;
             Description = description ?? "";
             Run = run;
+            Complete = complete;
         }
 
         /// <summary>GUID of the mod that registered it.</summary>
@@ -26,6 +27,10 @@ namespace DragNWash.ModFramework.ToolWindow
         public string Description { get; }
 
         internal Func<string[], string> Run { get; }
+
+        // Words that could come next, given the words typed so far (the last
+        // one possibly partial); null when the command offers none.
+        internal Func<string[], IEnumerable<string>> Complete { get; }
 
         /// <summary>True when another mod registered the same name first; then only <c>owner:name</c> runs this one.</summary>
         public bool Shadowed { get; internal set; }
@@ -45,7 +50,7 @@ namespace DragNWash.ModFramework.ToolWindow
             get { lock (Commands) { return Commands.ToArray(); } }
         }
 
-        internal static ConsoleCommand Register(string owner, string name, string description, Func<string[], string> run)
+        internal static ConsoleCommand Register(string owner, string name, string description, Func<string[], string> run, Func<string[], IEnumerable<string>> complete = null)
         {
             if (string.IsNullOrEmpty(owner) || string.IsNullOrEmpty(name) || run == null)
             {
@@ -56,7 +61,7 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 throw new ArgumentException("A command name is one word without ':'.");
             }
-            var command = new ConsoleCommand(owner, name, description, run);
+            var command = new ConsoleCommand(owner, name, description, run, complete);
             lock (Commands)
             {
                 foreach (ConsoleCommand c in Commands)
@@ -126,6 +131,84 @@ namespace DragNWash.ModFramework.ToolWindow
                 ToolWindowPlugin.Log.LogError($"Console command \"{command.Name}\" of {command.Owner} threw: {ex}");
             }
         }
+
+        /// <summary>
+        /// What could complete <paramref name="line"/>: command names while the
+        /// first word is being typed, else what the command suggests for its
+        /// arguments. Sorted, at most <paramref name="max"/>.
+        /// </summary>
+        public static List<string> Suggest(string line, int max = 8)
+        {
+            var result = new List<string>();
+            line = line ?? "";
+            string[] words = Split(line);
+            bool endsWithSpace = line.Length > 0 && char.IsWhiteSpace(line[line.Length - 1]);
+            if (words.Length == 1 && !endsWithSpace)
+            {
+                string prefix = words[0].ToLowerInvariant();
+                foreach (ConsoleCommand c in All)
+                {
+                    string shown = c.Shadowed ? c.Owner + ":" + c.Name : c.Name;
+                    if (shown.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || c.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Add(shown);
+                    }
+                }
+            }
+            else
+            {
+                string name = words[0].ToLowerInvariant();
+                string owner = null;
+                int colon = name.IndexOf(':');
+                if (colon > 0)
+                {
+                    owner = name.Substring(0, colon);
+                    name = name.Substring(colon + 1);
+                }
+                ConsoleCommand command = Find(owner, name);
+                if (command?.Complete != null)
+                {
+                    var args = new List<string>();
+                    for (int i = 1; i < words.Length; i++)
+                    {
+                        args.Add(words[i]);
+                    }
+                    if (endsWithSpace)
+                    {
+                        args.Add("");
+                    }
+                    string partial = args.Count > 0 ? args[args.Count - 1] : "";
+                    try
+                    {
+                        foreach (string option in command.Complete(args.ToArray()) ?? new string[0])
+                        {
+                            if (option.StartsWith(partial, StringComparison.OrdinalIgnoreCase))
+                            {
+                                result.Add(option);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ToolWindowPlugin.Log.LogWarning($"Completion for \"{command.Name}\" of {command.Owner} threw: {ex.Message}");
+                    }
+                }
+            }
+            result.Sort(StringComparer.OrdinalIgnoreCase);
+            if (result.Count > max)
+            {
+                result.RemoveRange(max, result.Count - max);
+            }
+            return result;
+        }
+
+        // Helper for completers: the options for the argument at this position.
+        internal static IEnumerable<string> Options(string[] args, int position, params string[] options)
+        {
+            return args.Length == position + 1 ? options : new string[0];
+        }
+
+        private static readonly string[] LevelNames = { "fatal", "error", "warning", "message", "info", "debug" };
 
         private static ConsoleCommand Find(string owner, string name)
         {
@@ -203,6 +286,14 @@ namespace DragNWash.ModFramework.ToolWindow
                     sb.Append(c.Shadowed ? $"{c.Owner}:{c.Name}" : c.Name).Append(" - ").Append(c.Description).Append('\n');
                 }
                 return sb.ToString().TrimEnd();
+            }, args =>
+            {
+                var names = new List<string>();
+                foreach (ConsoleCommand c in All)
+                {
+                    names.Add(c.Name);
+                }
+                return Options(args, 0, names.ToArray());
             });
             Register(ToolWindow.Guid, "log", "log <n>: the last n lines | log show <level> [off] | log level <source|unity|default> <level> | log filter <text> | log clear", args =>
             {
@@ -258,6 +349,34 @@ namespace DragNWash.ModFramework.ToolWindow
                     default:
                         return "log <n> | log show <level> [off] | log level <source> <level> | log filter <text> | log clear";
                 }
+            }, args =>
+            {
+                if (args.Length == 1)
+                {
+                    return new[] { "show", "level", "filter", "clear", "20", "50" };
+                }
+                string what = args[0].ToLowerInvariant();
+                if (what == "show")
+                {
+                    return args.Length == 2 ? LevelNames : Options(args, 2, "off");
+                }
+                if (what == "level")
+                {
+                    if (args.Length == 2)
+                    {
+                        var sources = new List<string> { "unity", "default" };
+                        foreach (ConsoleEntry e in ConsoleLog.Snapshot())
+                        {
+                            if (e.Source != ConsoleLog.CommandSource && !sources.Contains(e.Source))
+                            {
+                                sources.Add(e.Source);
+                            }
+                        }
+                        return sources;
+                    }
+                    return Options(args, 2, LevelNames);
+                }
+                return new string[0];
             });
             Register(ToolWindow.Guid, "mods", "Loaded plugins, with features the framework found unavailable", args =>
             {
