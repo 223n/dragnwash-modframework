@@ -78,15 +78,15 @@ public class MyMod : BaseUnityPlugin
 - ゲームに渡したもの（コルーチン、`DontDestroyOnLoad` のオブジェクト、ファイルの監視）は `OnDestroy` で片付ける。
 - `Awake` に、Direct3D 12 でゲームの途中に走らせて危ないこと（テクスチャのアップロード）を置かない。置くなら `GameFonts.RuntimeUploadsAreSafe` で分ける。
 
-ビルドのたびに DLL をゲームにコピーすれば、あとはフレームワークがやります。
+ビルドを、入っている DLL の隣に `<Mod>.dll.new` として届ければ、あとはフレームワークがやります。Windows では動いている DLL を Mono が掴んでいて上書きできないので、ゲームは `.new` からすぐ読み直し、次の起動時にプリローダーのパッチャーがそれを本物の DLL にします。
 
 ```xml
-<!-- .csproj に。ビルド後に DLL がゲームへ行き、動いているゲームがそれを読み直します。 -->
+<!-- .csproj に。ビルド後に DLL が .dll.new としてゲームへ行き、動いているゲームがそれを読み直します。 -->
 <PropertyGroup>
   <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Drag'n Wash</GameDir>
 </PropertyGroup>
 <Target Name="CopyToGame" AfterTargets="Build" Condition="Exists('$(GameDir)')">
-  <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GameDir)\BepInEx\plugins\$(AssemblyName)" />
+  <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(GameDir)\BepInEx\plugins\$(AssemblyName)\$(AssemblyName).dll.new" />
 </Target>
 ```
 

@@ -78,15 +78,15 @@ Experimental, core 1.2.0, and only while developer tools are on: build, and the 
 - Anything it handed to the game (a coroutine, a `DontDestroyOnLoad` object, a file watcher) is cleaned up in `OnDestroy`.
 - Nothing in `Awake` that is unsafe mid-game on Direct3D 12 (a texture upload), or it is gated with `GameFonts.RuntimeUploadsAreSafe`.
 
-Copy the DLL into the game after each build, and the framework does the rest:
+Deliver the build as `<Mod>.dll.new` next to the installed DLL, and the framework does the rest. On Windows the running DLL is locked by Mono, so it cannot be overwritten; the game reloads from the `.new` file at once, and the preloader patcher makes it the real DLL at the next launch.
 
 ```xml
-<!-- In the .csproj: after a build, the DLL goes to the game, and the running game reloads it. -->
+<!-- In the .csproj: after a build, the DLL goes to the game as .dll.new, and the running game reloads it. -->
 <PropertyGroup>
   <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Drag'n Wash</GameDir>
 </PropertyGroup>
 <Target Name="CopyToGame" AfterTargets="Build" Condition="Exists('$(GameDir)')">
-  <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GameDir)\BepInEx\plugins\$(AssemblyName)" />
+  <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(GameDir)\BepInEx\plugins\$(AssemblyName)\$(AssemblyName).dll.new" />
 </Target>
 ```
 

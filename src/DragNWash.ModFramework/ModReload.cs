@@ -30,11 +30,18 @@ namespace DragNWash.ModFramework
     /// (core 1.2.0); see docs/MOD_RELOAD.md.
     /// </summary>
     /// <remarks>
+    /// On Windows the running DLL is mapped by Mono and cannot be overwritten,
+    /// so a build delivers the new file as <c>&lt;Mod&gt;.dll.new</c> next to
+    /// it; the framework reloads from that file, and the preloader patcher
+    /// makes it the real DLL at the next launch. Where overwriting works
+    /// (Linux), the DLL itself is watched too.
+    /// <para>
     /// Mono never unloads an assembly: the new build is loaded next to the old
     /// one, everything the old build registered with the framework is taken
     /// out by its GUID and by its assembly, its Harmony patches are removed,
     /// its plugin component is destroyed, and the new build's plugin is added
     /// to BepInEx's manager object, where its Awake runs as at startup.
+    /// </para>
     /// </remarks>
     public static class ModReload
     {
@@ -134,7 +141,15 @@ namespace DragNWash.ModFramework
                     Queued.Enqueue(guid);
                 }
             }
-            return $"Reloading {info.Metadata.Name} from {Path.GetFileName(info.Location)}...";
+            return $"Reloading {info.Metadata.Name} from {Path.GetFileName(SourceFile(info))}...";
+        }
+
+        // The file a reload reads: the delivered <Mod>.dll.new when there is
+        // one, else the DLL itself.
+        private static string SourceFile(PluginInfo info)
+        {
+            string pending = info.Location + PendingReloads.NewSuffix;
+            return File.Exists(pending) ? pending : info.Location;
         }
 
         // ---- framework side --------------------------------------------------------
@@ -181,15 +196,18 @@ namespace DragNWash.ModFramework
                     {
                         string folder = Path.GetDirectoryName(info.Location);
                         string file = Path.GetFileName(info.Location);
-                        var watcher = new FileSystemWatcher(folder, file) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName };
+                        // The DLL and its .new: a build delivers the .new on Windows,
+                        // where the running DLL is locked, and may overwrite the DLL elsewhere.
+                        var watcher = new FileSystemWatcher(folder, file + "*") { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName };
                         string g = guid;
-                        FileSystemEventHandler changed = (s, e) => { lock (Lock) { Pending[g] = DateTime.UtcNow; } };
+                        bool Mine(string name) => name.Equals(file, StringComparison.OrdinalIgnoreCase) || name.Equals(file + PendingReloads.NewSuffix, StringComparison.OrdinalIgnoreCase);
+                        FileSystemEventHandler changed = (s, e) => { if (Mine(e.Name)) lock (Lock) { Pending[g] = DateTime.UtcNow; } };
                         watcher.Changed += changed;
                         watcher.Created += changed;
-                        watcher.Renamed += (s, e) => { lock (Lock) { Pending[g] = DateTime.UtcNow; } };
+                        watcher.Renamed += (s, e) => { if (Mine(e.Name)) lock (Lock) { Pending[g] = DateTime.UtcNow; } };
                         watcher.EnableRaisingEvents = true;
                         Watchers[guid] = watcher;
-                        ModFramework.Log.LogInfo($"Watching {file} for changes (mod reload).");
+                        ModFramework.Log.LogInfo($"Watching {file} and {file}{PendingReloads.NewSuffix} for changes (mod reload).");
                     }
                     catch (Exception ex)
                     {
@@ -252,9 +270,10 @@ namespace DragNWash.ModFramework
             // 1. The new build must load and hold a plugin before anything is taken down.
             Assembly fresh;
             Type pluginType = null;
+            string source = SourceFile(info);
             try
             {
-                byte[] bytes = File.ReadAllBytes(info.Location);
+                byte[] bytes = File.ReadAllBytes(source);
                 string pdb = Path.ChangeExtension(info.Location, ".pdb");
                 fresh = File.Exists(pdb) ? Assembly.Load(bytes, File.ReadAllBytes(pdb)) : Assembly.Load(bytes);
                 foreach (Type t in fresh.GetTypes())
@@ -321,7 +340,8 @@ namespace DragNWash.ModFramework
                     Counts.TryGetValue(guid, out count);
                     Counts[guid] = ++count;
                 }
-                ModFramework.Log.LogMessage($"Reloaded {name} ({Ordinal(count)} time) from {Path.GetFileName(info.Location)}.");
+                ModFramework.Log.LogMessage($"Reloaded {name} ({Ordinal(count)} time) from {Path.GetFileName(source)}." +
+                                            (source != info.Location ? " It becomes the installed DLL at the next launch." : ""));
             }
             catch (Exception ex)
             {
