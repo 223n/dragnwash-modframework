@@ -14,7 +14,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ### Tool window 1.1.0
 
-- Experimental. A **Console** tab: every BepInEx log line with its level and source, in colour, the last 2,000 kept; which levels and sources are shown is the player's choice, saved in the config and changeable from the tab, from commands (`log show`, `log level`, `log filter`) and from the Mods screen. Mods register commands with `ToolWindow.AddCommand`; built in: `help`, `log`, `mods`, `scene`. `ToolWindow.ErrorColor` and `WarningColor`. See [docs/CONSOLE.md](docs/CONSOLE.md).
+- Experimental. A **Console** tab: every BepInEx log line with its level and source, in colour, the last 2,000 kept; which levels and sources are shown is the player's choice, saved in the config and changeable from the tab, from commands (`log show`, `log level`, `log filter`) and from the Mods screen. Mods register commands with `ToolWindow.AddCommand`; built in: `help`, `log`, `mods`, `scene`, `clear` / `cls`. `ToolWindow.ErrorColor` and `WarningColor`. See [docs/CONSOLE.md](docs/CONSOLE.md).
 
 ### Assets 1.1.0
 

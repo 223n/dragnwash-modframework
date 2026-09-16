@@ -41,6 +41,7 @@ BepInEx が記録するすべての行が、どの Mod からでも Unity から
 | `log show <level> [off]`、`log level <source|unity|default> <level>`、`log filter <text>`、`log clear` | 上を参照 |
 | `mods` | 読み込まれたプラグインと、フレームワークが使えないと判断した機能 |
 | `scene` | 読み込まれているシーン |
+| `clear`、`cls` | Console を消す（`log clear` と同じ） |
 | `assets textures [filter]`、`assets replacements`、`assets apply`、`assets reload` | Assets ライブラリのもの。[ASSET_TOOL.ja.md](ASSET_TOOL.ja.md) を参照 |
 
 コマンドが例外を投げると、持ち主の Mod 名とともに赤で表示され、それ以外は何も起きません。スクリプト言語はなく、予定もありません。コマンドは Mod が登録するものだけです。

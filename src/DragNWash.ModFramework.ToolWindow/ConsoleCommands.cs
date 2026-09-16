@@ -395,6 +395,9 @@ namespace DragNWash.ModFramework.ToolWindow
             });
             Register(ToolWindow.Guid, "scene", "The scene that is loaded", args =>
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+            // The same as "log clear", under the names people type by habit.
+            Register(ToolWindow.Guid, "clear", "Clears the console (also: cls, log clear)", args => { ConsoleLog.Clear(); return ""; });
+            Register(ToolWindow.Guid, "cls", "Clears the console (also: clear, log clear)", args => { ConsoleLog.Clear(); return ""; });
         }
     }
 }

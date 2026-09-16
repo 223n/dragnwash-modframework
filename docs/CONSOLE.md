@@ -41,6 +41,7 @@ Type in the line at the bottom and press Enter. While you type, what could come 
 | `log show <level> [off]`, `log level <source|unity|default> <level>`, `log filter <text>`, `log clear` | see above |
 | `mods` | loaded plugins, with the features the framework found unavailable |
 | `scene` | the loaded scene |
+| `clear`, `cls` | clears the console (same as `log clear`) |
 | `assets textures [filter]`, `assets replacements`, `assets apply`, `assets reload` | from the Assets library; see [ASSET_TOOL.md](ASSET_TOOL.md) |
 
 A command that throws prints the error in red with the mod that owns it, and nothing else happens. There is no scripting language and none is planned: commands are what mods register.
