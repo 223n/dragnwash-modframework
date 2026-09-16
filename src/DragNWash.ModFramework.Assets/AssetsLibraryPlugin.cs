@@ -79,7 +79,10 @@ namespace DragNWash.ModFramework.Assets
                 AssetReplacements.ReloadDisabled = true;
                 AssetReplacements.ReloadDisabledReason = $"refused on Direct3D 12 after {ReloadGuard.CrashCount} crashes; use -force-d3d11";
             }
-            GameHooks.Require(GameFonts.Guid, "Texture reload", !AssetReplacements.ReloadDisabled, AssetReplacements.ReloadDisabledReason ?? "");
+            if (AssetReplacements.ReloadDisabled)
+            {
+                GameHooks.Unavailable(GameFonts.Guid, "Texture reload", AssetReplacements.ReloadDisabledReason);
+            }
             if (!AssetReplacements.ReloadDisabled && WatchFiles.Value)
             {
                 AssetReplacements.WatchFiles();

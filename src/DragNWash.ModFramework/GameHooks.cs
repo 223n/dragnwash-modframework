@@ -46,6 +46,17 @@ namespace DragNWash.ModFramework
             return passed;
         }
 
+        /// <summary>
+        /// Marks a feature unavailable for a reason that is not a missing game
+        /// member: switched off after a crash, refused on this renderer, and so
+        /// on. Shown on the Mods screen like a failed <see cref="Require(string, string, bool, string)"/>.
+        /// </summary>
+        public static void Unavailable(string ownerGuid, string feature, string reason)
+        {
+            Remember(ownerGuid, feature);
+            ModFramework.Log.LogWarning($"{ownerGuid ?? "A mod"}: \"{feature}\" is unavailable: {reason}.");
+        }
+
         /// <summary>Features of <paramref name="ownerGuid"/> that failed a check on this game build.</summary>
         public static IReadOnlyList<string> UnavailableFeatures(string ownerGuid)
         {
@@ -56,6 +67,12 @@ namespace DragNWash.ModFramework
         }
 
         private static void Report(string ownerGuid, string feature, string detail)
+        {
+            Remember(ownerGuid, feature);
+            ModFramework.Log.LogWarning($"{ownerGuid ?? "A mod"}: \"{feature}\" is unavailable on this game build: {detail} was not found.");
+        }
+
+        private static void Remember(string ownerGuid, string feature)
         {
             string key = ownerGuid ?? "";
             lock (Missing)
@@ -69,7 +86,6 @@ namespace DragNWash.ModFramework
                     list.Add(feature);
                 }
             }
-            ModFramework.Log.LogWarning($"{ownerGuid ?? "A mod"}: \"{feature}\" is unavailable on this game build: {detail} was not found.");
         }
     }
 }
