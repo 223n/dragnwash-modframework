@@ -89,8 +89,10 @@ namespace DragNWash.ModFramework.Assets
                 : GameFonts.RuntimeUploadsAreSafe
                     ? "Reload files re-reads changed PNGs and uploads them; Apply replacements only re-points materials and sprites."
                     : "Reload files uploads textures while the game runs, which can crash it on Direct3D 12; Apply replacements is always safe. Work with -force-d3d11 to reload freely.";
-            GUI.Label(new Rect(x, y, w, row), reloadNote, s.MutedLabel);
-            y += row;
+            // Wraps on narrow windows; take as many rows as it needs.
+            float noteHeight = Mathf.Max(row, s.WrappedLabel.CalcHeight(new GUIContent(reloadNote), w));
+            GUI.Label(new Rect(x, y, w, noteHeight), reloadNote, s.WrappedLabel);
+            y += noteHeight + 4;
 
             var view = new Rect(x, y, w, area.yMax - pad - y);
             if (_showReplacements)
