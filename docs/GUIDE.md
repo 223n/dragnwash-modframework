@@ -42,6 +42,7 @@ A mod that needs a newer library than the one installed can say so with `[BepInD
 | Give players settings | BepInEx `Config.Bind` (the Mods screen builds a page), `GameOptions.AddChoice` / `AddToggle` for the game's own Options screen | your own settings menu |
 | Change text before it is shown | `GameText.AddRewriter` (library **Text**) | patching `TMP_Text.text` or `SetText` |
 | Know which line of dialogue is shown, and who says it | `GameDialogue.LineShowing`, `OptionShowing`, `TryGetLine` (library **Dialogue**) | patching Yarn Spinner's presenters |
+| Find your data for a line after a game update edited it | `LineKey`, `LineResolver` (library **Dialogue**, experimental; [STABLE_LINE_KEYS.md](STABLE_LINE_KEYS.md)) | keying by the English text alone |
 | Add a debug or developer tool | `ToolWindow.AddTab` (library **Tool window**) | your own `OnGUI` window, cursor unlocking or input blocking |
 | Show text in scripts the game's fonts lack | `GameFonts.Prepare` and `GameFonts.SetLanguage` (library **Assets**) | adding to `TMP_Settings.fallbackFontAssets` yourself |
 | Load a texture or an asset bundle | `GameAssets.LoadTexture`, `GameAssets.LoadBundle` (library **Assets**), from `Awake` | loading while the game runs |

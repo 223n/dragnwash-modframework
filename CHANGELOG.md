@@ -2,6 +2,12 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
+## Unreleased
+
+### Dialogue 1.1.0
+
+- Experimental. `LineKey` and `LineResolver`: keys for a line of dialogue that carry no text and survive a game update editing the line (line ID, exact hash, normalized hash, fingerprint), tried strongest first; matches by anything but the exact text are flagged for review. Same definitions in `tools/linekeys.py`, checked against `ci/linekey-vectors.json` in CI. See [docs/STABLE_LINE_KEYS.md](docs/STABLE_LINE_KEYS.md).
+
 ## 2026-09-15: hand-made icon
 
 Released together with Drag'n Wash Localization v1.1.2. The libraries stay at 1.0.0.
