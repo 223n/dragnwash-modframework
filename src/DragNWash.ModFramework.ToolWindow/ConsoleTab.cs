@@ -26,6 +26,7 @@ namespace DragNWash.ModFramework.ToolWindow
         // before the field is drawn in a pass, GetNameOfFocusedControl does not
         // know the name yet, so keys would fall through to the field itself.
         private static bool _inputFocused;
+        private static int _inputControlId;
 
         // [Console] TraceInput: every key the tab sees and what it did with it,
         // written to the log as DragNWash.ConsoleTrace, for debugging the input.
@@ -300,7 +301,20 @@ namespace DragNWash.ModFramework.ToolWindow
             string inputBefore = _input;
             _input = GUI.TextField(inputRect, _input ?? "", s.TextField);
             bool wasFocused = _inputFocused;
-            _inputFocused = GUI.GetNameOfFocusedControl() == InputControl;
+            // Only the repaint pass knows the focused control's name; during a
+            // Layout pass GetNameOfFocusedControl answers "" (seen in the trace),
+            // and a key event arrives right after a Layout pass. So the answer is
+            // taken from repaints only, and the control id is kept as a second
+            // witness that survives every pass.
+            if (ev.type == EventType.Repaint)
+            {
+                _inputFocused = GUI.GetNameOfFocusedControl() == InputControl;
+                _inputControlId = _inputFocused ? GUIUtility.keyboardControl : 0;
+            }
+            else if (_inputControlId != 0)
+            {
+                _inputFocused = GUIUtility.keyboardControl == _inputControlId;
+            }
             if (_input != inputBefore || _inputFocused != wasFocused)
             {
                 T($"field: input=\"{_input}\" focused={_inputFocused} (event {ev.type})");
