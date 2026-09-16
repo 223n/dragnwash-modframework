@@ -40,10 +40,7 @@ namespace DragNWash.ModFramework.Assets
             // read now while uploads are safe, and the Assets tab when the Tool window is there.
             AssetReplacements.LoadAll();
             SetUpReload();
-            if (BepInEx.Bootstrap.Chainloader.PluginInfos.ContainsKey(global::DragNWash.ModFramework.ToolWindow.ToolWindow.Guid))
-            {
-                InstallTab();
-            }
+            TryInstallTab();
 
             if (!GameFonts.RuntimeUploadsAreSafe)
             {
@@ -112,18 +109,55 @@ namespace DragNWash.ModFramework.Assets
         private void Update()
         {
             AssetReplacements.Tick();
+            // The Tool window may load after this library; keep trying until it is there.
+            if (!_tabInstalled && !_tabGivenUp && Time.frameCount % 60 == 0)
+            {
+                TryInstallTab();
+            }
+        }
+
+        private bool _tabInstalled, _tabGivenUp;
+
+        // The Assets tab needs the Tool window library. Its assembly is looked
+        // up by name rather than through the chainloader, whose plugin list is
+        // not filled in the same order on every load.
+        private void TryInstallTab()
+        {
+            bool present = false;
+            foreach (System.Reflection.Assembly a in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (a.GetName().Name == "DragNWash.ModFramework.ToolWindow")
+                {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present)
+            {
+                if (Time.realtimeSinceStartup > 30f)
+                {
+                    _tabGivenUp = true;
+                    Logger.LogInfo("No Tool window library: the Assets tab and the assets command are not available.");
+                }
+                return;
+            }
+            _tabInstalled = InstallTab();
+            _tabGivenUp = !_tabInstalled;
         }
 
         // In its own method so the Tool window types are only loaded when it is installed.
-        private static void InstallTab()
+        private static bool InstallTab()
         {
             try
             {
                 AssetsTab.Install();
+                Log.LogInfo("Assets tab and the assets command added to the Tool window.");
+                return true;
             }
             catch (Exception ex)
             {
-                Log.LogWarning($"The Assets tab could not be added: {ex.Message}");
+                Log.LogWarning($"The Assets tab could not be added: {ex}");
+                return false;
             }
         }
     }
