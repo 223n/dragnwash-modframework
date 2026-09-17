@@ -6,9 +6,9 @@ Drag'n Wash ModFramework のこれからの予定です。予定は変わるこ�
 
 判断の基準は変わりません。すべての Mod が一緒に安全に動くこと。そして、ほかの人が引き継げるように、それぞれの部分を小さく保つことです。
 
-## 次のリリース：1.2.0（近日中）
+## リリース済み：1.2.0（2026-09-17）
 
-Drag'n Wash Localization v1.2.0 と一緒にリリースします。
+Drag'n Wash Localization v1.2.0 と一緒にリリースしました。
 
 - 中核 1.2.0：開発者ツールのスイッチ、Mods 画面での文字列とキーの設定、`GameEvents`、`SettingMeta`、ゲームを動かしたままの Mod のリロード、外と通信する Mod の申告（[NETWORK.ja.md](NETWORK.ja.md)）。
 - Tool window 1.1.0（Console）、Assets 1.1.0（テクスチャの差し替え、プレビュー）、Dialogue 1.1.0（安定した行キー）。

@@ -6,7 +6,7 @@ Where Drag'n Wash ModFramework is going. Plans change; dates are given only when
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
 
-## Next release: 1.2.0 (in the next few days)
+## Released: 1.2.0 (2026-09-17)
 
 Released together with Drag'n Wash Localization v1.2.0.
 
