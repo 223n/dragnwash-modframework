@@ -31,6 +31,49 @@ namespace DragNWash.ModFramework.Assets
         private static string _status = "Press List to walk the loaded textures.";
         private static bool _showReplacements;
 
+        // The Inspector's Go on a texture: list, filter to the name, open the tab.
+        internal static void ShowTexture(string textureName)
+        {
+            _textures = AssetCatalog.Textures();
+            _filter = textureName ?? "";
+            _showReplacements = false;
+            _scroll = Vector2.zero;
+            _status = $"{_textures.Count} texture(s) loaded; showing \"{_filter}\".";
+            TW.Open("Assets");
+        }
+
+        // The Inspector library, when it is loaded: a texture row's Inspect
+        // button opens the first material that uses the texture there.
+        private static System.Reflection.MethodInfo _inspect;
+        private static bool _inspectLookedUp;
+        private static System.Reflection.MethodInfo InspectMethod()
+        {
+            if (!_inspectLookedUp)
+            {
+                _inspectLookedUp = true;
+                Type type = Type.GetType("DragNWash.ModFramework.Inspector.Inspector, DragNWash.ModFramework.Inspector", false);
+                _inspect = type?.GetMethod("Inspect", new[] { typeof(UnityEngine.Object) });
+            }
+            return _inspect;
+        }
+
+        private static Material FirstMaterialUsing(Texture2D texture)
+        {
+            foreach (Material m in Resources.FindObjectsOfTypeAll<Material>())
+            {
+                if (m == null || m.shader == null) continue;
+                int count = m.shader.GetPropertyCount();
+                for (int i = 0; i < count; i++)
+                {
+                    if (m.shader.GetPropertyType(i) == UnityEngine.Rendering.ShaderPropertyType.Texture && m.GetTexture(m.shader.GetPropertyName(i)) == texture)
+                    {
+                        return m;
+                    }
+                }
+            }
+            return null;
+        }
+
         public static void Install()
         {
             if (_tab != null)
@@ -191,7 +234,19 @@ namespace DragNWash.ModFramework.Assets
                     GUI.Label(new Rect(inner * 0.65f, ry, inner * 0.2f - 6, row), $"{t.MaterialUsers} mat, {t.Sprites} sprite", _mutedCell);
                     if (t.Replaced)
                     {
-                        GUI.Label(new Rect(inner * 0.85f, ry, inner * 0.15f, row), "replacement", _mutedCell);
+                        GUI.Label(new Rect(inner * 0.85f, ry, inner * 0.15f - 70, row), "replacement", _mutedCell);
+                    }
+                    if (t.MaterialUsers > 0 && InspectMethod() != null && GUI.Button(new Rect(inner - 66, ry + 2, 66, row - 4), "Inspect", s.Button))
+                    {
+                        Material m = FirstMaterialUsing(t.Texture);
+                        if (m != null)
+                        {
+                            InspectMethod().Invoke(null, new object[] { m });
+                        }
+                        else
+                        {
+                            _status = $"No material uses {t.Name} right now.";
+                        }
                     }
                 }
                 ry += row;

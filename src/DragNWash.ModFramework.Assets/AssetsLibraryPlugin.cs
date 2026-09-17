@@ -18,6 +18,17 @@ namespace DragNWash.ModFramework.Assets
         internal static ConfigEntry<bool> AllowReload;
         internal static ConfigEntry<bool> WatchFiles;
 
+        // Reached only through AssetCatalog.ShowInToolWindow: the Tool window
+        // types are touched inside, so this library still loads without it.
+        internal static void ShowTexture(string textureName)
+        {
+            if (!TabReady)
+            {
+                return;
+            }
+            AssetsTab.ShowTexture(textureName);
+        }
+
         private void Awake()
         {
             Log = Logger;
@@ -156,6 +167,7 @@ namespace DragNWash.ModFramework.Assets
         }
 
         private bool _tabInstalled, _tabGivenUp;
+        private static bool TabReady;
 
         // The Assets tab needs the Tool window library. Its assembly is looked
         // up by name rather than through the chainloader, whose plugin list is
@@ -181,6 +193,7 @@ namespace DragNWash.ModFramework.Assets
                 return;
             }
             _tabInstalled = InstallTab();
+            TabReady = _tabInstalled;
             _tabGivenUp = !_tabInstalled;
         }
 

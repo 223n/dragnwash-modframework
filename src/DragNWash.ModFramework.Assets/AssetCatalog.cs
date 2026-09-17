@@ -86,6 +86,17 @@ namespace DragNWash.ModFramework.Assets
     /// </remarks>
     public static class AssetCatalog
     {
+        /// <summary>
+        /// Opens the Tool window on the Assets tab, listing the loaded textures
+        /// filtered to <paramref name="textureName"/> (experimental). Does
+        /// nothing without the Tool window library or while developer tools
+        /// are off. The Inspector's Go button on a texture uses it.
+        /// </summary>
+        public static void ShowInToolWindow(string textureName)
+        {
+            AssetsLibraryPlugin.ShowTexture(textureName);
+        }
+
         /// <summary>Every loaded 2D texture, by name, with how many materials and sprites use it.</summary>
         public static List<TextureInfo> Textures()
         {
