@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>DragNWash.ModFramework.Inspector</AssemblyName>
+    <RootNamespace>DragNWash.ModFramework.Inspector</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <!-- A library on top of the core and the Tool window, with its own version. Keep in sync with Inspector.Version. -->
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0</FileVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DragNWash.ModFramework\DragNWash.ModFramework.csproj" Private="false" />
+    <ProjectReference Include="..\DragNWash.ModFramework.ToolWindow\DragNWash.ModFramework.ToolWindow.csproj" Private="false" />
+  </ItemGroup>
+
+  <!-- Shares libs/ with the core project; see tools/copy-libs.ps1. -->
+  <ItemGroup>
+    <Reference Include="BepInEx"><HintPath>../DragNWash.ModFramework/libs/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>../DragNWash.ModFramework/libs/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.IMGUIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- EventSystem raycasts and Canvas, for pick mode and the outline of uGUI elements. -->
+    <Reference Include="UnityEngine.UI"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>../DragNWash.ModFramework/libs/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- Mouse and keyboard for the free camera: this game has legacy input switched off. -->
+    <Reference Include="Unity.InputSystem"><HintPath>../DragNWash.ModFramework/libs/Unity.InputSystem.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>

@@ -37,6 +37,7 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextSameCode = "Changes the same game code as:";
         internal const string TextSameCodeRisky = "Changes the same game code as, and may override:";
         internal const string TextUpdateTag = "Update";
+        internal const string TextReloaded = "Reloaded";
         internal const string TextNewVersion = "New version available:";
         internal const string TextOpenReleasePage = "Open release page";
         internal const string TextUninstall = "Uninstall";
@@ -339,6 +340,11 @@ namespace DragNWash.ModFramework.Mods
             if (newer != null && _confirming != entry)
             {
                 notes.Add(("Update", TextNewVersion, newer.Tag, false));
+            }
+            int reloads = ModReload.ReloadCount(entry.Guid);
+            if (reloads > 0 && _confirming != entry)
+            {
+                notes.Add(("Reloaded", TextReloaded, reloads == 1 ? "once this session; not the file BepInEx loaded" : reloads + " times this session; not the file BepInEx loaded", false));
             }
             if (entry.ProblemGuids.Count > 0 && _confirming != entry)
             {
