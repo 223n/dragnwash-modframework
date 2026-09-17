@@ -156,19 +156,103 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         /// <summary>
-        /// Selects <paramref name="target"/> (a GameObject, a Component or a
-        /// Material) in the Inspector tab and opens the window on it
-        /// (experimental, Tool window 1.1). Anything else is refused with a note
-        /// in the tab. Nothing happens while developer tools are off.
+        /// Adds an overlay: <paramref name="draw"/> is called from OnGUI while the
+        /// window is open, before the window itself, with the window's rectangle,
+        /// in screen coordinates (top-left origin). For outlines, gizmos and
+        /// pick modes drawn over the game. An exception is logged with the
+        /// owner and the overlay is switched off. Dispose the handle to remove it.
         /// </summary>
-        public static void Inspect(UnityEngine.Object target)
+        public static IDisposable AddOverlay(string owner, Action<Rect> draw)
         {
-            if (target == null)
+            if (string.IsNullOrEmpty(owner) || draw == null)
+            {
+                throw new ArgumentException("An overlay needs an owner and a draw callback.");
+            }
+            var overlay = new Overlay { Owner = owner, Draw = draw };
+            lock (Overlays)
+            {
+                Overlays.Add(overlay);
+            }
+            return new OverlayRemoval(overlay);
+        }
+
+        /// <summary>
+        /// Holds the game's input (its action maps) while <paramref name="block"/>
+        /// is true for <paramref name="owner"/>, on top of the window's own
+        /// blocking while the pointer is over it. For a pick mode or a drag in
+        /// the game view that must not move the player. Cleared with false, and
+        /// when the owner's mod is reloaded.
+        /// </summary>
+        public static void BlockGameInput(string owner, bool block)
+        {
+            if (string.IsNullOrEmpty(owner))
             {
                 return;
             }
-            InspectorTab.Select(target);
-            Open(InspectorTab.Title);
+            lock (InputHolders)
+            {
+                if (block) InputHolders.Add(owner); else InputHolders.Remove(owner);
+            }
+        }
+
+        /// <summary>
+        /// The text as the window can draw it now: characters the window font has
+        /// not rasterised yet come out as '?' (and are prepared for later frames
+        /// where that is safe). For text a tab did not know in advance, such as
+        /// object names.
+        /// </summary>
+        public static string Drawable(string text)
+        {
+            return ConsoleTab.Drawable(text ?? "");
+        }
+
+        internal static readonly List<Overlay> Overlays = new List<Overlay>();
+        private static readonly HashSet<string> InputHolders = new HashSet<string>(StringComparer.Ordinal);
+
+        internal static bool InputBlockRequested
+        {
+            get { lock (InputHolders) { return InputHolders.Count > 0; } }
+        }
+
+        internal static void DrawOverlays(Rect window)
+        {
+            Overlay[] all;
+            lock (Overlays)
+            {
+                all = Overlays.ToArray();
+            }
+            foreach (Overlay o in all)
+            {
+                if (o.Failed) continue;
+                try
+                {
+                    o.Draw(window);
+                }
+                catch (Exception ex) when (!(ex is ExitGUIException))
+                {
+                    o.Failed = true;
+                    ToolWindowPlugin.Log.LogError($"The overlay of {o.Owner} threw and was turned off: {ex}");
+                }
+            }
+        }
+
+        internal sealed class Overlay
+        {
+            public string Owner;
+            public Action<Rect> Draw;
+            public bool Failed;
+        }
+
+        private sealed class OverlayRemoval : IDisposable
+        {
+            private Overlay _overlay;
+            public OverlayRemoval(Overlay overlay) { _overlay = overlay; }
+            public void Dispose()
+            {
+                if (_overlay == null) return;
+                lock (Overlays) { Overlays.Remove(_overlay); }
+                _overlay = null;
+            }
         }
 
         /// <summary>Closes the window.</summary>
@@ -232,6 +316,11 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 Tabs.RemoveAll(t => t.Owner == owner);
             }
+            lock (Overlays)
+            {
+                Overlays.RemoveAll(o => o.Owner == owner);
+            }
+            BlockGameInput(owner, false);
             ConsoleCommands.UnregisterOwned(owner);
             OpenChanged = (Action<bool>)ModReload.Prune(OpenChanged, assembly);
         }

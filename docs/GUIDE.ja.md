@@ -52,7 +52,7 @@ public class MyMod : BaseUnityPlugin
 | セーブスロットやフラグを読み書きする | `GameSaves`、`GameFlags`（ライブラリ **Flags and saves**） | `savegame.dgn` を自分で書き換えること |
 | ほかの Mod に API を提供する | `Services.Register<T>` と `Services.Get<T>` | リフレクションで探させる public static フィールド |
 | パッチを当てるゲームのメソッドがまだあるか確かめる | `GameHooks.Require` | とりあえずパッチを当てること |
-| オブジェクト、コンポーネント、マテリアルが何を持っているかを見て、値を試す | **Inspector** タブ（F1）と `ToolWindow.Inspect(target)`（実験的） | 逆コンパイルと、当て推量ごとのビルドし直し |
+| オブジェクト、コンポーネント、マテリアルが何を持っているかを見て、値を試す | **Inspector** タブ（F1。独立したライブラリ）と `Inspector.Inspect(target)`（実験的） | 逆コンパイルと、当て推量ごとのビルドし直し |
 | シーンの読み込み時、ゲームの起動時、終了時に何かする | `GameEvents.OnSceneLoaded`、`OnGameStarted`、`OnQuitting`（実験的） | `SceneManager.sceneLoaded` や `Application.quitting` への直接の登録 |
 
 ## ルール

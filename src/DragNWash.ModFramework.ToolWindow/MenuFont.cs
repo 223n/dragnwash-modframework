@@ -58,7 +58,17 @@ namespace DragNWash.ModFramework.ToolWindow
                         {
                             continue;
                         }
-                        Font candidate = Font.CreateDynamicFontFromOSFont(name, Size);
+                        // With a symbol face behind it, where the OS has one: the
+                        // Inspector's toolbar glyphs come from there.
+                        var names = new List<string> { name };
+                        foreach (string symbols in new[] { "Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols2", "DejaVu Sans" })
+                        {
+                            if (installed.Contains(symbols))
+                            {
+                                names.Add(symbols);
+                            }
+                        }
+                        Font candidate = Font.CreateDynamicFontFromOSFont(names.ToArray(), Size);
                         if (candidate == null)
                         {
                             continue;
@@ -66,7 +76,7 @@ namespace DragNWash.ModFramework.ToolWindow
                         if (Renders(candidate))
                         {
                             Font = candidate;
-                            ToolWindowPlugin.Log.LogInfo($"Window font: {name}");
+                            ToolWindowPlugin.Log.LogInfo($"Window font: {string.Join(" + ", names)}");
                             break;
                         }
                         UnityEngine.Object.Destroy(candidate);

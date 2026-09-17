@@ -92,7 +92,6 @@ namespace DragNWash.ModFramework.ToolWindow
             ToolWindow.IsAvailable = true;
 
             Install("Console", SetUpConsole);
-            Install("Inspector", InspectorTab.Install);
             ModReload.Unloading += ToolWindow.RemoveOwned;
         }
 
@@ -325,7 +324,8 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 _pointerGrabbed = false;
             }
-            InputBlocker.SetBlocking(over || _pointerGrabbed);
+            // In pick mode the click on the game selects an object and must not move the player.
+            InputBlocker.SetBlocking(over || _pointerGrabbed || ToolWindow.InputBlockRequested);
         }
 
         private void OnDestroy()
@@ -432,6 +432,9 @@ namespace DragNWash.ModFramework.ToolWindow
                 GUI.backgroundColor = Color.white;
                 GUI.contentColor = Color.white;
                 MenuText.Begin(MenuFont.Font, MenuFont.Size);
+                // Overlays (outlines, gizmos, pick modes) live in the game's
+                // screen space, under the window.
+                ToolWindow.DrawOverlays(_windowRect);
                 _windowRect = GUI.Window(GetInstanceID(), _windowRect, DrawWindow, string.Empty, _windowStyle);
                 MenuText.End();
                 // GUI.Window returns its own rectangle after the callback; apply a

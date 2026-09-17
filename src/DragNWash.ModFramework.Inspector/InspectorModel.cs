@@ -1,3 +1,5 @@
+using DragNWash.ModFramework.ToolWindow;
+using TW = global::DragNWash.ModFramework.ToolWindow.ToolWindow;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -8,7 +10,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
-namespace DragNWash.ModFramework.ToolWindow
+namespace DragNWash.ModFramework.Inspector
 {
     // The Inspector tab's data: the hierarchy, a component's members through
     // reflection, a material's shader properties, and how a value is shown and
@@ -458,6 +460,59 @@ namespace DragNWash.ModFramework.ToolWindow
                 list.Add(f);
             }
             return list.ToArray();
+        }
+
+        // ---- composite values: one field per component ------------------------------
+
+        internal static bool IsComposite(Type t)
+        {
+            return t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4) || t == typeof(Quaternion)
+                || t == typeof(Vector2Int) || t == typeof(Vector3Int) || t == typeof(Color) || t == typeof(Color32)
+                || t == typeof(Rect) || t == typeof(Bounds);
+        }
+
+        internal static string[] ComponentLabels(Type t)
+        {
+            if (t == typeof(Vector2) || t == typeof(Vector2Int)) return new[] { "x", "y" };
+            if (t == typeof(Vector3) || t == typeof(Vector3Int) || t == typeof(Quaternion)) return new[] { "x", "y", "z" };
+            if (t == typeof(Vector4)) return new[] { "x", "y", "z", "w" };
+            if (t == typeof(Color) || t == typeof(Color32)) return new[] { "r", "g", "b", "a" };
+            if (t == typeof(Rect)) return new[] { "x", "y", "w", "h" };
+            if (t == typeof(Bounds)) return new[] { "cx", "cy", "cz", "sx", "sy", "sz" };
+            return new string[0];
+        }
+
+        internal static float[] Components(object v)
+        {
+            switch (v)
+            {
+                case Vector2 a: return new[] { a.x, a.y };
+                case Vector3 a: return new[] { a.x, a.y, a.z };
+                case Vector4 a: return new[] { a.x, a.y, a.z, a.w };
+                case Vector2Int a: return new float[] { a.x, a.y };
+                case Vector3Int a: return new float[] { a.x, a.y, a.z };
+                case Quaternion q: { Vector3 e = q.eulerAngles; return new[] { e.x, e.y, e.z }; }
+                case Color c: return new[] { c.r, c.g, c.b, c.a };
+                case Color32 c: return new float[] { c.r, c.g, c.b, c.a };
+                case Rect r: return new[] { r.x, r.y, r.width, r.height };
+                case Bounds b: return new[] { b.center.x, b.center.y, b.center.z, b.size.x, b.size.y, b.size.z };
+            }
+            return new float[0];
+        }
+
+        internal static object Compose(Type t, float[] n)
+        {
+            if (t == typeof(Vector2)) return new Vector2(n[0], n[1]);
+            if (t == typeof(Vector3)) return new Vector3(n[0], n[1], n[2]);
+            if (t == typeof(Vector4)) return new Vector4(n[0], n[1], n[2], n[3]);
+            if (t == typeof(Vector2Int)) return new Vector2Int((int)n[0], (int)n[1]);
+            if (t == typeof(Vector3Int)) return new Vector3Int((int)n[0], (int)n[1], (int)n[2]);
+            if (t == typeof(Quaternion)) return Quaternion.Euler(n[0], n[1], n[2]);
+            if (t == typeof(Color)) return new Color(n[0], n[1], n[2], n[3]);
+            if (t == typeof(Color32)) return new Color32((byte)n[0], (byte)n[1], (byte)n[2], (byte)n[3]);
+            if (t == typeof(Rect)) return new Rect(n[0], n[1], n[2], n[3]);
+            if (t == typeof(Bounds)) return new Bounds(new Vector3(n[0], n[1], n[2]), new Vector3(n[3], n[4], n[5]));
+            return null;
         }
 
         // Cycle an enum to its next value (the row's button for enums).
