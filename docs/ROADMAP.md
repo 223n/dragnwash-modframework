@@ -6,6 +6,10 @@ Where Drag'n Wash ModFramework is going. Plans change; dates are given only when
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
 
+## Released: 1.2.1 (2026-09-19)
+
+- Flags and saves 1.0.1: the Saves tab finds saves made after the game update of 2026-09-14 again, and lists slots in order ([#40](https://github.com/TomXV/dragnwash-modframework/issues/40)).
+
 ## Released: 1.2.0 (2026-09-17)
 
 Released together with Drag'n Wash Localization v1.2.0.
