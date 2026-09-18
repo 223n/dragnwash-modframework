@@ -91,7 +91,7 @@ namespace DragNWash.ModFramework.Saves
         private static readonly Regex NewSlotFolder = new Regex(@"^slot(\d+)$", RegexOptions.Compiled);
 
         /// <summary>
-        /// Slots that hold a save, most recently written first, named
+        /// Slots that hold a save, in slot order (1, 2, 3), named
         /// <c>&lt;steamid&gt;_slot&lt;N&gt;</c> whichever layout the save is in.
         /// </summary>
         public static List<string> Slots()
@@ -118,13 +118,24 @@ namespace DragNWash.ModFramework.Saves
                         }
                     }
                 }
-                slots.Sort((a, b) => File.GetLastWriteTimeUtc(SavePath(b)).CompareTo(File.GetLastWriteTimeUtc(SavePath(a))));
+                slots.Sort(CompareSlots);
             }
             catch (Exception ex)
             {
                 SavesLibraryPlugin.Log.LogWarning($"Could not list save slots: {ex.Message}");
             }
             return slots;
+        }
+
+        // By slot number, then by name, so the tab shows 1, 2, 3 left to right.
+        private static int CompareSlots(string a, string b)
+        {
+            Match ma = OldSlotName.Match(a), mb = OldSlotName.Match(b);
+            if (ma.Success && mb.Success && int.TryParse(ma.Groups[2].Value, out int na) && int.TryParse(mb.Groups[2].Value, out int nb) && na != nb)
+            {
+                return na.CompareTo(nb);
+            }
+            return string.CompareOrdinal(a, b);
         }
 
         /// <summary>"slot 1" for "76561198000000000_slot1"; other names as they are.</summary>
