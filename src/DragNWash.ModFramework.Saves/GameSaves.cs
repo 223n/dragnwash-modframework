@@ -41,9 +41,14 @@ namespace DragNWash.ModFramework.Saves
     /// can be undone.
     /// </summary>
     /// <remarks>
-    /// The game keeps one save per slot at
-    /// <c>&lt;persistentDataPath&gt;/&lt;steamid&gt;_slot&lt;N&gt;/savegame.dgn</c> and
-    /// overwrites it on every save. The library snapshots the file whenever it
+    /// The game keeps one save per slot and overwrites it on every save. Since
+    /// the game update of 2026-09-14 it writes
+    /// <c>&lt;persistentDataPath&gt;/&lt;steamid&gt;/slot&lt;N&gt;/savegame.dgn</c> (inside the
+    /// folder Steam Cloud syncs, with a <c>{"version":1}</c> entry first), and
+    /// reads the older <c>&lt;steamid&gt;_slot&lt;N&gt;/savegame.dgn</c> only when a slot has
+    /// no new save yet. Slots keep their older names here (<c>&lt;steamid&gt;_slot&lt;N&gt;</c>)
+    /// so their snapshot history carries on; <see cref="SavePath"/> finds the file
+    /// the game reads. The library snapshots the file whenever it
     /// changes and before any edit made through it, into <c>BepInEx/SaveHistory</c>.
     /// Edits only rewrite the file: the game reads it when a slot is loaded, so the
     /// player returns to the title screen and loads the slot for an edit to take
@@ -59,7 +64,7 @@ namespace DragNWash.ModFramework.Saves
         public const string Guid = "com.tomxv.dragnwash.modframework.saves";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
 
         /// <summary>The game's save file name inside a slot folder.</summary>
         public const string SaveFileName = "savegame.dgn";
@@ -82,7 +87,13 @@ namespace DragNWash.ModFramework.Saves
         /// <summary>Where the game keeps its save slots.</summary>
         public static string SaveFolder => Application.persistentDataPath;
 
-        /// <summary>Slot folder names that hold a save, most recently written first.</summary>
+        private static readonly Regex OldSlotName = new Regex(@"^(.+)_slot(\d+)$", RegexOptions.Compiled);
+        private static readonly Regex NewSlotFolder = new Regex(@"^slot(\d+)$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Slots that hold a save, most recently written first, named
+        /// <c>&lt;steamid&gt;_slot&lt;N&gt;</c> whichever layout the save is in.
+        /// </summary>
         public static List<string> Slots()
         {
             var slots = new List<string>();
@@ -90,9 +101,21 @@ namespace DragNWash.ModFramework.Saves
             {
                 foreach (string dir in Directory.GetDirectories(SaveFolder))
                 {
-                    if (File.Exists(System.IO.Path.Combine(dir, SaveFileName)))
+                    string name = System.IO.Path.GetFileName(dir);
+                    // The older layout: <steamid>_slot<N>/savegame.dgn.
+                    if (File.Exists(System.IO.Path.Combine(dir, SaveFileName)) && !slots.Contains(name))
                     {
-                        slots.Add(System.IO.Path.GetFileName(dir));
+                        slots.Add(name);
+                    }
+                    // The layout since 2026-09-14: <steamid>/slot<N>/savegame.dgn.
+                    foreach (string sub in Directory.GetDirectories(dir))
+                    {
+                        Match m = NewSlotFolder.Match(System.IO.Path.GetFileName(sub));
+                        string slot = name + "_slot" + (m.Success ? m.Groups[1].Value : "");
+                        if (m.Success && File.Exists(System.IO.Path.Combine(sub, SaveFileName)) && !slots.Contains(slot))
+                        {
+                            slots.Add(slot);
+                        }
                     }
                 }
                 slots.Sort((a, b) => File.GetLastWriteTimeUtc(SavePath(b)).CompareTo(File.GetLastWriteTimeUtc(SavePath(a))));
@@ -111,10 +134,35 @@ namespace DragNWash.ModFramework.Saves
             return i >= 0 ? "slot " + slot.Substring(i + 5) : slot;
         }
 
-        /// <summary>Full path of a slot's save file.</summary>
+        /// <summary>
+        /// Full path of the save file the game reads for a slot: the newer
+        /// <c>&lt;steamid&gt;/slot&lt;N&gt;</c> one when it exists, else the older
+        /// <c>&lt;steamid&gt;_slot&lt;N&gt;</c> one, else where the game will write next.
+        /// </summary>
         public static string SavePath(string slot)
         {
-            return System.IO.Path.Combine(SaveFolder, slot, SaveFileName);
+            Match m = OldSlotName.Match(slot ?? "");
+            string older = System.IO.Path.Combine(SaveFolder, slot ?? "", SaveFileName);
+            if (!m.Success)
+            {
+                return older;
+            }
+            string newer = System.IO.Path.Combine(SaveFolder, m.Groups[1].Value, "slot" + m.Groups[2].Value, SaveFileName);
+            return File.Exists(newer) || !File.Exists(older) ? newer : older;
+        }
+
+        // The game reads a save in the newer layout only when it starts with {"version":1};
+        // a snapshot taken before the update does not, so it gets one on the way back.
+        private static string ForPath(string savePath, string content)
+        {
+            bool newer = NewSlotFolder.IsMatch(System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(savePath) ?? ""));
+            string trimmed = content.TrimStart();
+            if (!newer || content.Contains("\"version\"") || !trimmed.StartsWith("[", StringComparison.Ordinal))
+            {
+                return content;
+            }
+            string rest = trimmed.Substring(1).TrimStart();
+            return "[{\"version\":1}" + (rest.StartsWith("]", StringComparison.Ordinal) ? "" : ",") + rest;
         }
 
         /// <summary>Snapshots of a slot, newest first.</summary>
@@ -171,7 +219,8 @@ namespace DragNWash.ModFramework.Saves
                     LastContent[slot] = current;
                     TakeSnapshot(slot, savePath, current);
                 }
-                File.Copy(snapshot.Path, savePath, overwrite: true);
+                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(savePath));
+                File.WriteAllText(savePath, ForPath(savePath, File.ReadAllText(snapshot.Path)));
                 LastWrite[slot] = File.GetLastWriteTimeUtc(savePath);
                 LastContent[slot] = File.ReadAllText(savePath);
                 SavesLibraryPlugin.Log.LogInfo($"Restored {slot} to {snapshot.Label}.");

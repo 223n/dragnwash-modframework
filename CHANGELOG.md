@@ -2,6 +2,12 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
+## Unreleased
+
+### Saves 1.0.1
+
+- Saves made after the game update of 2026-09-14 are found again. The game now writes `<steamid>/slot<N>/savegame.dgn` (inside the folder Steam Cloud syncs) and reads the older `<steamid>_slot<N>/savegame.dgn` only for a slot with no new save, so once a slot was saved in game (or deleted and started again) it disappeared from the Saves tab, which showed "No save files found" ([Localization #32](https://github.com/TomXV/dragnwash-localization/issues/32)). `GameSaves.Slots()` lists both layouts under the same slot names as before, so snapshot history carries on, and `SavePath` returns the file the game reads. A snapshot taken before the update gets the `{"version":1}` entry the game now expects when it is restored into the newer layout.
+
 ## 2026-09-17: developer tools, going online, Inspector
 
 Released together with Drag'n Wash Localization v1.2.0, first as a pre-release. The core and the preloader patcher go to 1.2.0; the Tool window, Assets and Dialogue libraries to 1.1.0; Text and Flags and saves stay at 1.0.0; the Inspector library arrives at 1.0.0.
