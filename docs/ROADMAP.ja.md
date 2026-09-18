@@ -2,9 +2,17 @@
 
 [English](ROADMAP.md)
 
-Drag'n Wash ModFramework のこれからの予定です。予定は変わることがあり、日付は近いものだけ書いています。更新日：2026-09-17。
+Drag'n Wash ModFramework のこれからの予定です。予定は変わることがあり、日付は近いものだけ書いています。更新日：2026-09-19。
 
 判断の基準は変わりません。すべての Mod が一緒に安全に動くこと。そして、ほかの人が引き継げるように、それぞれの部分を小さく保つことです。
+
+## リリース済み：1.3.0（2026-09-19）
+
+Drag'n Wash Localization v1.3.0 と一緒にリリースしました。
+
+- クラッシュレポート：セッションごとの記録、クラッシュやフリーズのあとのレポート（Unity のクラッシュダンプや、フリーズ時のダンプつき）、何が起きたかを知らせるゲームの外のウィンドウ（`CrashReporter.exe`、Windows）（[CRASH_REPORTS.ja.md](CRASH_REPORTS.ja.md)）。
+- それで突き止めた、Tool window を開いたときの Direct3D 12 のクラッシュ：フォントのアトラスの転送を 1 フレームに 1 回にまとめ、Console の訳もまた表示されるように。
+- `GameOptions.AddSlider`（[#39](https://github.com/TomXV/dragnwash-modframework/issues/39)）。
 
 ## リリース済み：1.2.1（2026-09-19）
 
@@ -23,7 +31,7 @@ Drag'n Wash Localization v1.2.0 と一緒にリリースしました。
 
 - **Mods 画面に、Mod ごとのお知らせ欄。** 今の画面が出せるのは「使えない機能」と「同じコードを書き換えている」の 2 種類だけです。どちらにも当てはまらないこともあります。たとえば、2 つの Mod が同じ行に違う訳を同梱した場合です（[Localization #28](https://github.com/TomXV/dragnwash-localization/issues/28)）。Mod やライブラリが、Mod の下に一言残せる小さな共通の仕組みを用意します。
 - **他の Mod が同梱する訳。** まず Drag'n Wash Localization が単独で `<Mod のフォルダー>/Translations/` を読むようにします。β版の実験的機能で、既定はオフです（[設計](https://github.com/TomXV/dragnwash-localization/blob/main/docs/MOD_TRANSLATIONS.ja.md)）。2 つ目の翻訳 Mod が同じ約束事を使いたくなったら、フォルダーを見つける処理を Text ライブラリに移します。
-- **Direct3D 12。** F1 の窓を開いたときやテクスチャのリロード中に、まれにゲームが落ちることがあります（Unity UUM-140564）。きっかけを突き止めるか、アップロードをすべて起動時に済ませる形にします。
+- **Direct3D 12。** 1.3.0 で、このクラッシュ（Unity UUM-140564）のいちばん多いきっかけだった、フォントのアトラスの転送の集中をなくしました。ゲーム中のテクスチャのリロードは、まだ一度に転送します。同じ対策が要るかは、クラッシュレポートの GPU 転送のトレースで確かめます。
 - **言語ごとのテクスチャの差し替え。** 特定の言語を使っている間だけ効き、元に戻せて、Direct3D 12 では再起動を待つ差し替え。Drag'n Wash Localization の絵の翻訳のため（[設計](https://github.com/TomXV/dragnwash-localization/blob/experimental/translated-textures/docs/TRANSLATED_TEXTURES.ja.md)）。
 - **あらゆる種類の書き出しと取り込み。** テクスチャ、メッシュ、マテリアル、音、ゲームのデータ（ScriptableObject）をファイルに書き出し、手を加え、Mod から取り込めるように（[設計](ASSET_TOOL.ja.md#取り出すと取り込む)）。
 - **Steam Deck：** F1 の窓で、画面キーボードで文字を入力できるかの確認。

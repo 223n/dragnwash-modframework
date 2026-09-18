@@ -2,9 +2,17 @@
 
 [日本語](ROADMAP.ja.md)
 
-Where Drag'n Wash ModFramework is going. Plans change; dates are given only when they are close. Updated 2026-09-17.
+Where Drag'n Wash ModFramework is going. Plans change; dates are given only when they are close. Updated 2026-09-19.
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
+
+## Released: 1.3.0 (2026-09-19)
+
+Released together with Drag'n Wash Localization v1.3.0.
+
+- Crash reports: a record of each session, a report after a crash or a freeze with Unity's crash dump or a freeze dump, and a window outside the game that says what happened (`CrashReporter.exe`, Windows) ([CRASH_REPORTS.md](CRASH_REPORTS.md)).
+- The Direct3D 12 crash when the Tool window opened, found with them: font atlas uploads are batched to once per frame, and the Console shows translated text again.
+- `GameOptions.AddSlider` ([#39](https://github.com/TomXV/dragnwash-modframework/issues/39)).
 
 ## Released: 1.2.1 (2026-09-19)
 
@@ -23,7 +31,7 @@ Released together with Drag'n Wash Localization v1.2.0.
 
 - **A notice per mod on the Mods screen.** Today the screen can say a feature is unavailable or that a mod patches the same code as another. Some things fit neither, such as two mods shipping different translations for the same line ([Localization #28](https://github.com/TomXV/dragnwash-localization/issues/28)). A small, general way for a mod or a library to leave a note under a mod.
 - **Translations shipped by other mods.** Drag'n Wash Localization will first load `<mod folder>/Translations/` on its own, as an experimental beta feature off by default ([design](https://github.com/TomXV/dragnwash-localization/blob/main/docs/MOD_TRANSLATIONS.md)). If a second translation mod wants the same convention, finding those folders moves into the Text library.
-- **Direct3D 12.** Opening the F1 window or reloading textures can, rarely, crash the game on Direct3D 12 (Unity UUM-140564). Find what triggers it, or keep every upload at startup.
+- **Direct3D 12.** 1.3.0 removed the most common trigger of the crash (Unity UUM-140564): a burst of font atlas uploads. Reloading textures while the game runs still uploads at once; the crash reports' GPU trace says whether it needs the same treatment.
 - **Texture replacements per language.** Replacements that apply only while a given language is in use, can be taken back, and wait for a restart on Direct3D 12. For Drag'n Wash Localization's translated pictures ([design](https://github.com/TomXV/dragnwash-localization/blob/experimental/translated-textures/docs/TRANSLATED_TEXTURES.md)).
 - **Export and import for every kind.** Textures, meshes, materials, sounds and the game's data (ScriptableObjects) written to files, changed, and brought back by a mod ([design](ASSET_TOOL.md#export-and-import)).
 - **Steam Deck:** typing in the F1 window with the on-screen keyboard.

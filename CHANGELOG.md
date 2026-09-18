@@ -2,17 +2,27 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
-## Unreleased
+## 2026-09-19: crash reports, sliders, Direct3D 12
 
-### Core, next version
+Released together with Drag'n Wash Localization v1.3.0. The core and the preloader patcher go to 1.3.0, the Tool window and Assets libraries to 1.1.1; the others stay as they are. Everything new is additive: mods built on 1.2 need no change.
+
+### Core 1.3.0
 
 - Experimental. **Crash reports** ([docs/CRASH_REPORTS.md](docs/CRASH_REPORTS.md)): the core keeps a short record of each session in `BepInEx/CrashReports/session.log` (the start with versions, graphics and mods, scene changes, Unity errors and device messages, mod reloads, a heartbeat), flushed line by line; when the next start finds the session did not end cleanly, it writes a report folder with the last notes and the native stack from Unity's crash folder. `CrashReports.Note` lets mods add their own notes. `[Diagnostics] CrashReports`, on. Nothing is sent anywhere.
 - Experimental. Memory dumps: a crash report keeps a copy of Unity's `crash.dmp`, and a watchdog writes a minidump when the game freezes (no frame for 15 s while in front; Unity writes nothing then), `[Diagnostics] HangDumps`, on. Dumps are for private sharing, not public issues.
-- Experimental. **Crash report window**: on Windows the core starts `CrashReporter.exe`, which waits for the game to close and, when it crashed or froze, writes the report and shows it at once in a window of its own (what happened, what to do, details, open the folder, copy the report), in English, Japanese or Chinese. `[Diagnostics] CrashReporterWindow`, on. Not under Wine/Proton.
-- Experimental. On Direct3D 12 the core uploads each changed font atlas once per frame (`[Direct3D12] BatchFontAtlasUploads`, on), which the crash reports showed to be the Tool window's crash, and the Console draws translated text instead of '?' while it does (`GameInfo.FontAtlasUploadsBatched`).
-- The freeze watchdog asks Windows which window is in front rather than Unity, so a game that freezes the moment it comes back (exclusive fullscreen on Direct3D 12, a problem of the game and Unity that the framework leaves alone) is caught too.
-- Experimental. `GameOptions.AddSlider` ([#39](https://github.com/TomXV/dragnwash-modframework/issues/39)): a slider row in the game's own Options screen, built by the game with its own slider (the range at its ends, the value shown while dragging). `OptionsSlider` has Id, Label, Min, Max, Step (values snap to Min + n x Step; 0 is continuous), Section, DefaultValue, GetSaved, Save and Preview, and follows the game's flow like `OptionsChoice`: moving it previews the value and shows Save, Save keeps it, Back returns to the saved value, Set Default. `AddSlider(id, label, step, min, max, getSaved, save, ...)` for the short form.
 - Experimental. `[Diagnostics] TraceGpuUploads` (off, advanced) adds a note for every GPU upload and released GPU resource, with the mod on the calling stack, to find what triggers the Direct3D 12 crash (Unity UUM-140564).
+- Experimental. **Crash report window**: on Windows the core starts `CrashReporter.exe`, which waits for the game to close and, when it crashed or froze, writes the report and shows it at once in a window of its own (what happened, what to do, details, open the folder, copy the report), in English, Japanese or Chinese. `[Diagnostics] CrashReporterWindow`, on. Not under Wine/Proton.
+- The freeze watchdog asks Windows which window is in front rather than Unity, so a game that freezes the moment it comes back (exclusive fullscreen on Direct3D 12, a problem of the game and Unity that the framework leaves alone) is caught too.
+- Experimental. On Direct3D 12 the core uploads each changed font atlas once per frame (`[Direct3D12] BatchFontAtlasUploads`, on), which the crash reports showed to be the Tool window's crash; `GameInfo.FontAtlasUploadsBatched` says when it does.
+- Experimental. `GameOptions.AddSlider` ([#39](https://github.com/TomXV/dragnwash-modframework/issues/39)): a slider row in the game's own Options screen, built by the game with its own slider (the range at its ends, the value shown while dragging). `OptionsSlider` has Id, Label, Min, Max, Step (values snap to Min + n x Step; 0 is continuous), Section, DefaultValue, GetSaved, Save and Preview, and follows the game's flow like `OptionsChoice`: moving it previews the value and shows Save, Save keeps it, Back returns to the saved value, Set Default. `AddSlider(id, label, step, min, max, getSaved, save, ...)` for the short form.
+
+### Tool window 1.1.1
+
+- On Direct3D 12 the Console (and `ToolWindow.Drawable`) draws translated text instead of `?` while the core batches font atlas uploads; with an older core, or with batching off, nothing changes.
+
+### Assets 1.1.1
+
+- `GameFonts.SetLanguage` notes the language in the crash reports' session record, so the crash report window speaks the language chosen in the game.
 
 ## 2026-09-19: saves after the game update
 

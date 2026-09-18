@@ -30,7 +30,7 @@ namespace DragNWash.ModFramework
         /// may still change between minor versions; from 1.0 on, breaking changes
         /// only come with a new major version. Keep in sync with the csproj.
         /// </summary>
-        public const string Version = "1.2.1";
+        public const string Version = "1.3.0";
 
         private static ManualLogSource _log;
         private static readonly Dictionary<string, ModInfo> Infos = new Dictionary<string, ModInfo>(StringComparer.Ordinal);
