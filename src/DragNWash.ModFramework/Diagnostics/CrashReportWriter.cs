@@ -82,7 +82,9 @@ namespace DragNWash.ModFramework.Diagnostics
                 File.Copy(Path.Combine(unityFolder, "crash.dmp"), Path.Combine(dir, "crash.dmp"), overwrite: true);
                 report.AppendLine("crash.dmp: Unity's memory dump of the crash (it holds part of the game's memory: share it privately).");
             }
-            foreach (string hang in Directory.GetDirectories(folder, "*_hang").Where(d => Directory.GetCreationTime(d) >= ended.AddHours(-12) && Directory.GetCreationTime(d) <= ended.AddMinutes(1)))
+            // Freezes of this session only: from its start to its end.
+            DateTime started = Started(lines) ?? ended.AddHours(-12);
+            foreach (string hang in Directory.GetDirectories(folder, "*_hang").Where(d => Directory.GetCreationTime(d) >= started.AddSeconds(-5) && Directory.GetCreationTime(d) <= ended.AddMinutes(1)))
             {
                 report.AppendLine($"The game froze during this session; see {Path.GetFileName(hang)}.");
             }
@@ -142,6 +144,19 @@ namespace DragNWash.ModFramework.Diagnostics
                 i = j + 1;
             }
             return folded.Skip(Math.Max(0, folded.Count - count)).ToList();
+        }
+
+        // "HH:mm:ss.fff f0 main start yyyy-MM-dd ..." gives the session's start.
+        private static DateTime? Started(List<string> lines)
+        {
+            string start = lines.FirstOrDefault(l => l.Contains(" start "));
+            if (start == null) return null;
+            string[] parts = start.Split(' ');
+            int at = Array.IndexOf(parts, "start");
+            if (at < 0 || at + 1 >= parts.Length) return null;
+            return DateTime.TryParseExact(parts[at + 1] + " " + parts[0], "yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime t)
+                ? t
+                : (DateTime?)null;
         }
 
         private static bool IsBeat(string line) => line.IndexOf(" beat ", StringComparison.Ordinal) > 0;
