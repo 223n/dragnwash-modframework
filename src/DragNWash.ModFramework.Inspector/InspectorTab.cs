@@ -72,6 +72,13 @@ namespace DragNWash.ModFramework.Inspector
         private static Vector2 _menuAt;
         private static bool _showHistory;
         private static Vector2 _scrollHistory;
+        // The Rigidbodies list, in place of the members like History.
+        private static bool _showBodies;
+        private static Vector2 _scrollBodies;
+        private static bool _bodiesSelectionOnly;
+        private static bool _bodiesAwakeOnly;
+        private static bool _bodiesFastestFirst = true;
+        private static string _bodiesFilter = "";
         private static readonly HashSet<string> ExpandedLists = new HashSet<string>();
         private static readonly List<RowInfo> Rows = new List<RowInfo>();
         private static string _focusedControl = "";
@@ -100,6 +107,9 @@ namespace DragNWash.ModFramework.Inspector
             TW.AddCommand(TW.Guid, "inspect",
                 "inspect | inspect <name or path> [component] | inspect set <path> <component> <member> <value> | inspect pick",
                 Command, Complete);
+            TW.AddCommand(TW.Guid, "bodies",
+                "bodies | bodies pause | bodies resume | bodies step [count]  (rigidbodies, fastest first; the physics pause is experimental)",
+                InspectorBodies.Command, InspectorBodies.Complete);
         }
 
         // ---- selection (also from TW.Inspect, the console and pick mode) ----
@@ -145,6 +155,8 @@ namespace DragNWash.ModFramework.Inspector
             _target = target;
             // A new selection shows its members, not the history that was open.
             _showHistory = false;
+            _showBodies = false;
+            _bodyNote = "";
             _members = null;
             _rendererUsers = -1;
             Drafts.Clear();
@@ -369,7 +381,7 @@ namespace DragNWash.ModFramework.Inspector
             bool viewOn = InspectorPick.Highlight || InspectorBones.Show || InspectorMesh.Wireframe || InspectorFreeCamera.Active || InspectorDebugView.Active;
             Tool(IconHighlight, "View \u25BE", "Highlight, bones, wireframe, free camera", viewOn, () => OpenToolMenu("view"));
             bx += 6;
-            Tool(IconHistory, InspectorHistory.Count > 0 ? "History " + InspectorHistory.Count : "History", "History of edits", _showHistory, () => _showHistory = !_showHistory);
+            Tool(IconHistory, InspectorHistory.Count > 0 ? "History " + InspectorHistory.Count : "History", "History of edits", _showHistory, () => { _showHistory = !_showHistory; _showBodies = false; });
             Tool(IconRefresh, "Refresh", "Rebuild the tree and reread the members", false, () => { _dirty = true; _members = null; });
             if (x + w - bx < 140)
             {
@@ -436,6 +448,11 @@ namespace DragNWash.ModFramework.Inspector
                 GUI.Label(new Rect(x, y, w, noteHeight), meshNote, _warningCell);
                 y += noteHeight;
             }
+            if (InspectorBodies.Paused)
+            {
+                GUI.Label(new Rect(x, y, w, row), "Physics paused (experimental): Step moves it one fixed step; Resume or closing the window puts it back.", _accentCell);
+                y += row;
+            }
             if (InspectorDebugView.Active)
             {
                 GUI.Label(new Rect(x, y, w, row), InspectorDebugView.Status(), _accentCell);
@@ -461,6 +478,7 @@ namespace DragNWash.ModFramework.Inspector
             {
                 var pane = new Rect(x, y, w, bodyHeight);
                 if (_page == 0 && _showHierarchy) DrawHierarchy(pane, s, row);
+                else if (_showBodies) DrawBodies(pane, s, row);
                 else if (_showHistory) DrawHistory(pane, s, row);
                 else DrawMembers(pane, s, row);
             }
@@ -469,12 +487,14 @@ namespace DragNWash.ModFramework.Inspector
                 float gap = 8;
                 float w1 = (w - gap) * 0.32f, w2 = (w - gap) - w1;
                 DrawHierarchy(new Rect(x, y, w1, bodyHeight), s, row);
-                if (_showHistory) DrawHistory(new Rect(x + w1 + gap, y, w2, bodyHeight), s, row);
+                if (_showBodies) DrawBodies(new Rect(x + w1 + gap, y, w2, bodyHeight), s, row);
+                else if (_showHistory) DrawHistory(new Rect(x + w1 + gap, y, w2, bodyHeight), s, row);
                 else DrawMembers(new Rect(x + w1 + gap, y, w2, bodyHeight), s, row);
             }
             else
             {
-                if (_showHistory) DrawHistory(new Rect(x, y, w, bodyHeight), s, row);
+                if (_showBodies) DrawBodies(new Rect(x, y, w, bodyHeight), s, row);
+                else if (_showHistory) DrawHistory(new Rect(x, y, w, bodyHeight), s, row);
                 else DrawMembers(new Rect(x, y, w, bodyHeight), s, row);
             }
             if (ev.type == EventType.Repaint)
@@ -537,11 +557,19 @@ namespace DragNWash.ModFramework.Inspector
                 items.Add(("Debug view: what the search text matches", InspectorDebugView.Mode == InspectorDebugView.Scope.Filter, () => { InspectorDebugView.Filter = _search ?? ""; InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Filter ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Filter; }, true));
                 items.Add(("Colliders and triggers", InspectorDebugView.Colliders, () => InspectorDebugView.Colliders = !InspectorDebugView.Colliders, true));
                 items.Add(("Lights", InspectorDebugView.Lights, () => InspectorDebugView.Lights = !InspectorDebugView.Lights, true));
+                if (InspectorBodies.Available)
+                {
+                    items.Add(("Rigidbodies: centre of mass and velocity", InspectorDebugView.Bodies, () => InspectorDebugView.Bodies = !InspectorDebugView.Bodies, true));
+                }
                 items.Add(("    of the selection only", InspectorDebugView.SelectionOnly, () => InspectorDebugView.SelectionOnly = !InspectorDebugView.SelectionOnly, true));
                 items.Add(("    collider and light shapes", InspectorDebugView.Shapes, () => InspectorDebugView.Shapes = !InspectorDebugView.Shapes, true));
                 items.Add(("    draw screen rectangles", InspectorDebugView.Rects, () => InspectorDebugView.Rects = !InspectorDebugView.Rects, true));
                 items.Add(("    draw 3D boxes", InspectorDebugView.Boxes, () => InspectorDebugView.Boxes = !InspectorDebugView.Boxes, true));
                 items.Add(("    names (near the pointer when many)", InspectorDebugView.Names, () => InspectorDebugView.Names = !InspectorDebugView.Names, true));
+                if (InspectorBodies.Available)
+                {
+                    items.Add(("Rigidbodies list", _showBodies, () => { _showBodies = !_showBodies; if (_showBodies) { _showHistory = false; if (_page == 0) _page = 1; } }, false));
+                }
             }
             float lineH = row - 2;
             float width = 200;
@@ -809,6 +837,137 @@ namespace DragNWash.ModFramework.Inspector
             GUI.EndGroup();
             MenuScrollbar(box, contentHeight, _menuScroll);
             Swallow(ev, box);
+        }
+
+        // The outcome of the last rigidbody button.
+        private static string _bodyNote = "";
+
+        // ---- rigidbodies ------------------------------------------------------------------------
+
+        // Buttons laid out left to right, onto a new line when the pane is too narrow.
+        private static bool FlowButton(ref float bx, ref float y, float x, float w, float width, string label, bool on, ToolWindowStyles s, float row)
+        {
+            if (bx > x && bx + width > x + w)
+            {
+                bx = x;
+                y += row + 2;
+            }
+            bool clicked = GUI.Button(new Rect(bx, y, width, row), label, on ? s.SelectedButton : s.Button);
+            bx += width + 6;
+            return clicked;
+        }
+
+        private static float ButtonWidth(ToolWindowStyles s, string label) => Mathf.Max(60, s.Button.CalcSize(new GUIContent(label)).x + 14);
+
+        // The physics pause and step, shared by the list and a selected body.
+        private static void PhysicsButtons(ref float bx, ref float y, float x, float w, ToolWindowStyles s, float row)
+        {
+            string pause = InspectorBodies.Paused ? "Resume physics" : "Pause physics";
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, pause), pause, InspectorBodies.Paused, s, row))
+            {
+                _bodyNote = InspectorBodies.Paused ? InspectorBodies.Resume() : InspectorBodies.Pause();
+            }
+            if (InspectorBodies.Paused && FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Step"), "Step", false, s, row))
+            {
+                _bodyNote = InspectorBodies.Step();
+            }
+        }
+
+        // A selected Rigidbody or Rigidbody2D: what it is doing, and buttons to stop it,
+        // switch it kinematic, put it to sleep or wake it, and pause the physics.
+        private static float DrawBodyControls(Component body, float x, float y, float w, ToolWindowStyles s, float row)
+        {
+            GUI.Label(new Rect(x, y, w, row), InspectorBodies.Describe(body), _accentCell);
+            y += row;
+            float bx = x;
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Stop"), "Stop", false, s, row))
+            {
+                _bodyNote = InspectorBodies.Stop(body);
+            }
+            bool kinematic = InspectorBodies.Kinematic(body);
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Kinematic"), "Kinematic", kinematic, s, row))
+            {
+                _bodyNote = InspectorBodies.SetKinematic(body, !kinematic, WhereLabel());
+            }
+            string sleep = InspectorBodies.Sleeping(body) ? "Wake" : "Sleep";
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, sleep), sleep, false, s, row))
+            {
+                _bodyNote = InspectorBodies.SleepOrWake(body);
+            }
+            PhysicsButtons(ref bx, ref y, x, w, s, row);
+            y += row;
+            if (!string.IsNullOrEmpty(_bodyNote))
+            {
+                GUI.Label(new Rect(x, y, w, row), Drawable(_bodyNote), _mutedCell);
+                y += row;
+            }
+            return y + 4;
+        }
+
+        private static void DrawBodies(Rect pane, ToolWindowStyles s, float row)
+        {
+            TW.Fill(pane, TW.InsetColor);
+            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
+            List<Component> found = InspectorBodies.In(SelectedObject, _bodiesSelectionOnly);
+            var shown = new List<Component>();
+            foreach (Component c in found)
+            {
+                if (c == null) continue;
+                if (_bodiesAwakeOnly && InspectorBodies.Sleeping(c)) continue;
+                if (!string.IsNullOrEmpty(_bodiesFilter) && c.name.IndexOf(_bodiesFilter, StringComparison.OrdinalIgnoreCase) < 0 && c.GetType().Name.IndexOf(_bodiesFilter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                shown.Add(c);
+            }
+            if (_bodiesFastestFirst)
+            {
+                shown.Sort((a, b) => InspectorBodies.Velocity(b).sqrMagnitude.CompareTo(InspectorBodies.Velocity(a).sqrMagnitude));
+            }
+            string where = _bodiesSelectionOnly ? (SelectedObject != null ? "under " + SelectedObject.name : "under the selection (nothing selected)") : "in the scene";
+            GUI.Label(new Rect(x, y, w, row), Drawable($"Rigidbodies {where}: {shown.Count} of {found.Count} shown."), _mutedCell);
+            y += row;
+            if (!string.IsNullOrEmpty(_bodyNote))
+            {
+                GUI.Label(new Rect(x, y, w, row), Drawable(_bodyNote), _mutedCell);
+                y += row;
+            }
+            float bx = x;
+            string scope = _bodiesSelectionOnly ? "Selection's children" : "Whole scene";
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Selection's children"), scope, _bodiesSelectionOnly, s, row)) _bodiesSelectionOnly = !_bodiesSelectionOnly;
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Awake only"), "Awake only", _bodiesAwakeOnly, s, row)) _bodiesAwakeOnly = !_bodiesAwakeOnly;
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Fastest first"), "Fastest first", _bodiesFastestFirst, s, row)) _bodiesFastestFirst = !_bodiesFastestFirst;
+            PhysicsButtons(ref bx, ref y, x, w, s, row);
+            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "< Members"), "< Members", false, s, row)) _showBodies = false;
+            y += row + 4;
+            var filterRect = new Rect(x, y, w, row);
+            _bodiesFilter = GUI.TextField(filterRect, _bodiesFilter ?? "", s.TextField);
+            Underline(filterRect);
+            if (string.IsNullOrEmpty(_bodiesFilter))
+            {
+                GUI.Label(new Rect(filterRect.x + 6, filterRect.y, filterRect.width - 6, row), "Filter by name or type", s.MutedLabel);
+            }
+            y += row + 4;
+            var view = new Rect(x, y, w, pane.yMax - y - 2);
+            float inner = view.width - 20;
+            float lineH = row * 2;
+            TW.ApplyScroll(view, ref _scrollBodies);
+            _scrollBodies = GUI.BeginScrollView(view, _scrollBodies, new Rect(0, 0, inner, Mathf.Max(view.height, shown.Count * lineH)), false, false);
+            float ry = 0;
+            foreach (Component c in shown)
+            {
+                if (ry + lineH >= _scrollBodies.y && ry <= _scrollBodies.y + view.height)
+                {
+                    bool selected = ReferenceEquals(_target, c);
+                    GUI.Label(new Rect(0, ry, inner - 84, row), Drawable(c.name + "  (" + c.GetType().Name + ")"), selected ? _accentCell : _cell);
+                    GUI.Label(new Rect(0, ry + row, inner - 84, row), InspectorBodies.Describe(c), _mutedCell);
+                    if (GUI.Button(new Rect(inner - 78, ry + 2, 74, row - 4), "Select", s.Button))
+                    {
+                        Select(c);
+                        // Selecting from the list keeps the list open, for going through them.
+                        _showBodies = true;
+                    }
+                }
+                ry += lineH;
+            }
+            GUI.EndScrollView();
         }
 
         // ---- the History view ----------------------------------------------------------------
@@ -1090,6 +1249,11 @@ namespace DragNWash.ModFramework.Inspector
             {
                 InspectorCode.Draw(new Rect(x, y, w, pane.yMax - y - 2), _target, s, row);
                 return;
+            }
+
+            if (_target is Component body && InspectorBodies.IsBody(body))
+            {
+                y = DrawBodyControls(body, x, y, w, s, row);
             }
 
             // The rows. Values are read on Repaint only, and kept while frozen.

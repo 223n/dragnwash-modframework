@@ -62,6 +62,15 @@ Tool window の **Inspector** タブ。シーンのオブジェクトとその�
 
 保存できるようになる前でも作る価値があるのは、この部分のためです。ここで見つけた色や smoothness の値は、のちの上書きファイルに書くものそのもので、翻訳者のテクスチャ作業も、それを表示しているマテリアルから Go ボタン 1 つの距離になります。
 
+## Rigidbody
+
+実験的。ゲームは Rigidbody で物を動かします（たとえばマスばねのコントローラーが力を加えて動かします）。そこで Inspector は Rigidbody を読み、一覧にし、いくつかのスイッチを操作します。物理モジュールは参照しません。`Rigidbody` と `Rigidbody2D` はコライダーと同じく名前で探してリフレクションで読むので、モジュールがなくてもライブラリは読み込めます。Unity 6 で `velocity` が `linearVelocity` に名前が変わったので、両方を試します。
+
+- **デバッグ表示。** 表示 → **Rigidbodies: centre of mass and velocity** で、各ボディの重心に十字、進む向きに矢印（いまの速度で 0.25 秒ぶん進む長さ）を描き、速さ・回転の速さ・質量・種類（dynamic、kinematic、static）・スリープ中かをタグに出します。スリープ中のボディは灰色です。**of the selection only** で、コライダーやライトと同じく、選択とその子だけに絞れます。
+- **一覧。** 表示 → **Rigidbodies list** で、シーンの（または選択の下の）有効な Rigidbody と Rigidbody2D を、History と同じくメンバーの代わりに出します。名前・型・いまの動きを速い順に並べ、**Awake only** と名前・型での絞り込みがあります。**Select** でボディを開き、一覧は開いたままなので順に見ていけます。
+- **操作。** Rigidbody か Rigidbody2D を選ぶと、いまの動きを示す行と、メンバーの上にボタンが出ます。**Stop**（速度と回転を 0 に）、**Kinematic**（オンとオフ。`isKinematic`、Rigidbody2D では `bodyType`。History に残るので Revert で戻せます）、**Sleep** / **Wake**。
+- **Pause physics**（Inspector の中でもさらに実験的）。`Physics.simulationMode` と `Physics2D.simulationMode` を Script にしてボディをその場に止め、**Step** で物理を固定ステップ 1 つぶん進めます（`Physics.Simulate(Time.fixedDeltaTime)`）。ゲームのスクリプトは動き続けるので、その間に加えられた力は次のステップで効きます。**Resume physics**、窓を閉じる、開発者ツールをオフにする、のどれでも、モードはゲームが持っていた値に戻ります。
+
 ## 安全策
 
 - **開発者ツールの中だけ。** 窓のほかの部分と同じく、スイッチがオンの間だけタブがあります。
@@ -77,6 +86,7 @@ Tool window の **Inspector** タブ。シーンのオブジェクトとその�
 - `inspect` でヒエラルキーのルートを一覧。`inspect <名前またはパス>` でオブジェクトを選び（パスの区切りは `/`。パスでなければ名前の最初の一致）、タブをそこに開く。`inspect <パス> <コンポーネント>` でコンポーネントを選ぶ。
 - `inspect set <パス> <コンポーネント> <メンバー> <値>` で、行と同じ解釈で Console から 1 つの値を入れる。手で打つ用で、スクリプト言語は相変わらずありません。
 - 補完は、いまの検索に合うオブジェクト名と、パスのあとにそのコンポーネント名を出します。
+- `bodies` でシーンの Rigidbody を速い順に、速さ・質量・種類・スリープとともに一覧。`bodies pause`、`bodies resume`、`bodies step [回数]` で物理の一時停止を操作します（実験的）。
 
 ## Mod 作者向け
 

@@ -62,6 +62,15 @@ Shader keywords (`_ALPHATEST_ON` and the like) are listed with a toggle each. Ch
 
 This part is the reason the tab is worth building even before it can save anything: a colour or a smoothness value found here is exactly what a later overrides file records, and a translator's texture work is a Go button away from the material that shows it.
 
+## Rigidbodies
+
+Experimental. The game moves things with Rigidbodies (its mass-spring controller pushes them with forces, for one), so the Inspector reads them, lists them and drives a few of their switches. The physics modules are not referenced: `Rigidbody` and `Rigidbody2D` are found by name and read through reflection, as colliders are, so the library still loads if a module is missing. Unity 6 renamed `velocity` to `linearVelocity`; both are tried.
+
+- **Debug view.** View → **Rigidbodies: centre of mass and velocity** draws a cross on each body's centre of mass and an arrow for where it is heading (a quarter of a second of travel at its current velocity), with a tag giving its speed, turning speed, mass, kind (dynamic, kinematic, static) and whether it is asleep. A sleeping body is grey. **Of the selection only** limits it to the selection and its children, as for colliders and lights.
+- **List.** View → **Rigidbodies list** shows every active Rigidbody and Rigidbody2D in the scene, or only under the selection, in place of the members (like History): name, type and what it is doing, fastest first, with **Awake only** and a filter by name or type. **Select** opens a body and keeps the list open for going through them.
+- **Controls.** A selected Rigidbody or Rigidbody2D gets a line saying what it is doing and buttons above its members: **Stop** (velocity and turning to zero), **Kinematic** (on and off; `isKinematic`, or `bodyType` for a Rigidbody2D; kept in History, so Revert puts it back), **Sleep** / **Wake**.
+- **Pause physics** (experimental even within the Inspector). Switches `Physics.simulationMode` and `Physics2D.simulationMode` to Script, so bodies stay where they are, and **Step** moves the physics one fixed step (`Physics.Simulate(Time.fixedDeltaTime)`). The game's scripts keep running, so forces they add meanwhile arrive with the next step. **Resume physics**, closing the window and switching developer tools off all put the modes back as the game had them.
+
 ## Safety
 
 - **Developer tools only.** The tab exists only while the switch is on, like the rest of the window.
@@ -77,6 +86,7 @@ This part is the reason the tab is worth building even before it can save anythi
 - `inspect` lists the hierarchy's root objects; `inspect <name or path>` selects an object (path segments separated by `/`, the first match by name when there is no path) and opens the tab on it; `inspect <path> <component>` selects the component.
 - `inspect set <path> <component> <member> <value>` sets one value from the console, with the same parsing as the row. For scripts one runs by hand; there is still no scripting language.
 - Completion offers object names for the current search and, after a path, its component names.
+- `bodies` lists the scene's rigidbodies, fastest first, with their speed, mass, kind and sleep; `bodies pause`, `bodies resume` and `bodies step [count]` drive the physics pause (experimental).
 
 ## For mod authors
 

@@ -12,7 +12,8 @@ namespace DragNWash.ModFramework.Inspector
     // search text by name or component type), colliders and lights can be
     // added (they have no look of their own), and each entry is drawn as a
     // screen rectangle, a 3D box, or both, coloured by kind, with names on the
-    // ones near the pointer when there are many.
+    // ones near the pointer when there are many. Rigidbodies add a cross on
+    // their centre of mass and an arrow for their velocity.
     internal static class InspectorDebugView
     {
         internal enum Scope { Off, Visible, Children, Filter }
@@ -20,6 +21,7 @@ namespace DragNWash.ModFramework.Inspector
         internal static Scope Mode = Scope.Off;
         internal static bool Colliders;
         internal static bool Lights;
+        internal static bool Bodies;
         // Colliders and lights of the selection and its children only, rather than the whole scene.
         internal static bool SelectionOnly = true;
         internal static bool Rects = true;
@@ -29,7 +31,7 @@ namespace DragNWash.ModFramework.Inspector
         internal static bool Names = true;
         internal static string Filter = "";
 
-        private enum Kind { Renderer, Ui, Collider, Trigger, Light }
+        private enum Kind { Renderer, Ui, Collider, Trigger, Light, Body }
 
         private sealed class Entry
         {
@@ -40,6 +42,7 @@ namespace DragNWash.ModFramework.Inspector
             public string Label;
             public Component Collider;  // for the true shape of a collider
             public Light Light;         // for the reach of a light
+            public Component Body;      // a Rigidbody or Rigidbody2D, read live
         }
 
         private static readonly List<Entry> Entries = new List<Entry>();
@@ -52,15 +55,17 @@ namespace DragNWash.ModFramework.Inspector
         private static readonly Color ColliderColor = new Color(0.45f, 0.95f, 0.45f, 0.85f);
         private static readonly Color TriggerColor = new Color(0.98f, 0.85f, 0.3f, 0.85f);
         private static readonly Color LightColor = new Color(1f, 0.6f, 0.25f, 0.9f);
+        private static readonly Color BodyColor = new Color(0.7f, 0.55f, 1f, 0.95f);
+        private static readonly Color SleepingColor = new Color(0.6f, 0.6f, 0.68f, 0.85f);
 
-        internal static bool Active => Mode != Scope.Off || Colliders || Lights;
+        internal static bool Active => Mode != Scope.Off || Colliders || Lights || Bodies;
 
         internal static string Status()
         {
             if (!Active) return "";
             string what = Mode == Scope.Visible ? "everything the camera sees" : Mode == Scope.Children ? "the selection's children" : Mode == Scope.Filter ? $"\"{Filter}\" by name or component" : "nothing";
             string where = SelectionOnly ? " of the selection" : " in the scene";
-            string extras = Colliders || Lights ? (Colliders ? " + colliders" : "") + (Lights ? " + lights" : "") + where : "";
+            string extras = Colliders || Lights || Bodies ? (Colliders ? " + colliders" : "") + (Lights ? " + lights" : "") + (Bodies ? " + rigidbodies" : "") + where : "";
             return $"Debug view: {what}{extras}, {Entries.Count} shown{(Entries.Count >= Cap ? " (capped)" : "")}.";
         }
 
@@ -150,6 +155,18 @@ namespace DragNWash.ModFramework.Inspector
                     if (Entries.Count >= Cap) break;
                 }
             }
+            if (Bodies)
+            {
+                // Outlined by what draws them; a body with no renderer gets a small box on its centre of mass.
+                foreach (Component b in InspectorBodies.In(selected, SelectionOnly && selected != null))
+                {
+                    if (b == null) continue;
+                    Renderer rend = b.GetComponentInChildren<Renderer>();
+                    Bounds world = rend != null ? rend.bounds : new Bounds(InspectorBodies.CenterOfMass(b), Vector3.one * 0.2f);
+                    Entries.Add(new Entry { Object = b.gameObject, Kind = Kind.Body, World = world, HasWorld = true, Body = b, Label = b.gameObject.name + " (" + b.GetType().Name + ")" });
+                    if (Entries.Count >= Cap) break;
+                }
+            }
         }
 
         // Every Collider component, scene-wide or under the selection. The type
@@ -231,7 +248,7 @@ namespace DragNWash.ModFramework.Inspector
                 }
                 rects.Add(new KeyValuePair<Entry, Rect>(e, r));
             }
-            if ((Boxes || Shapes) && InspectorGizmo.Lines != null)
+            if ((Boxes || Shapes || Bodies) && InspectorGizmo.Lines != null)
             {
                 InspectorGizmo.Lines.SetPass(0);
                 GL.PushMatrix();
@@ -240,7 +257,13 @@ namespace DragNWash.ModFramework.Inspector
                 foreach (KeyValuePair<Entry, Rect> kv in rects)
                 {
                     Entry e = kv.Key;
-                    GL.Color(ColorOf(e.Kind));
+                    GL.Color(ColorOf(e));
+                    if (e.Body != null)
+                    {
+                        InspectorBodies.DrawMarks(cam, e.Body);
+                        if (Boxes) Box(cam, e.World);
+                        continue;
+                    }
                     // A collider knows its own form (box, sphere, capsule,
                     // mesh) and a light its reach; the bounds box stands in for
                     // the rest, and for a shape that cannot be read.
@@ -259,7 +282,7 @@ namespace DragNWash.ModFramework.Inspector
             bool nameAll = rects.Count <= 12 || !Names;
             foreach (KeyValuePair<Entry, Rect> kv in rects)
             {
-                Color c = ColorOf(kv.Key.Kind);
+                Color c = ColorOf(kv.Key);
                 if (Rects || !kv.Key.HasWorld)
                 {
                     Outline(kv.Value, c, 1);
@@ -267,6 +290,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (Names && (nameAll || kv.Value.Contains(ev.mousePosition) || Vector2.Distance(ev.mousePosition, kv.Value.center) < 40))
                 {
                     string label = kv.Key.Label;
+                    if (kv.Key.Body != null) label += "  " + InspectorBodies.Describe(kv.Key.Body);
                     if (Shapes && kv.Key.Collider != null && InspectorColliderShape.IsScanned(kv.Key.Collider))
                     {
                         // Simulated with rays: the real shape may differ.
@@ -277,9 +301,10 @@ namespace DragNWash.ModFramework.Inspector
             }
         }
 
-        private static Color ColorOf(Kind k)
+        private static Color ColorOf(Entry e)
         {
-            switch (k)
+            if (e.Body != null) return InspectorBodies.Sleeping(e.Body) ? SleepingColor : BodyColor;
+            switch (e.Kind)
             {
                 case Kind.Ui: return UiColor;
                 case Kind.Collider: return ColliderColor;

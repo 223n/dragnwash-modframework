@@ -76,9 +76,9 @@ namespace DragNWash.ModFramework.Inspector
                     InspectorBones.OnGUI(window, InspectorTab.SelectedObject);
                     InspectorGizmo.OnGUI(window, InspectorTab.SelectedObject);
                 });
-                TW.OpenChanged += open => { if (!open) InspectorPick.End(); };
+                TW.OpenChanged += open => { if (!open) { InspectorPick.End(); if (InspectorBodies.Paused) InspectorBodies.Resume(); } };
                 // The free camera is a developer tool too: off with the switch.
-                DeveloperTools.Changed += () => { if (!DeveloperTools.Enabled) InspectorFreeCamera.Stop(); };
+                DeveloperTools.Changed += () => { if (!DeveloperTools.Enabled) { InspectorFreeCamera.Stop(); if (InspectorBodies.Paused) InspectorBodies.Resume(); } };
             }
             catch (Exception ex)
             {
@@ -97,6 +97,7 @@ namespace DragNWash.ModFramework.Inspector
         private void OnDestroy()
         {
             InspectorFreeCamera.Stop();
+            if (InspectorBodies.Paused) InspectorBodies.Resume();
             TW.BlockGameInput(Inspector.Guid, false);
             _overlay?.Dispose();
         }
