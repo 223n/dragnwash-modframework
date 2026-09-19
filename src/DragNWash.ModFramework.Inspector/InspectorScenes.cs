@@ -34,7 +34,7 @@ namespace DragNWash.ModFramework.Inspector
     {
         private static bool _looked;
         private static Type _state, _flow, _menuManager, _transition, _levelLoad, _sceneLoader, _loadDescription;
-        private static FieldInfo _stateInstance, _currentLevel, _levelFlow, _menuInstance;
+        private static FieldInfo _stateInstance, _currentLevel, _levelFlow, _menuInstance, _dragonStateField;
         private static MethodInfo _levelCount, _dragonOf, _weatherOf, _dragonState, _cleanPercentage, _skip, _sparkle, _startLevel, _processTransition, _loadScene;
 
         private static void Look()
@@ -54,6 +54,7 @@ namespace DragNWash.ModFramework.Inspector
                 _stateInstance = _state.GetField("instance", Any);
                 _currentLevel = _state.GetField("currentLevel", Any);
                 _levelFlow = _state.GetField("levelFlow", Any);
+                _dragonStateField = _state.GetField("dragonState", Any);
                 _dragonState = _state.GetMethod("GetDragonState", Any, null, Type.EmptyTypes, null);
                 _cleanPercentage = _state.GetMethod("GetCleanPercentage", Any, null, Type.EmptyTypes, null);
                 _skip = _state.GetMethod("SkipLevel", Any, null, Type.EmptyTypes, null);
@@ -273,6 +274,15 @@ namespace DragNWash.ModFramework.Inspector
             BeginTrial("started level " + (level + 1));
             try
             {
+                // The game moves a dragon through its states in order and
+                // ignores a jump (WaitingOnBeingWashed -> WaitingToAppear), which
+                // left the new dragon at its spawn point. Exited comes right
+                // before WaitingToAppear; it is set on the field, so the game's
+                // own "level ended" (which saves) does not run.
+                if (_dragonStateField != null && _dragonStateField.FieldType.IsEnum)
+                {
+                    _dragonStateField.SetValue(state, Enum.Parse(_dragonStateField.FieldType, "Exited"));
+                }
                 _currentLevel.SetValue(state, level);
                 _startLevel.Invoke(state, null);
             }
