@@ -1382,6 +1382,18 @@ namespace DragNWash.ModFramework.Inspector
             GUI.EndScrollView();
         }
 
+        private static string FitPath(string path, float width, GUIStyle style)
+        {
+            if (string.IsNullOrEmpty(path) || style == null || style.CalcSize(new GUIContent(Drawable(path))).x <= width) return path;
+            string[] parts = path.Split('/');
+            for (int first = 1; first < parts.Length; first++)
+            {
+                string cut = "…/" + string.Join("/", parts, first, parts.Length - first);
+                if (style.CalcSize(new GUIContent(Drawable(cut))).x <= width || first == parts.Length - 1) return cut;
+            }
+            return path;
+        }
+
         // Room kept for a name in the tree, and the width of one level.
         private const float TreeNameRoom = 120;
         private const float MaxStep = 18;
@@ -1480,8 +1492,11 @@ namespace DragNWash.ModFramework.Inspector
                         {
                             TW.Fill(new Rect(0, ry, inner, row), TW.PanelColor);
                         }
-                        string text = _results != null ? n.Path : n.Name;
-                        if (GUI.Button(label, Drawable(text), selected ? _accentCell : (n.Active ? _cell : _mutedCell)))
+                        GUIStyle cellStyle = selected ? _accentCell : (n.Active ? _cell : _mutedCell);
+                        // A search result's path, cut from the front when it is too
+                        // wide, so the object's own name stays in view.
+                        string text = _results != null ? FitPath(n.Path, label.width, cellStyle) : n.Name;
+                        if (GUI.Button(label, Drawable(text), cellStyle))
                         {
                             SelectObject(n.Transform.gameObject);
                             _page = 1;
