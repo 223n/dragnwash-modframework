@@ -8,6 +8,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - The wireframe is drawn whole for detailed meshes (parts of a dragon were missing): each renderer gets a mesh of its edges, built once (each edge once) and drawn with the camera's matrices. Before, every line went through GL immediate mode each frame, which dropped vertices past about 65,000 and, sent whole, uploaded megabytes a frame and crashed Direct3D 12 (UUM-140564); now only a skinned mesh's positions go up each frame.
 - A deep tree (a rig's bones) no longer pushes names out of the tree pane: its levels get narrower, and when even that is not enough, the levels above every row in view are left out.
+- The debug view's names keep clear of the selection's name and of each other (moved above, or below the outline when there is no room), instead of being drawn over them.
 
 ## 2026-09-19: crash reports, sliders, Direct3D 12
 

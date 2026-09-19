@@ -113,6 +113,10 @@ namespace DragNWash.ModFramework.Inspector
         // The object's name at the outline's top-left corner, on a dark strip,
         // kept on screen.
         private static GUIStyle _tagStyle;
+        // Where the selection's name was drawn, and in which frame, so the
+        // debug view's names can keep out of its way.
+        internal static Rect LastTag;
+        internal static int LastTagFrame = -10;
 
         private static void Tag(Rect outline, string text, Color color)
         {
@@ -136,6 +140,8 @@ namespace DragNWash.ModFramework.Inspector
                 y = Mathf.Min(outline.yMin + 2, Screen.height - size.y - 4);
             }
             var strip = new Rect(x, y, size.x + 8, size.y + 2);
+            LastTag = strip;
+            LastTagFrame = Time.frameCount;
             TW.Fill(strip, new Color(0.06f, 0.06f, 0.08f, 0.9f));
             TW.Fill(new Rect(strip.x, strip.yMax - 2, strip.width, 2), color);
             GUI.Label(new Rect(strip.x + 4, strip.y, size.x, size.y), content, style);

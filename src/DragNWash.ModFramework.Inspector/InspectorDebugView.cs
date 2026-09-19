@@ -206,6 +206,10 @@ namespace DragNWash.ModFramework.Inspector
             {
                 return;
             }
+            // Names already on screen this frame: the selection's (drawn after
+            // the debug view, so last frame's place) and each tag as it goes.
+            Placed.Clear();
+            if (InspectorPick.Highlight && Time.frameCount - InspectorPick.LastTagFrame <= 2) Placed.Add(InspectorPick.LastTag);
             Camera cam = Camera.main;
             if (cam == null)
             {
@@ -327,6 +331,7 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         private static GUIStyle _tagStyle;
+        private static readonly List<Rect> Placed = new List<Rect>();
 
         private static void Tag(Rect outline, string text, Color color)
         {
@@ -341,6 +346,16 @@ namespace DragNWash.ModFramework.Inspector
             float y = outline.yMin - size.y - 2;
             if (y < 0) y = Mathf.Min(outline.yMin + 2, Screen.height - size.y - 4);
             var strip = new Rect(x, y, size.x + 8, size.y + 2);
+            // Moved up past any name it would cover, or below its outline when
+            // there is no room above.
+            for (int tries = 0; tries < 8; tries++)
+            {
+                Rect hit = Placed.Find(p => p.Overlaps(strip));
+                if (hit.width <= 0) break;
+                strip.y = hit.yMin - strip.height - 1;
+                if (strip.y < 0) strip.y = Mathf.Min(Mathf.Max(hit.yMax, outline.yMin) + 1, Screen.height - strip.height);
+            }
+            Placed.Add(strip);
             TW.Fill(strip, new Color(0.06f, 0.06f, 0.08f, 0.85f));
             TW.Fill(new Rect(strip.x, strip.yMax - 2, strip.width, 2), color);
             GUI.Label(new Rect(strip.x + 4, strip.y, size.x, size.y), content, _tagStyle);
