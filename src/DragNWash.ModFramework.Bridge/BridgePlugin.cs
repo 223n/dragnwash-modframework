@@ -21,9 +21,11 @@ namespace DragNWash.ModFramework.Bridge
     {
         internal static ManualLogSource Log;
         internal static BridgeServer Server;
+        private static bool? _runInBackground;   // the game's own setting, while the Bridge overrides it
 
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<int> _port;
+        private ConfigEntry<string> _openIn;
         private string _note = "";
         private Vector2 _scroll;
 
@@ -35,6 +37,10 @@ namespace DragNWash.ModFramework.Bridge
                     null, new SettingMeta { DisplayName = "Let AI clients read the game (MCP)" }));
             _port = Config.Bind("Bridge", "Port", 47821,
                 new ConfigDescription("The port on 127.0.0.1 the Bridge listens on.", new AcceptableValueRange<int>(1024, 65535), new SettingMeta { Advanced = true }));
+
+            _openIn = Config.Bind("Bridge", "OpenPageIn", "App",
+                new ConfigDescription("Where the code graph opens: App (a window of its own, CodeGraph.exe, on Windows) or Browser. Without the app, and off Windows, it opens in the browser.",
+                    new AcceptableValueList<string>("App", "Browser"), new SettingMeta { DisplayName = "Open the code graph in" }));
 
             ModFramework.Register(new ModInfo
             {
@@ -61,6 +67,7 @@ namespace DragNWash.ModFramework.Bridge
             DeveloperTools.Changed += Apply;
 
             TW.AddTab(Bridge.Guid, "Bridge", DrawTab, 150);
+            RegisterPageOperation();
             TW.AddCommand(Bridge.Guid, "bridge", "bridge | bridge on | bridge off | bridge token new | bridge disconnect  (AI clients over MCP; read-only)", Command);
             Apply();
         }
@@ -87,6 +94,10 @@ namespace DragNWash.ModFramework.Bridge
                 var server = new BridgeServer(_port.Value);
                 server.Start();
                 Server = server;
+                // The game stops when its window is not in front, and a client (the
+                // browser, above all) takes the front: keep answering while listening.
+                if (_runInBackground == null) _runInBackground = Application.runInBackground;
+                Application.runInBackground = true;
                 _note = "";
                 Log.LogInfo($"[bridge] Listening on http://127.0.0.1:{_port.Value}/mcp (read-only, this computer only).");
             }
@@ -103,8 +114,57 @@ namespace DragNWash.ModFramework.Bridge
             if (Server == null) return;
             Server.Stop();
             Server = null;
+            if (_runInBackground != null)
+            {
+                Application.runInBackground = _runInBackground.Value;
+                _runInBackground = null;
+            }
             McpProtocol.EndAll();
+            PageDoor.EndAll();
             Log.LogInfo($"[bridge] Stopped: {why}.");
+        }
+
+        // Opens the page on this computer (docs/CODE_GRAPH.md) with a one-time
+        // code after '#', which browsers never send to a server. A write
+        // operation, so MCP never offers it; the Inspector's Graph button and
+        // the console call it.
+        private void RegisterPageOperation()
+        {
+            Operations.Register(Bridge.Guid, "bridge.page.open", "Opens the Bridge's page on this computer in the browser, signed in, optionally at a method or type of the game's code.", OperationKind.Write,
+                "a line saying it opened",
+                args =>
+                {
+                    if (Server == null) throw new InvalidOperationException(_enabled.Value ? "The Bridge is not listening (the developer tools are off, or the port is taken)." : "The Bridge is off: turn it on in the Bridge tab of the F1 window.");
+                    string focus = args.String("focus");
+                    if (OpenInApp(focus)) return "Opened the code graph in its window.";
+                    string url = $"http://127.0.0.1:{_port.Value}/page#code={PageDoor.NewCode()}";
+                    if (!string.IsNullOrEmpty(focus)) url += "&focus=" + Uri.EscapeDataString(focus);
+                    Application.OpenURL(url);
+                    return "Opened the page in the browser (the link works once, within a minute).";
+                },
+                Operations.Parameter("focus", OperationType.String, "What to show: m:<method id> or t:<type name>; the search when left out."));
+        }
+
+        // CodeGraph.exe, next to this DLL, on Windows: it signs in with the token by itself,
+        // and a window already open takes the focus instead of a second one opening.
+        private bool OpenInApp(string focus)
+        {
+            if (_openIn.Value != "App" || Application.platform != RuntimePlatform.WindowsPlayer) return false;
+            string exe = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(BridgePlugin).Assembly.Location) ?? "", "CodeGraph", "CodeGraph.exe");
+            if (!System.IO.File.Exists(exe)) return false;
+            try
+            {
+                string arguments = $"--from-game --port {_port.Value}" + (string.IsNullOrEmpty(focus) ? "" : " --focus \"" + focus.Replace("\"", "") + "\"");
+                // Through the shell: a child started directly inherits the game's handles, the
+                // Bridge's listening socket among them, and would keep the port after the game exits.
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, arguments) { UseShellExecute = true, WorkingDirectory = System.IO.Path.GetDirectoryName(exe) });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.LogWarning($"[bridge] Could not start CodeGraph.exe ({ex.Message}); opening the browser instead.");
+                return false;
+            }
         }
 
         private string Setup => $"claude mcp add --transport http dragnwash http://127.0.0.1:{_port.Value}/mcp --header \"Authorization: Bearer {BridgeToken.Value}\"";
@@ -125,12 +185,14 @@ namespace DragNWash.ModFramework.Bridge
                     {
                         BridgeToken.Renew();
                         McpProtocol.EndAll();
+                        PageDoor.EndAll();
                         return "New token made; every client was disconnected and needs the new setup (the Bridge tab shows it).";
                     }
                     return "bridge token new";
                 case "disconnect":
                     int n = McpProtocol.AllSessions().Count;
                     McpProtocol.EndAll();
+                    PageDoor.EndAll();
                     return $"Disconnected {n} client(s).";
             }
             var sb = new StringBuilder();
@@ -177,12 +239,14 @@ namespace DragNWash.ModFramework.Bridge
             {
                 BridgeToken.Renew();
                 McpProtocol.EndAll();
+                PageDoor.EndAll();
                 TW.ShowNotice("New token made; every client was disconnected and needs the new setup.");
             }
             bx += 128;
             if (GUI.Button(new Rect(bx, y, 150, row), "Disconnect all", s.Button))
             {
                 McpProtocol.EndAll();
+                PageDoor.EndAll();
             }
             y += row + 10;
             if (_note.Length > 0)
@@ -192,7 +256,7 @@ namespace DragNWash.ModFramework.Bridge
             }
             GUI.Label(new Rect(x, y, inner, 60), "Setup for Claude Code (Copy setup puts it on the clipboard with the token): claude mcp add --transport http dragnwash http://127.0.0.1:" + _port.Value + "/mcp --header \"Authorization: Bearer <token>\". VS Code and Cursor take the same URL and header. The token is kept in your user profile, not in the game folder.", s.WrappedLabel);
             y += 72;
-            GUI.Label(new Rect(x, y, inner, 26), $"CLIENTS ({sessions.Count})", s.Label);
+            GUI.Label(new Rect(x, y, inner, 26), $"CLIENTS ({sessions.Count})" + (PageDoor.SignedIn > 0 ? $"   PAGE: {PageDoor.SignedIn} signed in" : ""), s.Label);
             y += 28;
             if (sessions.Count == 0)
             {

@@ -40,7 +40,8 @@ namespace DragNWash.ModFramework.Inspector
         private static Vector2 _scroll;
         private static bool _showInherited;
         private static bool _showPrivateMethods;
-        private static GUIStyle _cell, _muted, _mono, _accent;
+        private static bool _gameType;
+        private static GUIStyle _cell, _muted, _mono, _accent, _wrapped;
 
         internal static void Reset()
         {
@@ -57,6 +58,7 @@ namespace DragNWash.ModFramework.Inspector
             if (_cell != null) return;
             _cell = new GUIStyle(s.Label) { wordWrap = false, clipping = TextClipping.Clip };
             _muted = new GUIStyle(s.MutedLabel) { wordWrap = false, clipping = TextClipping.Clip };
+            _wrapped = new GUIStyle(s.MutedLabel) { wordWrap = true };
             _mono = new GUIStyle(s.MutedLabel) { wordWrap = false, clipping = TextClipping.Clip };
             _accent = new GUIStyle(_cell);
             _accent.normal.textColor = TW.AccentColor;
@@ -72,6 +74,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             Reset();
             _type = type;
+            _gameType = InspectorCodeGraph.IsGameType(type);
             string assembly = type.Assembly.GetName().Name;
             _header = $"{type.FullName}   ({assembly}{(type.BaseType != null ? ", : " + type.BaseType.Name : "")})";
             _methods = new List<MethodRow>();
@@ -393,8 +396,26 @@ namespace DragNWash.ModFramework.Inspector
                 _showPrivateMethods = !_showPrivateMethods;
             }
             bx += 98;
-            GUI.Label(new Rect(bx, y, w - (bx - x), row), "Copy gives Type:Method, for GameHooks.Require and AccessTools.Method; Patch gives the whole Harmony patch, guard and all.", _muted);
-            y += row + 4;
+            // The graph draws the game's code only, not Unity's or .NET's.
+            if (_gameType && GUI.Button(new Rect(bx, y, 110, row), "Type graph", s.Button))
+            {
+                OpenGraph("t:" + _type.FullName.Replace('+', '/'));
+            }
+            if (_gameType) bx += 118;
+            // Beside the buttons when it fits; else on lines of its own below them, wrapped, never cut.
+            var hint = new GUIContent("Copy gives Type:Method, for GameHooks.Require and AccessTools.Method; Patch gives the whole Harmony patch, guard and all.");
+            if (_muted.CalcSize(hint).x <= w - (bx - x))
+            {
+                GUI.Label(new Rect(bx, y, w - (bx - x), row), hint, _muted);
+                y += row + 4;
+            }
+            else
+            {
+                y += row + 2;
+                float h = _wrapped.CalcHeight(hint, w);
+                GUI.Label(new Rect(x, y, w, h), hint, _wrapped);
+                y += h + 4;
+            }
 
             // Rows: events first, then methods; an opened method's IL follows it.
             var lines = new List<Action<Rect>>();
@@ -432,7 +453,11 @@ namespace DragNWash.ModFramework.Inspector
                         if (open) { _ilFor = null; _il = null; }
                         else { _ilFor = mr.Method; _il = Disassemble(mr.Method); }
                     }
-                    GUI.Label(new Rect(r.x + 170, r.y, r.width - 170, row), TW.Drawable(mr.Signature + (mr.Overloads > 1 ? "   (" + mr.Overloads + " overloads)" : "") + (mr.Inherited ? "   (" + mr.Method.DeclaringType.Name + ")" : "")), mr.Patches != null ? _accent : (mr.Method.IsPublic ? _cell : _muted));
+                    if (InspectorCodeGraph.IsGameType(mr.Method.DeclaringType) && GUI.Button(new Rect(r.x + 168, r.y + 2, 60, row - 4), "Graph", s.Button))
+                    {
+                        OpenGraph("m:" + InspectorCodeGraph.Id(mr.Method));
+                    }
+                    GUI.Label(new Rect(r.x + 234, r.y, r.width - 234, row), TW.Drawable(mr.Signature + (mr.Overloads > 1 ? "   (" + mr.Overloads + " overloads)" : "") + (mr.Inherited ? "   (" + mr.Method.DeclaringType.Name + ")" : "")), mr.Patches != null ? _accent : (mr.Method.IsPublic ? _cell : _muted));
                 });
                 heights.Add(row);
                 if (m.Patches != null)
@@ -468,6 +493,18 @@ namespace DragNWash.ModFramework.Inspector
                 ry += heights[i];
             }
             GUI.EndScrollView();
+        }
+
+        // The code graph opens in the browser through the Bridge (docs/CODE_GRAPH.md), when it is installed and on.
+        private static void OpenGraph(string focus)
+        {
+            if (Operations.Find("bridge.page.open") == null)
+            {
+                TW.ShowNotice("The graph needs the Bridge library, on (its tab in this window).");
+                return;
+            }
+            OperationResult r = Operations.CallNow("bridge.page.open", new Dictionary<string, object> { ["focus"] = focus }, "inspector");
+            TW.ShowNotice(r.Ok ? "The graph opens in your browser." : r.Error);
         }
 
         private static IEnumerable<string> Describe(Patches p)
