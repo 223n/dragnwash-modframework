@@ -20,7 +20,14 @@ namespace DragNWash.ModFramework.Inspector
         internal static bool Editing;
         internal static bool Dragging => _vertex >= 0 && _dragging;
 
-        private const int MaxEdges = 60000;
+        // Edges drawn at most, over all the selection's meshes; beyond it a
+        // notice says the wireframe is cut short.
+        private const int MaxEdges = 400000;
+        // GL immediate mode drops vertices past about 65535 in one GL.Begin, so
+        // the lines go out in batches.
+        private const int EdgesPerBatch = 16000;
+        private static int _batch;
+        private static readonly HashSet<long> Seen = new HashSet<long>();
         private const float Grab = 10f;
 
         private static readonly Mesh Baked = new Mesh();
@@ -87,7 +94,9 @@ namespace DragNWash.ModFramework.Inspector
             GL.PushMatrix();
             GL.LoadPixelMatrix();
             GL.Begin(GL.LINES);
+            _batch = 0;
             int edges = 0;
+            bool cut = false;
             foreach (Renderer r in selected.GetComponentsInChildren<Renderer>())
             {
                 if (!r.enabled) continue;
@@ -119,16 +128,25 @@ namespace DragNWash.ModFramework.Inspector
                 {
                     screen[i] = cam.WorldToScreenPoint(toWorld.MultiplyPoint3x4(v[i]));
                 }
-                for (int i = 0; i + 2 < tris.Length && edges < MaxEdges; i += 3)
+                // Each edge once: two triangles share it, and drawing it twice
+                // only doubled the count against the limit.
+                Seen.Clear();
+                for (int i = 0; i + 2 < tris.Length; i += 3)
                 {
-                    Edge(screen[tris[i]], screen[tris[i + 1]]);
-                    Edge(screen[tris[i + 1]], screen[tris[i + 2]]);
-                    Edge(screen[tris[i + 2]], screen[tris[i]]);
-                    edges += 3;
+                    if (edges >= MaxEdges)
+                    {
+                        cut = true;
+                        break;
+                    }
+                    edges += Edge(screen, tris[i], tris[i + 1]) + Edge(screen, tris[i + 1], tris[i + 2]) + Edge(screen, tris[i + 2], tris[i]);
                 }
             }
             GL.End();
             GL.PopMatrix();
+            if (cut)
+            {
+                TW.ShowNotice($"Wireframe: only the first {MaxEdges} edges are drawn.");
+            }
 
             // The vertices of the mesh being edited, the selected one larger.
             if (Editing && _editFilter != null && _vertices != null)
@@ -145,11 +163,25 @@ namespace DragNWash.ModFramework.Inspector
             }
         }
 
-        private static void Edge(Vector3 a, Vector3 b)
+        // Draws the edge between vertices i and j once per mesh; returns 1 when drawn.
+        private static int Edge(Vector3[] screen, int i, int j)
         {
-            if (a.z <= 0 || b.z <= 0) return;
+            long key = i < j ? ((long)i << 32) | (uint)j : ((long)j << 32) | (uint)i;
+            if (!Seen.Add(key))
+            {
+                return 0;
+            }
+            Vector3 a = screen[i], b = screen[j];
+            if (a.z <= 0 || b.z <= 0) return 0;
+            if (++_batch >= EdgesPerBatch)
+            {
+                GL.End();
+                GL.Begin(GL.LINES);
+                _batch = 0;
+            }
             GL.Vertex3(a.x, Screen.height - a.y, 0);
             GL.Vertex3(b.x, Screen.height - b.y, 0);
+            return 1;
         }
 
         private static void Box(Camera cam, Bounds b)
@@ -161,7 +193,13 @@ namespace DragNWash.ModFramework.Inspector
                 p[i] = cam.WorldToScreenPoint(new Vector3(c.x + ((i & 1) == 0 ? -e.x : e.x), c.y + ((i & 2) == 0 ? -e.y : e.y), c.z + ((i & 4) == 0 ? -e.z : e.z)));
             }
             int[][] edges = { new[] { 0, 1 }, new[] { 1, 3 }, new[] { 3, 2 }, new[] { 2, 0 }, new[] { 4, 5 }, new[] { 5, 7 }, new[] { 7, 6 }, new[] { 6, 4 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 } };
-            foreach (int[] ed in edges) Edge(p[ed[0]], p[ed[1]]);
+            foreach (int[] ed in edges)
+            {
+                Vector3 from = p[ed[0]], to = p[ed[1]];
+                if (from.z <= 0 || to.z <= 0) continue;
+                GL.Vertex3(from.x, Screen.height - from.y, 0);
+                GL.Vertex3(to.x, Screen.height - to.y, 0);
+            }
         }
 
         // The mesh is copied once per MeshFilter; the copy is what the filter

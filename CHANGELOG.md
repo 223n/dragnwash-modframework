@@ -2,6 +2,12 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
+## Unreleased
+
+### Inspector, next version
+
+- The wireframe no longer loses parts of detailed meshes (a dragon): each edge is drawn once instead of once per triangle, the lines go out in batches (GL immediate mode dropped vertices past about 65,000 in one batch), and the limit is 400,000 edges, with a notice when a selection has more.
+
 ## 2026-09-19: crash reports, sliders, Direct3D 12
 
 Released together with Drag'n Wash Localization v1.3.0. The core and the preloader patcher go to 1.3.0, the Tool window and Assets libraries to 1.1.1; the others stay as they are. Everything new is additive: mods built on 1.2 need no change.
