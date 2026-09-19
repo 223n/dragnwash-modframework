@@ -1233,6 +1233,21 @@ namespace DragNWash.ModFramework.Inspector
         private static Vector2 _scrollScenes;
         private static string _scenesNote = "";
 
+        private static readonly Dictionary<GUIStyle, GUIStyle> Wrapped = new Dictionary<GUIStyle, GUIStyle>();
+
+        // A line that wraps in a narrow pane instead of running out of it; returns the y below it.
+        private static float WrappedLine(string text, float x, float y, float w, GUIStyle style, float row)
+        {
+            if (!Wrapped.TryGetValue(style, out GUIStyle wrapped))
+            {
+                Wrapped[style] = wrapped = new GUIStyle(style) { wordWrap = true, clipping = TextClipping.Clip };
+            }
+            var content = new GUIContent(Drawable(text));
+            float h = Mathf.Max(row, wrapped.CalcHeight(content, w));
+            GUI.Label(new Rect(x, y, w, h), content, wrapped);
+            return y + h;
+        }
+
         // The level running and the game's cheats for it, every level to start
         // in its place, the scenes loaded and every scene of the build to load
         // (experimental; see InspectorScenes).
@@ -1240,8 +1255,7 @@ namespace DragNWash.ModFramework.Inspector
         {
             TW.Fill(pane, TW.InsetColor);
             float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
-            GUI.Label(new Rect(x, y, w, row), Drawable(InspectorScenes.Describe()), InspectorScenes.InLevel ? _accentCell : _mutedCell);
-            y += row;
+            y = WrappedLine(InspectorScenes.Describe(), x, y, w, InspectorScenes.InLevel ? _accentCell : _mutedCell, row);
             float bx = x;
             if (InspectorScenes.InLevel)
             {
@@ -1255,8 +1269,11 @@ namespace DragNWash.ModFramework.Inspector
             y += row + 4;
             if (!string.IsNullOrEmpty(_scenesNote))
             {
-                GUI.Label(new Rect(x, y, w, row), Drawable(_scenesNote), _mutedCell);
-                y += row;
+                y = WrappedLine(_scenesNote, x, y, w, _mutedCell, row);
+            }
+            if (InspectorScenes.InLevel)
+            {
+                y = WrappedLine("Start plays a level now as trial play: the game does not save until the title screen, so the save's progress and flags stay as they are.", x, y, w, _mutedCell, row);
             }
 
             // One scrolling list: the levels (in PlayGame), then the scenes.
@@ -1272,7 +1289,7 @@ namespace DragNWash.ModFramework.Inspector
             float ry = 0;
             if (levels > 0)
             {
-                GUI.Label(new Rect(0, ry, inner, row), "LEVELS: Start plays that level now, with the flags of the save as they are; the save changes only when it is finished.", _mutedCell);
+                GUI.Label(new Rect(0, ry, inner, row), "LEVELS", _mutedCell);
                 ry += row;
                 for (int i = 0; i < levels; i++)
                 {
@@ -1293,7 +1310,7 @@ namespace DragNWash.ModFramework.Inspector
                 ry += row;
             }
             ry += row;
-            GUI.Label(new Rect(0, ry, inner, row), "SCENES OF THE GAME: Load goes through the game's loading screen.", _mutedCell);
+            GUI.Label(new Rect(0, ry, inner, row), "SCENES OF THE GAME (Load goes through its loading screen; another scene is trial play)", _mutedCell);
             ry += row;
             foreach (string name in build)
             {
@@ -1374,6 +1391,12 @@ namespace DragNWash.ModFramework.Inspector
         private static void DrawHierarchy(Rect pane, ToolWindowStyles s, float row)
         {
             TW.Fill(pane, TW.InsetColor);
+            // Search results name objects; after a scene change some are gone
+            // (a destroyed Transform, not a heading), so search again.
+            if (_results != null && _results.Exists(n => !ReferenceEquals(n.Transform, null) && n.Transform == null))
+            {
+                _results = InspectorModel.Search(_search ?? "");
+            }
             List<Node> nodes = _results ?? _tree ?? new List<Node>();
             float inner = pane.width - 20;
             // Follow the selection: scroll so its row sits in the upper third of the pane.

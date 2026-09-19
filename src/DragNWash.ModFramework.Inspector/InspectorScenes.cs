@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using HarmonyLib;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -19,9 +21,15 @@ namespace DragNWash.ModFramework.Inspector
     // Scene changes go through the game's loading menu, as the game's own
     // menus do. Skip and Clean call the game's own cheats (shown in its
     // development builds only). Start level sets the level number and starts
-    // that level in place; nothing is written to the save until the level is
-    // finished, and the framework's Saves library keeps a copy of every save
-    // the game writes.
+    // that level in place.
+    //
+    // Trial play: the game saves "the level played + 1" when a level ends, and
+    // marks a scene as seen when it ends, so playing an earlier level, or a
+    // scene out of order, would move the save's progress. Start level and
+    // loading a scene (other than reloading the one in use) therefore begin a
+    // trial: until the title screen loads, the game's saves are not written
+    // (a Harmony prefix on SaveManagerV1.Save). Skip level in a normal game
+    // saves as the game's cheat does.
     internal static class InspectorScenes
     {
         private static bool _looked;
@@ -69,6 +77,59 @@ namespace DragNWash.ModFramework.Inspector
             }
         }
 
+        // ---- trial play -------------------------------------------------------------
+
+        private static Harmony _harmony;
+        private static bool _patched;
+
+        internal static bool Trial { get; private set; }
+        internal static int SavesHeld { get; private set; }
+
+        private static void BeginTrial(string why)
+        {
+            if (!Trial)
+            {
+                InspectorPlugin.Log.LogInfo($"[scenes] Trial play ({why}): the game's saves are not written until the title screen.");
+            }
+            Trial = true;
+            if (_patched) return;
+            _patched = true;
+            try
+            {
+                MethodInfo save = Type.GetType("SaveManagerV1, Assembly-CSharp")?.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .FirstOrDefault(m => m.Name == "Save" && m.GetParameters().Length >= 1);
+                if (save == null)
+                {
+                    InspectorPlugin.Log.LogWarning("[scenes] The game's save method was not found; trial play cannot hold saves back.");
+                    return;
+                }
+                _harmony = _harmony ?? new Harmony(Inspector.Guid + ".scenes");
+                _harmony.Patch(save, prefix: new HarmonyMethod(typeof(InspectorScenes), nameof(HoldSave)));
+                SceneManager.sceneLoaded += (scene, mode) =>
+                {
+                    if (Trial && scene.name == "StartScene")
+                    {
+                        Trial = false;
+                        InspectorPlugin.Log.LogInfo($"[scenes] Trial play over at the title screen ({SavesHeld} save(s) not written); the game saves again.");
+                        SavesHeld = 0;
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                InspectorPlugin.Log.LogWarning("[scenes] Trial play cannot hold saves back: " + ex.Message);
+            }
+        }
+
+        // Harmony prefix: false skips the game's save.
+        private static bool HoldSave()
+        {
+            if (!Trial) return true;
+            SavesHeld++;
+            InspectorPlugin.Log.LogInfo("[scenes] Trial play: the game's save was not written.");
+            return false;
+        }
+
         private static object Invoke(MethodInfo m, object target, params object[] args)
         {
             if (m == null) return null;
@@ -112,6 +173,7 @@ namespace DragNWash.ModFramework.Inspector
         {
             Look();
             if (string.IsNullOrEmpty(name)) return "";
+            if (name != ActiveScene && name != "StartScene") BeginTrial("loaded " + name);
             object menus = _menuInstance?.GetValue(null);
             if (menus != null && _processTransition != null && _transition != null && _levelLoad != null)
             {
@@ -175,10 +237,11 @@ namespace DragNWash.ModFramework.Inspector
 
         internal static string Describe()
         {
-            if (!InLevel) return "No level is running (levels run in PlayGame).";
+            string trial = Trial ? "TRIAL PLAY: the game does not save until the title screen. " : "";
+            if (!InLevel) return trial + "No level is running (levels run in PlayGame).";
             int level = CurrentLevel;
             string clean = Invoke(_cleanPercentage, null) is float f ? $", clean {f * 100f:0}%" : "";
-            return $"Level {level + 1} of {LevelCount}: {DragonOf(level)}, {WeatherOf(level)}, dragon {Invoke(_dragonState, null) ?? "?"}{clean}";
+            return $"{trial}Level {level + 1} of {LevelCount}: {DragonOf(level)}, {WeatherOf(level)}, dragon {Invoke(_dragonState, null) ?? "?"}{clean}";
         }
 
         // The game's own "skip level" cheat: the dragon walks out and the next
@@ -188,7 +251,7 @@ namespace DragNWash.ModFramework.Inspector
             if (!InLevel || _skip == null) return "No level is running.";
             Invoke(_skip, null);
             InspectorPlugin.Log.LogInfo("[scenes] Skip level (the game's cheat).");
-            return "Skipping the level (the next one starts, and is saved as reached).";
+            return Trial ? "Skipping the level (trial play: not saved)." : "Skipping the level (the next one starts, and is saved as reached).";
         }
 
         // The game's sparkle clean on the dragon being washed.
@@ -199,14 +262,15 @@ namespace DragNWash.ModFramework.Inspector
             return "Cleaned the dragon.";
         }
 
-        // Starts a level in place of the current one. The flags earlier levels
-        // would have set are not set, so dialogue that depends on them may
-        // differ; nothing is saved until the level is finished.
+        // Starts a level in place of the current one, as trial play (nothing is
+        // saved until the title screen). The flags earlier levels would have
+        // set are not set, so dialogue that depends on them may differ.
         internal static string StartLevel(int level)
         {
             object state = State;
             if (state == null || _currentLevel == null || _startLevel == null) return "No level is running.";
             if (level < 0 || level >= LevelCount) return $"There is no level {level + 1}.";
+            BeginTrial("started level " + (level + 1));
             try
             {
                 _currentLevel.SetValue(state, level);
@@ -217,7 +281,7 @@ namespace DragNWash.ModFramework.Inspector
                 return "Could not start the level: " + (ex.InnerException ?? ex).Message;
             }
             InspectorPlugin.Log.LogInfo($"[scenes] Started level {level + 1} ({DragonOf(level)}).");
-            return $"Started level {level + 1} ({DragonOf(level)}). Saved only when it is finished.";
+            return $"Started level {level + 1} ({DragonOf(level)}) as trial play: nothing is saved until the title screen.";
         }
     }
 }

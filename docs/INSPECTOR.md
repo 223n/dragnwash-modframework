@@ -86,7 +86,8 @@ Experimental. The game moves its characters with Animators, mostly by setting th
 Experimental. View → **Scenes and levels** opens a list in place of the members. The game has a few scenes (the title, PlayGame, the scenes after certain levels, the credits) and plays its levels inside PlayGame; everything here is read by reflection from the game's own types, so a game update that renames them turns these tools off.
 
 - **The level running** (in PlayGame): its number, dragon, weather, the dragon's state and how clean it is. **Skip level** and **Clean the dragon** call the game's own cheats, the ones its development builds show: Skip ends the level as if it was done, so the next one is saved as reached.
-- **Levels**: every level with its dragon and weather; **Start** plays that level now, in place of the current one. The flags earlier levels would have set are not set, so dialogue may differ from a normal play; nothing is written to the save until the level is finished (and the Saves library keeps a copy of every save the game writes).
+- **Levels**: every level with its dragon and weather; **Start** plays that level now, in place of the current one. The flags earlier levels would have set are not set, so dialogue may differ from a normal play.
+- **Trial play**: the game saves "the level played + 1" when a level ends and marks a scene as seen when it ends, so a level or scene played out of order would move the save's progress back or forward. **Start**, and **Load** of a scene other than the one in use, therefore begin trial play: until the title screen loads, the game's saves are not written, and the pane says so. **Skip level** in a normal game saves as the game's cheat does (the Saves library keeps a copy of every save the game writes).
 - **Scenes**: the scenes loaded, and every scene of the game with **Load**, which goes through the game's loading screen as its menus do; **Reload** loads the active scene again.
 
 ## Safety
