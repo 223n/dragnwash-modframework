@@ -8,6 +8,8 @@ name: Build
 # fine-grained token with read access to that repository only, kept as an
 # Actions secret. This workflow runs only on pushes to main, on tags and by
 # hand, never for pull requests, so a fork can never reach the token.
+# In a fork the job is skipped: the fork has no LIBS_TOKEN, and a push to
+# its main would otherwise end in a failed run.
 #
 # Every run uploads release/DragNWash.ModFramework-<version>.zip as a workflow
 # artifact. A v* tag also creates a DRAFT GitHub release with the zip attached;
@@ -27,6 +29,7 @@ permissions:
 
 jobs:
   pack:
+    if: github.repository == 'TomXV/dragnwash-modframework'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
