@@ -20,14 +20,25 @@ namespace DragNWash.ModFramework.Inspector
         internal static bool Editing;
         internal static bool Dragging => _vertex >= 0 && _dragging;
 
-        // Edges drawn at most, over all the selection's meshes; beyond it a
-        // notice says the wireframe is cut short.
-        private const int MaxEdges = 400000;
-        // GL immediate mode drops vertices past about 65535 in one GL.Begin, so
-        // the lines go out in batches.
-        private const int EdgesPerBatch = 16000;
-        private static int _batch;
-        private static readonly HashSet<long> Seen = new HashSet<long>();
+        // The wireframe is a mesh of lines per renderer, built once from the
+        // mesh's triangles (each edge once) and drawn with the camera's
+        // matrices. Sending every line through GL immediate mode each frame
+        // uploaded megabytes a frame for a detailed mesh, which crashes
+        // Direct3D 12 (UUM-140564); now only a skinned mesh's vertex positions
+        // go up each frame, and nothing for a mesh that does not move.
+        private sealed class Wire
+        {
+            public Mesh Lines;
+            public Mesh Topology;
+            public int VertexCount;
+            public Color32 Tint;
+            public readonly List<Vector3> Positions = new List<Vector3>();
+        }
+
+        private static readonly Dictionary<int, Wire> Wires = new Dictionary<int, Wire>();
+        private static GameObject _wiresFor;
+        private static readonly Color32 WireTint = new Color32(77, 230, 255, 140);
+        private static readonly Color32 EditTint = new Color32(255, 153, 51, 204);
         private const float Grab = 10f;
 
         private static readonly Mesh Baked = new Mesh();
@@ -46,6 +57,8 @@ namespace DragNWash.ModFramework.Inspector
         {
             if ((!Wireframe && !Editing) || selected == null)
             {
+                if (Wires.Count > 0) ClearWires();
+                _wiresFor = null;
                 return;
             }
             Camera cam = Camera.main;
@@ -90,62 +103,71 @@ namespace DragNWash.ModFramework.Inspector
             {
                 return;
             }
-            lines.SetPass(0);
-            GL.PushMatrix();
-            GL.LoadPixelMatrix();
-            GL.Begin(GL.LINES);
-            _batch = 0;
-            int edges = 0;
-            bool cut = false;
+            if (!ReferenceEquals(_wiresFor, selected))
+            {
+                ClearWires();
+                _wiresFor = selected;
+            }
+            var boxes = new List<Bounds>();
+            var draws = new List<KeyValuePair<Mesh, Matrix4x4>>();
             foreach (Renderer r in selected.GetComponentsInChildren<Renderer>())
             {
                 if (!r.enabled) continue;
-                Mesh mesh = null;
                 Matrix4x4 toWorld = r.transform.localToWorldMatrix;
+                MeshFilter filter2 = r.GetComponent<MeshFilter>();
+                bool edited = filter2 != null && ReferenceEquals(filter2, _editFilter) && _vertices != null;
+                Mesh topology = null;
                 if (r is SkinnedMeshRenderer skin && skin.sharedMesh != null)
                 {
-                    skin.BakeMesh(Baked);
-                    mesh = Baked;
+                    topology = skin.sharedMesh;
                     toWorld = Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
                 }
-                else if (r is MeshRenderer)
+                else if (r is MeshRenderer && filter2 != null)
                 {
-                    MeshFilter f = r.GetComponent<MeshFilter>();
-                    mesh = f != null ? (ReferenceEquals(f, _editFilter) ? _editMesh : f.sharedMesh) : null;
+                    topology = edited ? _editMesh : filter2.sharedMesh;
                 }
-                if (mesh == null) continue;
-                if (!mesh.isReadable)
+                if (topology == null) continue;
+                if (!topology.isReadable)
                 {
-                    GL.Color(new Color(0.5f, 0.8f, 1f, 0.6f));
-                    Box(cam, r.bounds);
+                    boxes.Add(r.bounds);
                     continue;
                 }
-                GL.Color(ReferenceEquals(r.GetComponent<MeshFilter>(), _editFilter) && Editing ? new Color(1f, 0.6f, 0.2f, 0.8f) : new Color(0.3f, 0.9f, 1f, 0.55f));
-                Vector3[] v = ReferenceEquals(r.GetComponent<MeshFilter>(), _editFilter) && _vertices != null ? _vertices : mesh.vertices;
-                int[] tris = mesh.triangles;
-                var screen = new Vector3[v.Length];
-                for (int i = 0; i < v.Length; i++)
+                Wire wire = WireFor(r, topology, edited ? EditTint : WireTint);
+                if (wire == null) continue;
+                if (r is SkinnedMeshRenderer skinned)
                 {
-                    screen[i] = cam.WorldToScreenPoint(toWorld.MultiplyPoint3x4(v[i]));
+                    // The pose changes every frame: only the positions go up.
+                    skinned.BakeMesh(Baked);
+                    Baked.GetVertices(wire.Positions);
+                    if (wire.Positions.Count == wire.VertexCount) wire.Lines.SetVertices(wire.Positions);
                 }
-                // Each edge once: two triangles share it, and drawing it twice
-                // only doubled the count against the limit.
-                Seen.Clear();
-                for (int i = 0; i + 2 < tris.Length; i += 3)
+                else if (edited)
                 {
-                    if (edges >= MaxEdges)
-                    {
-                        cut = true;
-                        break;
-                    }
-                    edges += Edge(screen, tris[i], tris[i + 1]) + Edge(screen, tris[i + 1], tris[i + 2]) + Edge(screen, tris[i + 2], tris[i]);
+                    wire.Lines.SetVertices(_vertices);
                 }
+                draws.Add(new KeyValuePair<Mesh, Matrix4x4>(wire.Lines, toWorld));
             }
-            GL.End();
-            GL.PopMatrix();
-            if (cut)
+
+            GL.PushMatrix();
+            GL.LoadProjectionMatrix(cam.projectionMatrix);
+            GL.modelview = cam.worldToCameraMatrix;
+            lines.SetPass(0);
+            foreach (KeyValuePair<Mesh, Matrix4x4> d in draws)
             {
-                TW.ShowNotice($"Wireframe: only the first {MaxEdges} edges are drawn.");
+                Graphics.DrawMeshNow(d.Key, d.Value);
+            }
+            GL.PopMatrix();
+
+            if (boxes.Count > 0)
+            {
+                lines.SetPass(0);
+                GL.PushMatrix();
+                GL.LoadPixelMatrix();
+                GL.Begin(GL.LINES);
+                GL.Color(new Color(0.5f, 0.8f, 1f, 0.6f));
+                foreach (Bounds b in boxes) Box(cam, b);
+                GL.End();
+                GL.PopMatrix();
             }
 
             // The vertices of the mesh being edited, the selected one larger.
@@ -163,25 +185,75 @@ namespace DragNWash.ModFramework.Inspector
             }
         }
 
-        // Draws the edge between vertices i and j once per mesh; returns 1 when drawn.
-        private static int Edge(Vector3[] screen, int i, int j)
+        // The renderer's line mesh, built when its mesh (or its vertex count)
+        // changes: every triangle edge once, as a line.
+        private static Wire WireFor(Renderer r, Mesh topology, Color32 tint)
+        {
+            int id = r.GetInstanceID();
+            if (Wires.TryGetValue(id, out Wire wire) && ReferenceEquals(wire.Topology, topology) && wire.VertexCount == topology.vertexCount && wire.Lines != null)
+            {
+                if (!wire.Tint.Equals(tint))
+                {
+                    wire.Tint = tint;
+                    wire.Lines.SetColors(Fill(tint, wire.VertexCount));
+                }
+                return wire;
+            }
+            if (wire != null && wire.Lines != null) UnityEngine.Object.Destroy(wire.Lines);
+            try
+            {
+                int[] tris = topology.triangles;
+                var seen = new HashSet<long>();
+                var indices = new List<int>(tris.Length);
+                for (int i = 0; i + 2 < tris.Length; i += 3)
+                {
+                    AddEdge(seen, indices, tris[i], tris[i + 1]);
+                    AddEdge(seen, indices, tris[i + 1], tris[i + 2]);
+                    AddEdge(seen, indices, tris[i + 2], tris[i]);
+                }
+                var mesh = new Mesh { name = "Inspector wireframe", hideFlags = HideFlags.HideAndDontSave };
+                mesh.indexFormat = topology.vertexCount > 65535 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+                if (r is SkinnedMeshRenderer) mesh.MarkDynamic();
+                mesh.SetVertices(topology.vertices);
+                mesh.SetColors(Fill(tint, topology.vertexCount));
+                mesh.SetIndices(indices, MeshTopology.Lines, 0, false);
+                mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 1e6f);
+                wire = new Wire { Lines = mesh, Topology = topology, VertexCount = topology.vertexCount, Tint = tint };
+                Wires[id] = wire;
+                return wire;
+            }
+            catch (Exception ex)
+            {
+                InspectorPlugin.Log.LogWarning($"[inspector] Could not build the wireframe of {r.name}: {ex.Message}");
+                Wires.Remove(id);
+                return null;
+            }
+        }
+
+        private static void AddEdge(HashSet<long> seen, List<int> indices, int i, int j)
         {
             long key = i < j ? ((long)i << 32) | (uint)j : ((long)j << 32) | (uint)i;
-            if (!Seen.Add(key))
+            if (seen.Add(key))
             {
-                return 0;
+                indices.Add(i);
+                indices.Add(j);
             }
-            Vector3 a = screen[i], b = screen[j];
-            if (a.z <= 0 || b.z <= 0) return 0;
-            if (++_batch >= EdgesPerBatch)
+        }
+
+        private static Color32[] Fill(Color32 c, int n)
+        {
+            var colors = new Color32[n];
+            for (int i = 0; i < n; i++) colors[i] = c;
+            return colors;
+        }
+
+        internal static void ClearWires()
+        {
+            foreach (Wire w in Wires.Values)
             {
-                GL.End();
-                GL.Begin(GL.LINES);
-                _batch = 0;
+                if (w.Lines != null) UnityEngine.Object.Destroy(w.Lines);
             }
-            GL.Vertex3(a.x, Screen.height - a.y, 0);
-            GL.Vertex3(b.x, Screen.height - b.y, 0);
-            return 1;
+            Wires.Clear();
         }
 
         private static void Box(Camera cam, Bounds b)

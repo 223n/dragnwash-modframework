@@ -6,7 +6,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ### Inspector, next version
 
-- The wireframe no longer loses parts of detailed meshes (a dragon): each edge is drawn once instead of once per triangle, the lines go out in batches (GL immediate mode dropped vertices past about 65,000 in one batch), and the limit is 400,000 edges, with a notice when a selection has more.
+- The wireframe is drawn whole for detailed meshes (parts of a dragon were missing): each renderer gets a mesh of its edges, built once (each edge once) and drawn with the camera's matrices. Before, every line went through GL immediate mode each frame, which dropped vertices past about 65,000 and, sent whole, uploaded megabytes a frame and crashed Direct3D 12 (UUM-140564); now only a skinned mesh's positions go up each frame.
 
 ## 2026-09-19: crash reports, sliders, Direct3D 12
 
