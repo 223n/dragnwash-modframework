@@ -31,6 +31,8 @@ namespace DragNWash.ModFramework.ToolWindow
 
         internal bool ShowWindow;
         internal string Notice = string.Empty;
+        private GUIStyle _footerStyle;
+        private GUIStyle _footerBase;
 
         private bool _wasOpen;
         private Rect _windowRect = new Rect(24, 24, 780, 580);
@@ -497,7 +499,17 @@ namespace DragNWash.ModFramework.ToolWindow
                 x += w + 8;
             }
             float bodyTop = y + ToolWindow.RowHeight + 12;
-            var body = new Rect(ToolWindow.Padding, bodyTop, bodyWidth, Mathf.Max(80, height - bodyTop - 38));
+            // The footer grows with a notice that wraps in a narrow window, up
+            // to three lines, and the body gives it the room.
+            string footer = string.IsNullOrEmpty(Notice) ? $"{_toggleKey.Value}: toggle    |    Drag title to move    |    Drag corner to resize" : Notice;
+            if (_footerStyle == null || _footerBase != styles.MutedLabel)
+            {
+                _footerBase = styles.MutedLabel;
+                _footerStyle = new GUIStyle(styles.MutedLabel) { wordWrap = true, clipping = TextClipping.Clip };
+            }
+            float footerWidth = width - 54;
+            float footerHeight = Mathf.Clamp(_footerStyle.CalcHeight(new GUIContent(footer), footerWidth), 24, 72);
+            var body = new Rect(ToolWindow.Padding, bodyTop, bodyWidth, Mathf.Max(80, height - bodyTop - footerHeight - 14));
 
             if (_current == null)
             {
@@ -530,9 +542,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
             }
 
-            GUI.Label(new Rect(ToolWindow.Padding, height - 30, width - 54, 24),
-                string.IsNullOrEmpty(Notice) ? $"{_toggleKey.Value}: toggle    |    Drag title to move    |    Drag corner to resize" : Notice,
-                styles.MutedLabel);
+            GUI.Label(new Rect(ToolWindow.Padding, height - footerHeight - 6, footerWidth, footerHeight), footer, _footerStyle);
 
             HandleResize(new Rect(width - GripSize, height - GripSize, GripSize, GripSize));
             // Dragging only by the title, so selecting text or scrolling never
