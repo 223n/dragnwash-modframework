@@ -276,7 +276,7 @@ namespace DragNWash.ModFramework.ToolWindow
             if (ShowWindow)
             {
                 CursorUnlock.Tick();
-                VirtualClick.Poll();
+                VirtualClick.Poll(_windowRect);
                 if (VirtualClick.UpdateDrag(ref _windowRect, HeaderHeight, CloseMargin, GripSize))
                 {
                     _windowRect = Clamp(_windowRect, Screen.width, Screen.height);

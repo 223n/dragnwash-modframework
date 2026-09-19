@@ -13,7 +13,9 @@ namespace DragNWash.ModFramework.ToolWindow
     // IMGUI did not see, treat the GUI.Button under the pointer as clicked.
     // Hooked into GUI.Button through Harmony so every button in the menu
     // gets it without changes. Pad buttons (A, R2, R3/L3) click, and the
-    // sticks / d-pad scroll the lists.
+    // sticks / d-pad scroll the lists. Where the system takes real mouse input
+    // (OsPointer: XTest on Linux, SendInput on Windows) they become a real left
+    // button and wheel instead, and every control works, not buttons only.
     internal static class VirtualClick
     {
         private static bool _pending;
@@ -50,9 +52,45 @@ namespace DragNWash.ModFramework.ToolWindow
         private static bool _held;
         private static Vector2 _pressPointer;
 
-        // Called from Update while the menu is open.
-        public static void Poll()
+        private const float WheelStepsPerSecond = 16f;   // at full deflection
+        private static float _wheel;
+
+        // Called from Update while the menu is open. Where the system takes real
+        // mouse input (OsPointer), a press over the window is a real left button,
+        // held until the pad button is let go, and the sticks send real wheel
+        // steps: every control then works as with a mouse. Elsewhere, presses
+        // click buttons only and the sticks scroll the lists that ask (below).
+        public static void Poll(Rect window)
         {
+            Gamepad real = Gamepad.current;
+            if (real != null && OsPointer.Available)
+            {
+                bool over = _pointer.x >= 0 && window.Contains(_pointer);
+                bool pressed = real.buttonSouth.wasPressedThisFrame || real.rightTrigger.wasPressedThisFrame
+                    || real.rightStickButton.wasPressedThisFrame || real.leftStickButton.wasPressedThisFrame;
+                bool holding = real.buttonSouth.isPressed || real.rightTrigger.isPressed
+                    || real.rightStickButton.isPressed || real.leftStickButton.isPressed;
+                if (pressed && over) OsPointer.Down();
+                if (!holding) OsPointer.Up();
+                float sy = real.rightStick.ReadValue().y + real.leftStick.ReadValue().y + real.dpad.ReadValue().y;
+                if (over && Mathf.Abs(sy) > 0.25f)
+                {
+                    _wheel += Mathf.Clamp(sy, -1f, 1f) * WheelStepsPerSecond * Time.unscaledDeltaTime;
+                    int steps = (int)_wheel;
+                    if (steps != 0) { OsPointer.Wheel(steps); _wheel -= steps; }
+                }
+                else
+                {
+                    _wheel = 0f;
+                }
+                _pending = false;
+                _held = false;
+                _scrollDelta = 0f;
+                _dragMode = DragMode.None;
+                _dragDecided = false;
+                return;
+            }
+
             bool press = false;
             bool held = false;
             // Pad buttons only. A real mouse click already reaches IMGUI as a
@@ -158,6 +196,8 @@ namespace DragNWash.ModFramework.ToolWindow
         public static void Cancel()
         {
             _pending = false;
+            // Never leave the system's left button down behind a closed window.
+            OsPointer.Up();
         }
 
         private static void AfterButton(Rect position, ref bool __result)
