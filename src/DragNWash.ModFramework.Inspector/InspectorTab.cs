@@ -869,6 +869,11 @@ namespace DragNWash.ModFramework.Inspector
             GUI.EndScrollView();
         }
 
+        // Room kept for a name in the tree, and the width of one level.
+        private const float TreeNameRoom = 120;
+        private const float MaxStep = 18;
+        private const float MinStep = 8;
+
         // The tree, or the search results, one row per object.
         private static void DrawHierarchy(Rect pane, ToolWindowStyles s, float row)
         {
@@ -891,6 +896,30 @@ namespace DragNWash.ModFramework.Inspector
             }
             TW.ApplyScroll(pane, ref _scrollTree);
             _scrollTree = GUI.BeginScrollView(pane, _scrollTree, new Rect(0, 0, inner, Mathf.Max(pane.height, nodes.Count * row)), false, false);
+            // A deep tree (a rig's bones) would push names out of the pane: the
+            // levels get narrower, down to MinStep, and when even that is too
+            // wide, the levels above every row in view are left out.
+            int deepest = 0;
+            foreach (Node n in nodes) deepest = Mathf.Max(deepest, n.Depth);
+            float room = inner - 24 - TreeNameRoom;
+            float step = deepest > 0 ? Mathf.Clamp(room / deepest, MinStep, MaxStep) : MaxStep;
+            int skip = 0;
+            if (deepest * step > room)
+            {
+                int first = Mathf.Clamp((int)(_scrollTree.y / row), 0, nodes.Count);
+                int last = Mathf.Clamp((int)((_scrollTree.y + pane.height) / row) + 1, 0, nodes.Count);
+                int shallow = int.MaxValue, deep = 0;
+                for (int i = first; i < last; i++)
+                {
+                    if (nodes[i].Transform == null) continue;
+                    shallow = Mathf.Min(shallow, nodes[i].Depth);
+                    deep = Mathf.Max(deep, nodes[i].Depth);
+                }
+                if (shallow != int.MaxValue)
+                {
+                    skip = Mathf.Clamp(Mathf.CeilToInt((deep * step - room) / step), 0, shallow);
+                }
+            }
             float ry = 0;
             foreach (Node n in nodes)
             {
@@ -902,19 +931,19 @@ namespace DragNWash.ModFramework.Inspector
                     }
                     else if (n.Transform)
                     {
-                        const float step = 18;
-                        float indent = 4 + n.Depth * step;
+                        int depth = n.Depth - skip;
+                        float indent = 4 + depth * step;
                         // Indent guides: one faint line per ancestor level, through
                         // the middle of that level's toggle, and a short tick to this
                         // row that stops before the row's own toggle.
                         var guide = new Color(TW.MutedColor.r, TW.MutedColor.g, TW.MutedColor.b, 0.35f);
-                        for (int d = 1; d < n.Depth; d++)
+                        for (int d = skip > 0 ? 0 : 1; d < depth; d++)
                         {
                             TW.Fill(new Rect(4 + d * step + 9, ry, 1, row), guide);
                         }
-                        if (n.Depth > 1)
+                        if (depth > 1 || (skip > 0 && depth > 0))
                         {
-                            TW.Fill(new Rect(4 + (n.Depth - 1) * step + 9, ry + row / 2, step - 12, 1), guide);
+                            TW.Fill(new Rect(4 + (depth - 1) * step + 9, ry + row / 2, Mathf.Max(2, step - 12), 1), guide);
                         }
                         if (_results == null && n.HasChildren)
                         {
