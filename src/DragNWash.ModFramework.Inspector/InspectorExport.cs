@@ -11,7 +11,7 @@ using UnityEngine;
 namespace DragNWash.ModFramework.Inspector
 {
     // Export as overrides: the edits in the History, written as a mod with no
-    // code for the Overrides library (docs/OVERRIDES.md):
+    // code for the Overrides library (https://github.com/TomXV/dragnwash-modframework/wiki/Overrides):
     //
     //   BepInEx/plugins/<name>/mod.json
     //   BepInEx/plugins/<name>/overrides/main.json

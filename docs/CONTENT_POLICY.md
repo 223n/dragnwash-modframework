@@ -9,7 +9,7 @@ The project follows the idea of **fair use**: material from the game may be used
 ## Not allowed: the game's own data, unchanged
 
 - Assets, script text and DLLs taken from the game as they are, without changes.
-- They go into neither a repository nor a release. CI refuses the game's files (`ci/game-fingerprints.json`), and it will refuse untouched exports from the asset tool too ([ASSET_TOOL.md](ASSET_TOOL.md#export-and-import)).
+- They go into neither a repository nor a release. CI refuses the game's files (`ci/game-fingerprints.json`), and it will refuse untouched exports from the asset tool too ([Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets)).
 
 ## Allowed: made by hand, or changed into something new
 

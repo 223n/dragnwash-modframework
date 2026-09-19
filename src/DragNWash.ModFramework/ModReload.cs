@@ -27,7 +27,7 @@ namespace DragNWash.ModFramework
     /// they are reloadable (<c>ModInfo.Reloadable</c> or
     /// <see cref="ReloadableModAttribute"/>) are ever reloaded, and only while
     /// developer tools are on. Libraries are never reloaded. Experimental
-    /// (core 1.2.0); see docs/MOD_RELOAD.md.
+    /// (core 1.2.0); see https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload.
     /// </summary>
     /// <remarks>
     /// On Windows the running DLL is mapped by Mono and cannot be overwritten,

@@ -16,7 +16,7 @@ namespace DragNWash.ModFramework.Inspector
     // while the game runs. Three panes side by side; in a narrow window, three
     // pages. Nothing is saved: an edit lives until the scene reloads or the
     // game quits, and Reset puts back what a row held before its first edit.
-    // See docs/INSPECTOR.md.
+    // See https://github.com/TomXV/dragnwash-modframework/wiki/Inspector.
     internal static class InspectorTab
     {
         internal const string Title = "Inspector";

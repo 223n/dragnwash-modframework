@@ -13,7 +13,7 @@ namespace DragNWash.ModFramework.Dialogue
     /// </summary>
     /// <remarks>
     /// Experimental (Dialogue 1.1). The definitions may still change before a
-    /// release; see docs/STABLE_LINE_KEYS.md.
+    /// release; see https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue.
     /// </remarks>
     public static class LineKey
     {

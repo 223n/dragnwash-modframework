@@ -77,7 +77,7 @@ Designed in detail in [BRIDGE.md](BRIDGE.md).
 A new, optional library, **Bridge**, its own plugin, so a mod's release can leave it out.
 
 - **This computer only.** It listens on `127.0.0.1` alone (a port in the config), with a token made for each session and written to a file only this user can read. Any other address is refused.
-- **Off by default**, and only while developer tools are on. It declares itself under `ModInfo.Network` (a local connection is still a connection, and players should see it, in the spirit of [NETWORK.md](NETWORK.md)), and the Mods screen shows *Bridge listening* and *AI client connected*, with a button to disconnect.
+- **Off by default**, and only while developer tools are on. It declares itself under `ModInfo.Network` (a local connection is still a connection, and players should see it, in the spirit of [Going online (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online)), and the Mods screen shows *Bridge listening* and *AI client connected*, with a button to disconnect.
 - **MCP**: the bridge speaks MCP over Streamable HTTP. `tools/list` is generated from the registry, **read operations only**; `tools/call` runs one on the main thread and returns JSON. Descriptions come from the registry, so an AI client understands them the same way a person reading `help` does.
 - A small stdio shim, for MCP clients that only start local programs, comes only if people need one.
 - **Limits**: results capped in size, calls rate-limited, no file access beyond what operations offer.
@@ -97,7 +97,7 @@ The Inspector's Code view already reads a method's IL through Mono.Cecil, and kn
 
 - A **graph** is data: events (a scene loaded, a key pressed, a dialogue line shown), operations (read and write), a little flow (if, wait, repeat with a limit) and values.
 - **Blocks** (as in Scratch) and **nodes** are two ways to edit the same graph file.
-- A graph is shipped the way [Overrides](OVERRIDES.md) are: a folder with `mod.json` and `graphs/*.json`, no DLL, shown and switched off on the Mods screen. Overrides and graphs share that loader.
+- A graph is shipped the way [Overrides](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides) are: a folder with `mod.json` and `graphs/*.json`, no DLL, shown and switched off on the Mods screen. Overrides and graphs share that loader.
 - A small **Graphs** library runs them: only registered operations, a time budget each frame, a graph that fails three times in a row switched off (as `GameEvents` handlers are), and the Mods screen lists the operations each graph uses, so what a graph *can* do is visible before it runs.
 
 ## Order and yardsticks

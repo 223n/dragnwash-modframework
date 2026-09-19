@@ -9,7 +9,7 @@ namespace DragNWash.ModFramework.Mods
     // What a mod does online, for players: the "Online" tag in the list, a line
     // in the details and the Internet page, which lists what the mod declared
     // (ModInfo.Network) and what the framework saw it connect to this session.
-    // Experimental; see docs/NETWORK.md.
+    // Experimental; see https://github.com/TomXV/dragnwash-modframework/wiki/Going-online.
     internal sealed partial class ModsMenu
     {
         internal const string TextOnlineTag = "Online";

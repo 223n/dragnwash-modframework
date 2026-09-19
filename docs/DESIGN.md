@@ -4,7 +4,7 @@
 
 Status: September 2026. The core is released as 1.1.2 and the libraries as 1.0.0; parts marked planned or future are not done yet. Open an issue to discuss any part of it.
 
-Design memos for features not built yet: [MOD_RELOAD.md](MOD_RELOAD.md) (a mod's DLL reloaded while the game runs) and [INSPECTOR.md](INSPECTOR.md) (an Inspector tab in the Tool window). Built since 1.1.2 and on `main`: [CONSOLE.md](CONSOLE.md), [ASSET_TOOL.md](ASSET_TOOL.md), [STABLE_LINE_KEYS.md](STABLE_LINE_KEYS.md).
+Design memos for features not built yet: [Mod reload (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload) (a mod's DLL reloaded while the game runs) and [Inspector (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector) (an Inspector tab in the Tool window). Built since 1.1.2 and on `main`: [Console (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Console), [Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets), [Dialogue (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue).
 
 ## Why a framework
 
@@ -23,7 +23,7 @@ In most modding scenes every author designs things their own way. Two mods patch
 - **Check before patching.** Patch targets are checked with `GameHooks` first; a missing target turns the feature off and says so, instead of crashing after a game update.
 - **Conflicts are visible.** The Mods screen shows what it can detect: missing or too old libraries, `BepInIncompatibility`, a plugin that did not load and why, and game methods that several mods patch directly.
 - **Nothing silently replaced.** A service can have only one provider; a second registration is refused and logged.
-- **Guidelines for authors.** [GUIDE.md](GUIDE.md) says what to use from the framework, what not to patch directly, and how to write a library others can build on.
+- **Guidelines for authors.** [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others) says what to use from the framework, what not to patch directly, and how to write a library others can build on.
 
 ## Goals
 
@@ -207,6 +207,6 @@ Things to settle first: whether the developers want code mods on their Workshop 
 ## Open questions
 
 - How mods show up in the tool window when several register tabs (order, naming).
-- The installer: done. One shared installer lives here and every mod's zip ships it, reading the mod's `mod-install.json` ([INSTALLER.md](INSTALLER.md)). Mods can also be uninstalled from the Mods screen.
+- The installer: done. One shared installer lives here and every mod's zip ships it, reading the mod's `mod-install.json` ([Installer (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Installer)). Mods can also be uninstalled from the Mods screen.
 - Distribution beyond GitHub Releases.
 - The developers' view on mods, which matters more for a framework than for a translation.

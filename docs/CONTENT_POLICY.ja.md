@@ -9,7 +9,7 @@
 ## NG：手を加えていない、ゲームのデータそのもの
 
 - ゲームから取り出したままの、手を加えていないアセット、台本の文章、DLL。
-- リポジトリにもリリースにも入れません。CI がゲームのファイルを拒否します（`ci/game-fingerprints.json`）。アセットツールで書き出したまま手を加えていないものも、拒否する予定です（[ASSET_TOOL.ja.md](ASSET_TOOL.ja.md#取り出すと取り込む)）。
+- リポジトリにもリリースにも入れません。CI がゲームのファイルを拒否します（`ci/game-fingerprints.json`）。アセットツールで書き出したまま手を加えていないものも、拒否する予定です（[Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets-ja)）。
 
 ## OK：手で作ったもの、手を加えて新しくしたもの
 

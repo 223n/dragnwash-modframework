@@ -4,7 +4,7 @@
 
 状態: 2026 年 9 月。中核は 1.1.2、ライブラリは 1.0.0 としてリリースしました。予定や将来と書いた部分はまだ実装していません。どの部分についても、Issue で議論してください。
 
-まだ作っていない機能の設計メモ：[MOD_RELOAD.ja.md](MOD_RELOAD.ja.md)（ゲームを動かしたまま Mod の DLL を読み直す）と [INSPECTOR.ja.md](INSPECTOR.ja.md)（Tool window の Inspector タブ）。1.1.2 以降に作って `main` にあるもの：[CONSOLE.ja.md](CONSOLE.ja.md)、[ASSET_TOOL.ja.md](ASSET_TOOL.ja.md)、[STABLE_LINE_KEYS.ja.md](STABLE_LINE_KEYS.ja.md)。
+まだ作っていない機能の設計メモ：[Mod reload (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload-ja)（ゲームを動かしたまま Mod の DLL を読み直す）と [Inspector (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector-ja)（Tool window の Inspector タブ）。1.1.2 以降に作って `main` にあるもの：[Console (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Console-ja)、[Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets-ja)、[Dialogue (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue-ja)。
 
 ## なぜフレームワークを作るのか
 
@@ -23,7 +23,7 @@
 - **パッチの前に確認する。** パッチの対象は先に `GameHooks` で確認し、無ければその機能を止めて知らせます。ゲームのアップデート後にクラッシュさせません
 - **競合を見えるようにする。** Mods 画面に、検出できる問題を表示します。足りない・古すぎるライブラリ、`BepInIncompatibility`、読み込まれなかったプラグインとその理由、そして複数の Mod が直接パッチを当てているゲームのメソッドです
 - **黙って置き換えない。** サービスの提供者は 1 つだけです。2 つ目の登録は拒否してログに出します
-- **作者向けのガイドライン。** [GUIDE.ja.md](GUIDE.ja.md) に、フレームワークの何を使うか、何に直接パッチを当てないか、ほかの人が使えるライブラリの作り方を書いています
+- **作者向けのガイドライン。** [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others-ja) に、フレームワークの何を使うか、何に直接パッチを当てないか、ほかの人が使えるライブラリの作り方を書いています
 
 ## 目標
 
@@ -207,6 +207,6 @@ Drag'n Wash には現在 Steam ワークショップがなく、有効にでき�
 ## 未決定のこと
 
 - 複数の Mod がタブを登録したときの、ツールウィンドウでの見せ方（順番、名前）
-- インストーラー：完了。このリポジトリの共通インストーラーを各 Mod の zip に同梱し、Mod の `mod-install.json` を読む（[INSTALLER.ja.md](INSTALLER.ja.md)）。Mods 画面からのアンインストールもできる
+- インストーラー：完了。このリポジトリの共通インストーラーを各 Mod の zip に同梱し、Mod の `mod-install.json` を読む（[Installer (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Installer-ja)）。Mods 画面からのアンインストールもできる
 - GitHub Releases 以外での配布
 - 開発者さんの Mod への考え方。翻訳よりもフレームワークのほうが、影響が大きいです

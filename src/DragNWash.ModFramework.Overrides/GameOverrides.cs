@@ -10,7 +10,7 @@ namespace DragNWash.ModFramework.Overrides
     /// the game (a component's field or property, a material's property) when
     /// they are loaded, and shows on the Mods screen like any mod. The Inspector
     /// writes such folders from its History. Experimental.
-    /// See docs/OVERRIDES.md.
+    /// See https://github.com/TomXV/dragnwash-modframework/wiki/Overrides.
     /// </summary>
     public static class GameOverrides
     {

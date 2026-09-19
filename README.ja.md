@@ -7,11 +7,11 @@
 [Drag'n Wash](https://store.steampowered.com/app/4739660/) 用の前提 Mod（BepInEx 5）です。ゲームに入り込むためのコードを 1 か所にまとめた小さな中核で、ほかの Mod や、その上に乗るライブラリ（前提 Mod の上の前提 Mod）に安定した API を提供します。ゲームの Options 画面から開く Mods 画面（Minecraft Forge の Mod 一覧のようなもので、Mod のオン・オフもできる）、ゲームの Options 画面への設定の追加、テキストや会話のイベント、Direct3D 12 で安全なアセットの読み込みなどです。ゲームがアップデートされても、追従が必要なのはフレームワークだけになります。
 
 > [!NOTE]
-> 最新のリリースは **1.3.0** です。何が起きたかをゲームの外のウィンドウで知らせる[クラッシュレポート](docs/CRASH_REPORTS.ja.md)、それで突き止めた Direct3D 12 のクラッシュの修正（フォントのアトラスの転送を 1 フレームに 1 回に）、`GameOptions.AddSlider` が加わり、Tool window と Assets は 1.1.1 になりました。1.2.1 では、2026 年 9 月 14 日のゲームのアップデート以降に作ったセーブを Saves タブがまた見つけられるようにしました。**中核 1.2.0** では開発者ツールのスイッチ（既定はオフ）、設定ページの文字列とキー割り当ての入力欄、[`GameEvents`](docs/GUIDE.ja.md)、`SettingMeta`、ゲームを動かしたままの Mod のリロード、[外と通信する Mod の申告](docs/NETWORK.ja.md) が加わり、あわせて Tool window、Assets、Dialogue の各ライブラリが 1.1.0 になり、新しい [Inspector](docs/INSPECTOR.ja.md) ライブラリ（1.0.0）が加わります（[Console](docs/CONSOLE.ja.md)、[テクスチャの差し替えとリロード](docs/ASSET_TOOL.ja.md)、[安定した行キー](docs/STABLE_LINE_KEYS.ja.md)）。新しい機能は実験的な扱いで、Inspector は今後も実験的な機能のままです。1.1.0 で [更新のお知らせ](#更新のお知らせ)、共通インストーラー、Mods 画面からのアンインストールを追加し、1.1.1 でフレームワークのアイコンを追加、1.1.2 でそのアイコンを手作りのロゴの「Dg」に差し替えました。1.0.0 は、最初にこの上で動く Mod である [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) の v1.0.0 と一緒にリリースしました。1.0.0 以降、公開 API の互換性を壊す変更はメジャーバージョンを上げるときだけにします。[CHANGELOG.md](CHANGELOG.md) を参照してください。
+> 最新のリリースは **1.3.0** です。何が起きたかをゲームの外のウィンドウで知らせる[クラッシュレポート](https://github.com/TomXV/dragnwash-modframework/wiki/Crash-reports-ja)、それで突き止めた Direct3D 12 のクラッシュの修正（フォントのアトラスの転送を 1 フレームに 1 回に）、`GameOptions.AddSlider` が加わり、Tool window と Assets は 1.1.1 になりました。1.2.1 では、2026 年 9 月 14 日のゲームのアップデート以降に作ったセーブを Saves タブがまた見つけられるようにしました。**中核 1.2.0** では開発者ツールのスイッチ（既定はオフ）、設定ページの文字列とキー割り当ての入力欄、[`GameEvents`](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others-ja)、`SettingMeta`、ゲームを動かしたままの Mod のリロード、[外と通信する Mod の申告](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online-ja) が加わり、あわせて Tool window、Assets、Dialogue の各ライブラリが 1.1.0 になり、新しい [Inspector](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector-ja) ライブラリ（1.0.0）が加わります（[Console](https://github.com/TomXV/dragnwash-modframework/wiki/Console-ja)、[テクスチャの差し替えとリロード](https://github.com/TomXV/dragnwash-modframework/wiki/Assets-ja)、[安定した行キー](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue-ja)）。新しい機能は実験的な扱いで、Inspector は今後も実験的な機能のままです。1.1.0 で [更新のお知らせ](#更新のお知らせ)、共通インストーラー、Mods 画面からのアンインストールを追加し、1.1.1 でフレームワークのアイコンを追加、1.1.2 でそのアイコンを手作りのロゴの「Dg」に差し替えました。1.0.0 は、最初にこの上で動く Mod である [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) の v1.0.0 と一緒にリリースしました。1.0.0 以降、公開 API の互換性を壊す変更はメジャーバージョンを上げるときだけにします。[CHANGELOG.md](CHANGELOG.md) を参照してください。
 >
 > これからの予定：[docs/ROADMAP.ja.md](docs/ROADMAP.ja.md)。
 
-目標と作業の順番は [docs/DESIGN.ja.md](docs/DESIGN.ja.md)、この上での Mod の作り方は [docs/GUIDE.ja.md](docs/GUIDE.ja.md)、確認したゲームのビルドは [docs/GAME_BUILDS.md](docs/GAME_BUILDS.md) を参照してください。[Wiki](https://github.com/TomXV/dragnwash-modframework/wiki/Home-ja) には、プレイヤー向けのページ、はじめての Mod の手順、ライブラリごとのリファレンスがあります。
+目標と作業の順番は [docs/DESIGN.ja.md](docs/DESIGN.ja.md)、この上での Mod の作り方は [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others-ja)、確認したゲームのビルドは [docs/GAME_BUILDS.md](docs/GAME_BUILDS.md) を参照してください。[Wiki](https://github.com/TomXV/dragnwash-modframework/wiki/Home-ja) には、プレイヤー向けのページ、はじめての Mod の手順、ライブラリごとのリファレンスがあります。
 
 ## 中身
 
@@ -32,7 +32,7 @@
 
 ## Mod を作る方へ
 
-`DragNWash.ModFramework.dll`（と使うライブラリの DLL）を参照し、BepInEx が先に読み込むようそれぞれを依存関係として宣言します。何に何を使うか、Mod 同士を一緒に動かすためのルールは [docs/GUIDE.ja.md](docs/GUIDE.ja.md) にあります。プレイヤーがワンクリックで入れられるようにするには、`mod-install.json` と一緒に共通インストーラーを同梱してください：[docs/INSTALLER.ja.md](docs/INSTALLER.ja.md)。
+`DragNWash.ModFramework.dll`（と使うライブラリの DLL）を参照し、BepInEx が先に読み込むようそれぞれを依存関係として宣言します。何に何を使うか、Mod 同士を一緒に動かすためのルールは [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others-ja) にあります。プレイヤーがワンクリックで入れられるようにするには、`mod-install.json` と一緒に共通インストーラーを同梱してください：[Installer (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Installer-ja)。
 
 ```csharp
 [BepInPlugin("com.example.mymod", "MyMod", "1.0.0")]

@@ -11,7 +11,7 @@ namespace DragNWash.ModFramework.Inspector
     /// objects, their components and members, materials, a pick mode, a
     /// transform gizmo, a history of edits), for people who make mods. Its own
     /// plugin, so a mod's release can ship the Tool window without it.
-    /// Experimental; see docs/INSPECTOR.md.
+    /// Experimental; see https://github.com/TomXV/dragnwash-modframework/wiki/Inspector.
     /// </summary>
     public static class Inspector
     {

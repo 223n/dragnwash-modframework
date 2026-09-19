@@ -45,7 +45,7 @@ Following the transport's security rules:
 
 ## What the player sees
 
-- **Mods screen**: the Bridge declares itself in `ModInfo.Network` (host 127.0.0.1, incoming, "lets AI clients on this computer read the game"), so the Online tag and page show it, as for any mod that uses the network ([NETWORK.md](NETWORK.md)).
+- **Mods screen**: the Bridge declares itself in `ModInfo.Network` (host 127.0.0.1, incoming, "lets AI clients on this computer read the game"), so the Online tag and page show it, as for any mod that uses the network ([Going online (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online)).
 - **Bridge tab** (in the F1 window: the Bridge runs only with the developer tools on, and their screen is the F1 window): off / listening on the port; the clients connected, by the name they gave (`clientInfo`); the last calls; buttons **Disconnect all**, **New token**, and **Copy setup** (puts the command below on the clipboard).
 - **Console**: `bridge` (status and clients), `bridge token new`, `bridge disconnect`.
 

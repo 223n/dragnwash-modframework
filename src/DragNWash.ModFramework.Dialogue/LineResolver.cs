@@ -76,7 +76,7 @@ namespace DragNWash.ModFramework.Dialogue
     /// Records that could be more than one line are never guessed.
     /// </summary>
     /// <remarks>
-    /// Experimental (Dialogue 1.1); see docs/STABLE_LINE_KEYS.md. Add records
+    /// Experimental (Dialogue 1.1); see https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue. Add records
     /// from Awake and keep the resolver for the life of the mod; Resolve is
     /// cheap enough to call for every line shown.
     /// </remarks>

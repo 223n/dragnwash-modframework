@@ -63,7 +63,7 @@ MCP の通信方式の安全のきまりに沿います。
 
 ## 遊ぶ人から見えるもの
 
-- **Mods 画面**：Bridge は自分を `ModInfo.Network` で申告します（ホストは 127.0.0.1、受ける側、「この PC の AI クライアントがゲームを読めるようにする」）。なので、ネットワークを使うほかの Mod と同じく、Online の印とページに出ます（[NETWORK.ja.md](NETWORK.ja.md)）。
+- **Mods 画面**：Bridge は自分を `ModInfo.Network` で申告します（ホストは 127.0.0.1、受ける側、「この PC の AI クライアントがゲームを読めるようにする」）。なので、ネットワークを使うほかの Mod と同じく、Online の印とページに出ます（[Going online (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online-ja)）。
 - **Bridge のタブ**（F1 の窓。Bridge は開発者ツールがオンのときだけ動き、開発者ツールの画面は F1 の窓なので）：
   - 状態：オフ、またはどのポートで待ち受けているか。
   - つながっているクライアント（クライアントが名乗った名前、`clientInfo`）と、最近の呼び出し。

@@ -14,7 +14,7 @@ Usage:
     python tools/linekeys.py --check              checks ci/linekey-vectors.json
     python tools/linekeys.py --write-vectors       (maintainers) regenerates the vectors
 
-Experimental (Dialogue 1.1); see docs/STABLE_LINE_KEYS.md.
+Experimental (Dialogue 1.1); see https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue.
 """
 import hashlib
 import json

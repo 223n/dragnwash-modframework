@@ -10,7 +10,7 @@ Drag'n Wash ModFramework のこれからの予定です。予定は変わるこ�
 
 Drag'n Wash Localization v1.3.0 と一緒にリリースしました。
 
-- クラッシュレポート：セッションごとの記録、クラッシュやフリーズのあとのレポート（Unity のクラッシュダンプや、フリーズ時のダンプつき）、何が起きたかを知らせるゲームの外のウィンドウ（`CrashReporter.exe`、Windows）（[CRASH_REPORTS.ja.md](CRASH_REPORTS.ja.md)）。
+- クラッシュレポート：セッションごとの記録、クラッシュやフリーズのあとのレポート（Unity のクラッシュダンプや、フリーズ時のダンプつき）、何が起きたかを知らせるゲームの外のウィンドウ（`CrashReporter.exe`、Windows）（[Crash reports (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Crash-reports-ja)）。
 - それで突き止めた、Tool window を開いたときの Direct3D 12 のクラッシュ：フォントのアトラスの転送を 1 フレームに 1 回にまとめ、Console の訳もまた表示されるように。
 - `GameOptions.AddSlider`（[#39](https://github.com/TomXV/dragnwash-modframework/issues/39)）。
 
@@ -22,7 +22,7 @@ Drag'n Wash Localization v1.3.0 と一緒にリリースしました。
 
 Drag'n Wash Localization v1.2.0 と一緒にリリースしました。
 
-- 中核 1.2.0：開発者ツールのスイッチ、Mods 画面での文字列とキーの設定、`GameEvents`、`SettingMeta`、ゲームを動かしたままの Mod のリロード、外と通信する Mod の申告（[NETWORK.ja.md](NETWORK.ja.md)）。
+- 中核 1.2.0：開発者ツールのスイッチ、Mods 画面での文字列とキーの設定、`GameEvents`、`SettingMeta`、ゲームを動かしたままの Mod のリロード、外と通信する Mod の申告（[Going online (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online-ja)）。
 - Tool window 1.1.0（Console）、Assets 1.1.0（テクスチャの差し替え、プレビュー）、Dialogue 1.1.0（安定した行キー）。
 - Inspector 1.0.0。新しいライブラリで、今後も実験的なままです。
 - NotaGames さんの新しいロゴと、Mister ERIO さんの手描きの Mods ボタン。
@@ -33,8 +33,8 @@ Drag'n Wash Localization v1.2.0 と一緒にリリースしました。
 - **他の Mod が同梱する訳。** まず Drag'n Wash Localization が単独で `<Mod のフォルダー>/Translations/` を読むようにします。β版の実験的機能で、既定はオフです（[設計](https://github.com/TomXV/dragnwash-localization/blob/main/docs/MOD_TRANSLATIONS.ja.md)）。2 つ目の翻訳 Mod が同じ約束事を使いたくなったら、フォルダーを見つける処理を Text ライブラリに移します。
 - **Direct3D 12。** 1.3.0 で、このクラッシュ（Unity UUM-140564）のいちばん多いきっかけだった、フォントのアトラスの転送の集中をなくしました。ゲーム中のテクスチャのリロードは、まだ一度に転送します。同じ対策が要るかは、クラッシュレポートの GPU 転送のトレースで確かめます。
 - **言語ごとのテクスチャの差し替え。** 特定の言語を使っている間だけ効き、元に戻せて、Direct3D 12 では再起動を待つ差し替え。Drag'n Wash Localization の絵の翻訳のため（[設計](https://github.com/TomXV/dragnwash-localization/blob/experimental/translated-textures/docs/TRANSLATED_TEXTURES.ja.md)）。
-- **あらゆる種類の書き出しと取り込み。** テクスチャ、メッシュ、マテリアル、音、ゲームのデータ（ScriptableObject）をファイルに書き出し、手を加え、Mod から取り込めるように（[設計](ASSET_TOOL.ja.md#取り出すと取り込む)）。
-- **Overrides：Inspector での編集を、そのまま Mod に。** History をファイルに書き出し、小さな Overrides ライブラリが遊ぶ人の環境で適用します。コードなしで Mod が作れます。`mod.json` と `overrides/*.json` だけのフォルダーで、ほかの Mod と同じく Mods 画面に出てオフにでき、きれいに元に戻せます。まず調査から（[設計](OVERRIDES.ja.md)）。
+- **あらゆる種類の書き出しと取り込み。** テクスチャ、メッシュ、マテリアル、音、ゲームのデータ（ScriptableObject）をファイルに書き出し、手を加え、Mod から取り込めるように（[設計](https://github.com/TomXV/dragnwash-modframework/wiki/Assets-ja)）。
+- **Overrides：Inspector での編集を、そのまま Mod に。** History をファイルに書き出し、小さな Overrides ライブラリが遊ぶ人の環境で適用します。コードなしで Mod が作れます。`mod.json` と `overrides/*.json` だけのフォルダーで、ほかの Mod と同じく Mods 画面に出てオフにでき、きれいに元に戻せます。まず調査から（[設計](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides-ja)）。
 - **操作の登録簿、MCP、ノードグラフ。** 各ライブラリが、できることを名前つきの操作として登録します。その 1 つの登録簿から、Console コマンド、AI クライアント向けの MCP のツール（まず読むだけ、この PC の中だけ、既定はオフ）、ゲームの外で組み立てて DLL のない Mod として配れるノードグラフのブロックを作ります。4 段階で進めます：登録簿、MCP、コードをノードで眺める、組み立て（[計画](API_PLAN.ja.md)）。
 - **Steam Deck：** F1 の窓で、画面キーボードで文字を入力できるかの確認。
 

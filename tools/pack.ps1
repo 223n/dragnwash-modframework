@@ -65,7 +65,7 @@ foreach ($art in 'ModsButton0.png', 'ModsButton1.png') {
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $Stage 'BepInEx/patchers') | Out-Null
 Copy-Item -LiteralPath (Join-Path $Root "src/$Patcher/bin/Release/$Patcher.dll") -Destination (Join-Path $Stage 'BepInEx/patchers')
-# The shared installer, for mods to ship next to their files (docs/INSTALLER.md).
+# The shared installer, for mods to ship next to their files (https://github.com/TomXV/dragnwash-modframework/wiki/Installer).
 # Built deterministically: the same sources give a byte-identical Install.exe.
 $InstallerProject = Join-Path $Root 'installer/DragNWash.Installer.csproj'
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $Root 'installer/bin'), (Join-Path $Root 'installer/obj')
@@ -79,7 +79,7 @@ Copy-Item -LiteralPath (Join-Path $Root 'installer/mod-install.example.json') -D
 $InstallerHash = (Get-FileHash -LiteralPath (Join-Path $InstallerStage 'Install.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "Install.exe sha256 $InstallerHash (unchanged unless installer/ or the .NET SDK changed)"
 
-# The crash reporter the core starts on Windows (docs/CRASH_REPORTS.md), next to
+# The crash reporter the core starts on Windows (https://github.com/TomXV/dragnwash-modframework/wiki/Crash-reports), next to
 # the core DLL. Built deterministically, like Install.exe.
 $ReporterProject = Join-Path $Root 'crashreporter/DragNWash.CrashReporter.csproj'
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $Root 'crashreporter/bin'), (Join-Path $Root 'crashreporter/obj')
