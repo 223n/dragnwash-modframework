@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
+using Yarn.Unity;
 
 namespace DragNWash.ModFramework.Dialogue
 {
@@ -17,13 +19,19 @@ namespace DragNWash.ModFramework.Dialogue
             GameDialogue.LineShowing += line => Remember(line, "line");
             GameDialogue.OptionShowing += line => Remember(line, "option");
 
-            Operations.Register(g, "dialogue.current", "The conversation now: the node running, whether lines or options are showing, and the last line shown.", OperationKind.Read,
-                "{ node, lines_showing, options_showing, last }", args => new Dictionary<string, object>
+            Operations.Register(g, "dialogue.current", "The conversation now: whether one is running, the node, whether options are on screen, and the last line shown.", OperationKind.Read,
+                "{ running, node, options_showing, last, hooks: { lines, options } } (hooks: whether this game build lets the library see lines and options at all)", args =>
                 {
-                    ["node"] = GameDialogue.CurrentNode,
-                    ["lines_showing"] = GameDialogue.LinesAvailable,
-                    ["options_showing"] = GameDialogue.OptionsAvailable,
-                    ["last"] = Recent.LastOrDefault(),
+                    bool running = UnityEngine.Object.FindObjectsByType<DialogueRunner>(FindObjectsSortMode.None).Any(r => r != null && r.IsDialogueRunning);
+                    bool options = UnityEngine.Object.FindObjectsByType<OptionItem>(FindObjectsSortMode.None).Any(o => o != null && o.isActiveAndEnabled && o.Option != null);
+                    return new Dictionary<string, object>
+                    {
+                        ["running"] = running,
+                        ["node"] = running ? GameDialogue.CurrentNode : null,
+                        ["options_showing"] = options,
+                        ["last"] = Recent.LastOrDefault(),
+                        ["hooks"] = new Dictionary<string, object> { ["lines"] = GameDialogue.LinesAvailable, ["options"] = GameDialogue.OptionsAvailable },
+                    };
                 });
 
             Operations.Register(g, "dialogue.recent", "The last lines and options shown this session, newest last, optionally only those that contain a text.", OperationKind.Read,
