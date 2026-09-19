@@ -95,6 +95,8 @@ Inspector の Code 表示は、すでに Mono.Cecil でメソッドの IL を読
 
 ## 第 4 段階：ブロックとノードで組み立てる
 
+詳しい設計は [GRAPHS.ja.md](GRAPHS.ja.md) にあります（まだ作っていません）。
+
 - **グラフ**はデータです。イベント（シーンが読み込まれた、キーが押された、会話の行が出た）、操作（read と write）、少しの流れ（もし、待つ、回数に上限のある繰り返し）、そして値です。
 - **ブロック**（Scratch のような）と**ノード**は、同じグラフのファイルを編集する 2 つのやり方です。
 - グラフは [Overrides](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides-ja) と同じ形で配ります。`mod.json` と `graphs/*.json` のフォルダーで、DLL はなく、Mods 画面に出てオフにできます。Overrides とグラフは、その読み込み処理を共有します。

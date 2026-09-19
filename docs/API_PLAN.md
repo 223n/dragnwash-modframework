@@ -95,6 +95,8 @@ The Inspector's Code view already reads a method's IL through Mono.Cecil, and kn
 
 ## Stage 4: building with blocks and nodes
 
+Designed in detail in [GRAPHS.md](GRAPHS.md) (not built yet).
+
 - A **graph** is data: events (a scene loaded, a key pressed, a dialogue line shown), operations (read and write), a little flow (if, wait, repeat with a limit) and values.
 - **Blocks** (as in Scratch) and **nodes** are two ways to edit the same graph file.
 - A graph is shipped the way [Overrides](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides) are: a folder with `mod.json` and `graphs/*.json`, no DLL, shown and switched off on the Mods screen. Overrides and graphs share that loader.
