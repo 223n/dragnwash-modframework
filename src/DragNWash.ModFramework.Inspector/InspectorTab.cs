@@ -1388,7 +1388,7 @@ namespace DragNWash.ModFramework.Inspector
             string[] parts = path.Split('/');
             for (int first = 1; first < parts.Length; first++)
             {
-                string cut = "…/" + string.Join("/", parts, first, parts.Length - first);
+                string cut = ".../" + string.Join("/", parts, first, parts.Length - first);
                 if (style.CalcSize(new GUIContent(Drawable(cut))).x <= width || first == parts.Length - 1) return cut;
             }
             return path;
