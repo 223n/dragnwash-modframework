@@ -2,7 +2,7 @@
 
 [日本語](BRIDGE.ja.md)
 
-> **Bridge 0.1.0 is built** (experimental). Stage 2 of the [API plan](API_PLAN.md). The research is done (see [Research before building](#research-before-building)); Proton is still to check.
+> **Bridge 0.1.0 is built** (experimental). Stage 2 of the [API plan](API_PLAN.md). The research is done (see [Research before building](#research-before-building)); checked on Windows and on the Steam Deck.
 
 The [operations registry](API_PLAN.md) lets anyone call what the libraries can do by name. The Bridge offers the **read** operations to AI clients (Claude Code, VS Code, Cursor and others) through the [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-06-18), so a client can look at the running game: objects and their values, the log, the mods, the saves, the dialogue. It cannot change anything.
 
@@ -21,7 +21,7 @@ A new library, **Bridge** (`DragNWash.ModFramework.Bridge`), separate from the c
 
 - `http://127.0.0.1:<port>/mcp`, port **47821** by default (`[Bridge] Port`). Bound to the loopback address only: no other computer can connect, and Windows does not ask to open the firewall for it.
 - Off until the player turns on **`[Bridge] Enabled`**, and only while the framework's developer tools are on; turning either off closes the port and drops every client.
-- A small HTTP/1.1 server on `TcpListener`, not `HttpListener` (Mono's `HttpListener` differs between Windows and Proton; see research). It reads `POST`, `GET` and `DELETE` with a `Content-Length` body, nothing else.
+- A small HTTP/1.1 server on `TcpListener`, not `HttpListener` (Mono's `HttpListener` differs between Windows and Linux; see research). It reads `POST`, `GET` and `DELETE` with a `Content-Length` body, nothing else.
 
 ## Security
 
@@ -29,7 +29,7 @@ Following the transport's security rules:
 
 1. **Host**: the `Host` header must be `127.0.0.1:<port>` or `localhost:<port>`. A website that points its own name at 127.0.0.1 (DNS rebinding) sends its own name, and is refused.
 2. **Origin**: a request with an `Origin` header (only browsers send one) is refused unless it is `null`. No web page can call the Bridge.
-3. **Token**: every request needs `Authorization: Bearer <token>`, compared in constant time. The token is 32 random bytes (base64url), made on first start and kept in `%LOCALAPPDATA%/DragNWash ModFramework/bridge-token.txt` (the user's own profile, not the game folder that other accounts on the PC may read; under Proton, the Wine prefix's user folder). **New token** on the Bridge tab (and `bridge token new` in the console) replaces it and drops every client.
+3. **Token**: every request needs `Authorization: Bearer <token>`, compared in constant time. The token is 32 random bytes (base64url), made on first start and kept in `%LOCALAPPDATA%/DragNWash ModFramework/bridge-token.txt` (the user's own profile, not the game folder that other accounts on the PC may read; on Linux and the Steam Deck, `~/.local/share/DragNWash ModFramework/`, and under Proton the Wine prefix's user folder). **New token** on the Bridge tab (and `bridge token new` in the console) replaces it and drops every client.
 4. **Limits**: a request body over 1 MB, more than 8 connections, or more than 20 calls a second from one session are refused. A result over 200,000 characters is an error (the registry's cap). An operation that takes more than 10 seconds on the main thread returns a time-out error.
 5. **Nothing else**: no files are read or written for a client, only what the operations return.
 
@@ -67,7 +67,8 @@ Write operations, resources, prompts, server-sent events, access from other comp
 
 Done on 2026-09-19 on Windows 11 (Direct3D 12), with a small research mod (never released) that listened on 127.0.0.1:47821, answered `initialize`, `tools/list` and `tools/call` through the registry, applied the Host, Origin and token checks, and wrote a token file.
 
-1. **TcpListener in the game: works on Windows.** `TcpListener(IPAddress.Loopback, 47821)` started in Awake, a background thread accepted, and calls ran through `Operations.Call` on the main thread. `netstat` shows it listening on 127.0.0.1:47821 only. **Proton (Steam Deck) is still to check.**
+1. **TcpListener in the game: works on Windows.** `TcpListener(IPAddress.Loopback, 47821)` started in Awake, a background thread accepted, and calls ran through `Operations.Call` on the main thread. `netstat` shows it listening on 127.0.0.1:47821 only.
+   - **Steam Deck (2026-09-19): works.** The Deck runs the game's native Linux build (Mono, Vulkan), not Proton. The built Bridge listened on 127.0.0.1:47821 only (`ss`); from curl on the Deck: no token 401, another Host 403, a web page's Origin 403, GET 405, a notification 202; `initialize`, `tools/list` (22 tools) and `tools/call` (`game_info`, `scene_list`) answered. Turning it off closed the port and on again listened on the same port. The token file was made in `~/.local/share/DragNWash ModFramework/`, whose home folder only the user can enter (700). Proton itself was not tried, since the game has a Linux build.
 2. **Firewall: no prompt.** Binding the loopback address raised no Windows Defender Firewall window.
 3. **NetworkWatch: not counted.** A dozen accepted connections, and no "went online" record; the watch sees outgoing connections only.
 4. **Clients.** With curl: no token 401, another Host 403, a web page's Origin 403, GET 405, a notification 202, `initialize` with `Mcp-Session-Id`, `tools/list` with the 22 read operations as `game_info`, `inspector_member_get`..., and `tools/call` returning the result. Claude Code (HTTP transport with the header) connected twice: `initialize`, `notifications/initialized`, a `GET` it took the 405 for, `tools/list`. A tool call from Claude Code is left for the built Bridge (the command-line client on this machine needed a new login, which is the user's to do).

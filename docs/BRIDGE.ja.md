@@ -2,7 +2,7 @@
 
 [English](BRIDGE.md)
 
-> **Bridge 0.1.0 を作りました**（実験的）。[API の計画](API_PLAN.ja.md)の第 2 段階です。調査は終わりました（[作る前の調査](#作る前の調査)）。Proton はまだです。
+> **Bridge 0.1.0 を作りました**（実験的）。[API の計画](API_PLAN.ja.md)の第 2 段階です。調査は終わりました（[作る前の調査](#作る前の調査)）。Windows と Steam Deck で確かめました。
 
 [操作の登録簿](API_PLAN.ja.md)によって、ライブラリにできることを名前で呼べるようになりました。Bridge は、そのうち**読む**操作を、[Model Context Protocol](https://modelcontextprotocol.io/specification/2025-06-18) で AI クライアント（Claude Code、VS Code、Cursor など）に見せます。AI クライアントは、動いているゲームを見られるようになります。オブジェクトとその値、ログ、Mod、セーブ、会話です。何かを変えることはできません。
 
@@ -21,7 +21,7 @@
 
 - `http://127.0.0.1:<ポート>/mcp`。ポートの既定は **47821**（`[Bridge] Port`）です。ループバックのアドレスだけで待ち受けるので、ほかのコンピューターからはつながりません。Windows のファイアウォールの許可を求める画面も出ません。
 - **`[Bridge] Enabled`** をオンにするまで、そしてフレームワークの開発者ツールがオンの間しか動きません。どちらかをオフにすると、ポートを閉じ、すべてのクライアントを切ります。
-- `HttpListener` ではなく、`TcpListener` の上の小さな HTTP/1.1 サーバーにします（Mono の `HttpListener` は Windows と Proton で振る舞いが違うため。調査を参照）。読むのは、`Content-Length` つきの `POST`、`GET`、`DELETE` だけです。
+- `HttpListener` ではなく、`TcpListener` の上の小さな HTTP/1.1 サーバーにします（Mono の `HttpListener` は Windows と Linux で振る舞いが違うため。調査を参照）。読むのは、`Content-Length` つきの `POST`、`GET`、`DELETE` だけです。
 
 ## 安全策
 
@@ -31,7 +31,7 @@ MCP の通信方式の安全のきまりに沿います。
 2. **Origin**：`Origin` ヘッダーのある要求（送るのはブラウザーだけです）は、`null` でなければ断ります。どのウェブページからも、Bridge は呼べません。
 3. **トークン**：すべての要求に `Authorization: Bearer <トークン>` が要ります。比べるときは、かかる時間が一定になる比べ方をします。
    - トークンは 32 バイトの乱数（base64url）で、最初の起動で作ります。
-   - 置き場所は `%LOCALAPPDATA%/DragNWash ModFramework/bridge-token.txt` です。利用者自身のプロファイルで、PC のほかのアカウントも読めるかもしれないゲームのフォルダーではありません。Proton では、Wine のプレフィックスの利用者フォルダーです。
+   - 置き場所は `%LOCALAPPDATA%/DragNWash ModFramework/bridge-token.txt` です。利用者自身のプロファイルで、PC のほかのアカウントも読めるかもしれないゲームのフォルダーではありません。Linux と Steam Deck では `~/.local/share/DragNWash ModFramework/`、Proton では Wine のプレフィックスの利用者フォルダーです。
    - Bridge のタブの **New token**（と Console の `bridge token new`）で作り直すと、すべてのクライアントを切ります。
 4. **上限**：1 MB を超える要求、8 本を超える接続、1 つのセッションから 1 秒に 20 回を超える呼び出しは断ります。20 万文字を超える結果はエラーです（登録簿の上限）。メインスレッドで 10 秒を超える操作は、時間切れのエラーを返します。
 5. **それ以外はしない**：クライアントのためにファイルを読み書きすることはありません。返すのは、操作が返すものだけです。
@@ -91,7 +91,8 @@ VS Code（`.vscode/mcp.json`）と Cursor（`mcp.json`）は、HTTP のサーバ
 - Host、Origin、トークンを確かめる。
 - トークンのファイルを書く。
 
-1. **ゲームの中の TcpListener：Windows では動く。** Awake で `TcpListener(IPAddress.Loopback, 47821)` を始め、裏のスレッドで接続を受け、呼び出しは `Operations.Call` でメインスレッドで動きました。`netstat` では、127.0.0.1:47821 だけで待ち受けています。**Proton（Steam Deck）はまだ確かめていません。**
+1. **ゲームの中の TcpListener：Windows では動く。** Awake で `TcpListener(IPAddress.Loopback, 47821)` を始め、裏のスレッドで接続を受け、呼び出しは `Operations.Call` でメインスレッドで動きました。`netstat` では、127.0.0.1:47821 だけで待ち受けています。
+   - **Steam Deck（2026-09-19）：動く。** Deck で動いているのは Proton ではなく、ゲームの Linux 版（Mono、Vulkan）です。作った Bridge は 127.0.0.1:47821 だけで待ち受けました（`ss`）。Deck の中の curl で、トークンなしは 401、違う Host は 403、ウェブページの Origin は 403、GET は 405、通知は 202 でした。`initialize`、`tools/list`（22 のツール）、`tools/call`（`game_info`、`scene_list`）も答えました。オフにするとポートを閉じ、オンに戻すと同じポートでまた待ち受けました。トークンのファイルは `~/.local/share/DragNWash ModFramework/` にでき、ホームのフォルダーには本人しか入れません（700）。ゲームに Linux 版があるので、Proton そのものは試していません。
 2. **ファイアウォール：画面は出ない。** ループバックのアドレスで待ち受けても、Windows Defender ファイアウォールの画面は出ませんでした。
 3. **NetworkWatch：数えない。** 十数本の接続を受けても、「ネットにつないだ」という記録は出ませんでした。見張っているのは、外へ出る接続だけです。
 4. **クライアント**

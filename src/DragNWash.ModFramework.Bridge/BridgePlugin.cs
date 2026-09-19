@@ -74,11 +74,12 @@ namespace DragNWash.ModFramework.Bridge
 
         private void Apply()
         {
-            if (Wanted && Server == null) Start();
+            if (Wanted && Server == null) Listen();
             else if (!Wanted && Server != null) Stop(_enabled.Value ? "the developer tools were turned off" : "it was switched off");
         }
 
-        private void Start()
+        // Not named Start: Unity calls a MonoBehaviour's Start() by itself after Awake.
+        private void Listen()
         {
             try
             {
