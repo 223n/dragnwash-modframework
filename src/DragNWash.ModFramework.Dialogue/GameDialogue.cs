@@ -12,8 +12,23 @@ namespace DragNWash.ModFramework.Dialogue
         /// <summary>Yarn line ID, e.g. "line:6046bedf". Stable across languages and game updates that only fix typos.</summary>
         public string LineId { get; internal set; }
 
-        /// <summary>The speaking character's name as written in the script ("Ryan"), or null.</summary>
+        /// <summary>
+        /// The speaking character's name as written in the script ("Ryan: Hello"), or
+        /// null. Drag'n Wash's script mostly names no speaker in the line; see
+        /// <see cref="SpeakerGuess"/>.
+        /// </summary>
         public string Speaker { get; internal set; }
+
+        /// <summary>
+        /// Who says the line: <see cref="Speaker"/> when the script names one, else a
+        /// guess from the node's name (the part before the first '_': "Ryan_1_intro" is
+        /// Ryan), and "Kobold" (the player) for an option. Null when there is nothing
+        /// to go on. <see cref="SpeakerFrom"/> says which. Since Dialogue 1.2.0.
+        /// </summary>
+        public string SpeakerGuess { get; internal set; }
+
+        /// <summary>Where <see cref="SpeakerGuess"/> came from: "script", "node", "option", or null.</summary>
+        public string SpeakerFrom { get; internal set; }
 
         /// <summary>The text without the character name.</summary>
         public string Text { get; internal set; }

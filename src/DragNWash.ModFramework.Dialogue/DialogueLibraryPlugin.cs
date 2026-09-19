@@ -126,7 +126,7 @@ namespace DragNWash.ModFramework.Dialogue
 
         private static DialogueLine Describe(LocalizedLine line, TMP_Text component, bool isOption, bool available)
         {
-            return new DialogueLine
+            var d = new DialogueLine
             {
                 LineId = line.TextID,
                 Speaker = line.CharacterName,
@@ -138,6 +138,30 @@ namespace DragNWash.ModFramework.Dialogue
                 IsOption = isOption,
                 IsAvailable = available,
             };
+            GuessSpeaker(d);
+            return d;
+        }
+
+        // The game's script mostly names no speaker in the line: the node says who
+        // speaks ("Ryan_1_intro"), and options are the player's, a kobold.
+        internal static void GuessSpeaker(DialogueLine d)
+        {
+            if (!string.IsNullOrEmpty(d.Speaker))
+            {
+                d.SpeakerGuess = d.Speaker;
+                d.SpeakerFrom = "script";
+            }
+            else if (d.IsOption)
+            {
+                d.SpeakerGuess = "Kobold";
+                d.SpeakerFrom = "option";
+            }
+            else if (!string.IsNullOrEmpty(d.Node))
+            {
+                string head = d.Node.Split('_')[0];
+                d.SpeakerGuess = head.Length > 0 ? head : null;
+                d.SpeakerFrom = d.SpeakerGuess != null ? "node" : null;
+            }
         }
     }
 }

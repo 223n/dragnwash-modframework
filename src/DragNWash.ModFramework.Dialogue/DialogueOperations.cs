@@ -27,7 +27,7 @@ namespace DragNWash.ModFramework.Dialogue
                 });
 
             Operations.Register(g, "dialogue.recent", "The last lines and options shown this session, newest last, optionally only those that contain a text.", OperationKind.Read,
-                "a list of { kind, line_id, node, speaker, text }", args =>
+                "a list of { kind, line_id, node, speaker, speaker_from, text } (speaker: named in the script, else guessed from the node, and Kobold for options)", args =>
                 {
                     string text = args.String("text");
                     int max = Math.Max(1, Math.Min(Kept, args.Int("max", 20)));
@@ -48,7 +48,8 @@ namespace DragNWash.ModFramework.Dialogue
                 ["kind"] = kind,
                 ["line_id"] = line.LineId,
                 ["node"] = line.Node,
-                ["speaker"] = line.Speaker,
+                ["speaker"] = line.SpeakerGuess,
+                ["speaker_from"] = line.SpeakerFrom,
                 ["text"] = line.Text,
             });
             if (Recent.Count > Kept) Recent.RemoveAt(0);

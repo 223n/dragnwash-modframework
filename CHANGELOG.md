@@ -19,6 +19,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ### Dialogue and Text, next version
 
+- `DialogueLine.SpeakerGuess` and `SpeakerFrom`: the game's script mostly names no speaker in a line, so `Speaker` was empty for nearly every line; the guess takes the script's name when there is one, else the node's (the part before the first `_`: `Ryan_1_intro` is Ryan), and Kobold (the player) for options. `dialogue.recent` and `dialogue.current` report it with where it came from.
 - Experimental. Read operations: `dialogue.current` (the node, whether lines or options show, the last line) and `dialogue.recent` (the last 100 lines and options shown this session); `text.rewriters` (the mods that rewrite text, in order) and `text.shown` (text on screen, as the game set it and as shown).
 
 ### Flags and saves, next version
