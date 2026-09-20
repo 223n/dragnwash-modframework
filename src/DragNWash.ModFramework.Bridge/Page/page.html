@@ -1286,8 +1286,8 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     const first = (open.doc.on || [])[0];
     if (!first) return;
     try {
-      await call("graphs.run", { file: open.file, handler: first.id });
-      window.dnwStatus("Started " + first.id + ".");
+      const r = await call("graphs.run", { file: open.file, handler: first.id });
+      window.dnwStatus("Started " + first.id + (r && r.started_again ? " (the graph was stopped; it runs again)" : "") + ".");
     } catch (e) {
       window.dnwStatus(e.message, true);
     }

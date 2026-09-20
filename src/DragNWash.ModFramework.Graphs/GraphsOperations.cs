@@ -304,9 +304,25 @@ namespace DragNWash.ModFramework.Graphs
             {
                 throw new InvalidOperationException($"{graph.File} has no handler {id}; it has {string.Join(", ", graph.Handlers.Select(h => h.Id).ToArray())}.");
             }
-            if (!graph.CanRun)
+            if (!graph.Ok)
             {
-                throw new InvalidOperationException($"{graph.File} is not running: {GameGraphs.State(graph)}.");
+                throw new InvalidOperationException($"{graph.File} does not run: {string.Join(" ", graph.Problems.ToArray())}");
+            }
+            if (graph.Waiting != null)
+            {
+                throw new InvalidOperationException($"{graph.File} is waiting for {graph.Waiting}.");
+            }
+            // Run is somebody asking for it by hand, so a graph that was stopped
+            // for the session - by the button, or by failing three times - starts
+            // again here rather than refusing. Its changes were put back when it
+            // stopped, so there is nothing to undo first.
+            bool again = graph.Stopped;
+            if (again)
+            {
+                graph.Stopped = false;
+                graph.StoppedWhy = null;
+                graph.Failures = 0;
+                GraphsPlugin.Log.LogInfo($"[graphs] {graph.Where} was started again from the page.");
             }
             GraphsPlugin.Instance.StartFromPage(graph, handler);
             return new Dictionary<string, object>
@@ -314,6 +330,7 @@ namespace DragNWash.ModFramework.Graphs
                 ["started"] = true,
                 ["graph"] = graph.File,
                 ["handler"] = handler.Id,
+                ["started_again"] = again,
             };
         }
 

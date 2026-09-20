@@ -16,6 +16,7 @@ The core and the preloader patcher go to 1.4.3, the Bridge to 0.1.2.
 
 - **Open page** and **Graphs** on the Bridge tab of the F1 window. The page could only be opened from a method in the Inspector's Code view, which is no help to somebody who wants to write a graph: **Graphs** opens the same page with the editor already in front (`bridge.page.open` takes `focus=v:graphs`), and **Open page** opens it at the code graph as before. Both views still switch inside the page.
 - The row of buttons wraps instead of walking off the edge of a narrow window.
+- Fixed: **Run** starts a graph that was stopped. Stopping is for the session, but pressing Run is somebody asking by hand, so the graph comes back (its failure count with it) instead of refusing with *switched off for this session*; the page says when a run did that. `graphs.run` returns `started_again`.
 - Fixed in the editor: the number in a new block's id climbed for ever. A graph with one handler is `h1` again, whatever was made and thrown away before it - an id only has to be unique inside its file, so a number a removed block freed is used again.
 
 ### Core 1.4.3
