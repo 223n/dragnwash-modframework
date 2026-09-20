@@ -70,6 +70,9 @@ public class MyMod : BaseUnityPlugin
 
    `src/DragNWash.ModFramework.*` の各プロジェクトも同じようにビルドします
 
+> [!TIP]
+> Docker があれば、`docker compose run --rm checks` で CI と同じ検査を、`docker compose run --rm build` で中核とライブラリのビルドを、CI と同じイメージの中で回せます（[docs/DOCKER.ja.md](docs/DOCKER.ja.md)）。手元には何も入りません。
+
 DLL はそれぞれのプロジェクトの `bin/Release/` にできます。試すときは、プラグインの DLL を 1 つずつ `<ゲーム>/BepInEx/plugins/<アセンブリ名>/` に、`DragNWash.ModFramework.Preloader.dll` を `<ゲーム>/BepInEx/patchers/` にコピーしてください。
 
 ### GitHub でビルドする

@@ -70,6 +70,9 @@ public class MyMod : BaseUnityPlugin
 
    and the same for each `src/DragNWash.ModFramework.*` project.
 
+> [!TIP]
+> With Docker, `docker compose run --rm checks` runs every check CI runs, and `docker compose run --rm build` builds the core and the libraries, in the image CI uses: [docs/DOCKER.md](docs/DOCKER.md). Nothing is installed on your machine.
+
 Each DLL goes to its project's `bin/Release/`. To try them, copy each plugin DLL to its own folder, `<Game>/BepInEx/plugins/<assembly name>/`, and `DragNWash.ModFramework.Preloader.dll` to `<Game>/BepInEx/patchers/`.
 
 ### Building on GitHub

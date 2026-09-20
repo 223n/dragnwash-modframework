@@ -90,6 +90,15 @@ python tools/linekeys.py --check  # line keys still match the vectors
 python tools/check-commits.py     # no tool's attribution in the commit messages
 ```
 
+With Docker you can run every one of them, and the builds CI makes, in the
+image CI itself uses - no Python and no .NET SDK of your own needed:
+
+```bash
+docker compose run --rm checks
+```
+
+See [docs/DOCKER.md](docs/DOCKER.md).
+
 The last one is the **Commit checker**. This history names the people who
 decided what a commit should say, not the editor, the assistant or the IDE that
 typed it. It fails the build on two things:

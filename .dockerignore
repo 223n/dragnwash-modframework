@@ -1,0 +1,9 @@
+# The image copies nothing in (the working tree is mounted instead), so this
+# only keeps the build context small and makes sure that what must never be
+# sent to a daemon - the game's assemblies in libs/, packed releases - is not.
+.git/
+**/bin/
+**/obj/
+**/libs/
+release/
+*.zip

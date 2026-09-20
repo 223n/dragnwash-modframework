@@ -5,6 +5,16 @@ name: CI
 # what needs no game files: consistency checks, and a build of the preloader
 # patcher, which only uses BepInEx.
 #
+# Every job runs its check inside the image docker/Dockerfile describes, which
+# is where Python and the .NET SDK come from. The same image runs the same
+# checks on a maintainer's machine:
+#
+#   docker compose run --rm checks
+#
+# docker/ci-image.sh pulls the published image, or builds it from the Dockerfile
+# when it cannot be pulled - which is what happens for a pull request from a
+# fork, and is why one needs no permission of any kind. See docs/DOCKER.md.
+#
 # A failure's reason is an annotation on the run (and on the file it names,
 # in a pull request's Files tab). The checks run locally the same way:
 #   python tools/check-repo.py      python tools/linekeys.py --check
@@ -15,27 +25,30 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   consistency:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - name: The checks' image
+        id: image
+        run: echo "tag=$(docker/ci-image.sh)" >> "$GITHUB_OUTPUT"
       - name: Versions, GUIDs, changelog and documentation links
-        run: python tools/check-repo.py
+        run: docker run --rm -v "$PWD":/work -w /work "${{ steps.image.outputs.tag }}" python tools/check-repo.py
 
   linekeys:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
+      - name: The checks' image
+        id: image
+        run: echo "tag=$(docker/ci-image.sh)" >> "$GITHUB_OUTPUT"
       - name: Line keys match the vectors (tools/linekeys.py)
-        run: python tools/linekeys.py --check
+        run: docker run --rm -v "$PWD":/work -w /work "${{ steps.image.outputs.tag }}" python tools/linekeys.py --check
+      - name: Graphs - the operations, the example graph and the broken ones
+        run: docker run --rm -v "$PWD":/work -w /work "${{ steps.image.outputs.tag }}" python tools/graphs.py --test
 
   preloader:
     runs-on: ubuntu-latest
@@ -44,9 +57,9 @@ jobs:
       BEPINEX_SHA256: 82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: "8.0.x"
+      - name: The checks' image
+        id: image
+        run: echo "tag=$(docker/ci-image.sh)" >> "$GITHUB_OUTPUT"
       - name: Get BepInEx 5.4.23.5 (checked against a pinned SHA-256)
         run: |
           curl -fsSL -o bepinex.zip "$BEPINEX_URL"
@@ -54,17 +67,17 @@ jobs:
           mkdir -p src/DragNWash.ModFramework/libs
           unzip -j -o bepinex.zip BepInEx/core/BepInEx.dll BepInEx/core/Mono.Cecil.dll -d src/DragNWash.ModFramework/libs
       - name: Build the preloader patcher
-        run: dotnet build src/DragNWash.ModFramework.Preloader/DragNWash.ModFramework.Preloader.csproj -c Release -warnaserror
+        run: docker run --rm -v "$PWD":/work -w /work "${{ steps.image.outputs.tag }}" dotnet build src/DragNWash.ModFramework.Preloader/DragNWash.ModFramework.Preloader.csproj -c Release -warnaserror
 
   installer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: "8.0.x"
+      - name: The checks' image
+        id: image
+        run: echo "tag=$(docker/ci-image.sh)" >> "$GITHUB_OUTPUT"
       - name: Build Install.exe
-        run: dotnet build installer/DragNWash.Installer.csproj -c Release -warnaserror
+        run: docker run --rm -v "$PWD":/work -w /work "${{ steps.image.outputs.tag }}" dotnet build installer/DragNWash.Installer.csproj -c Release -warnaserror
       - name: Check install-steamdeck.sh
         run: |
           bash -n installer/install-steamdeck.sh

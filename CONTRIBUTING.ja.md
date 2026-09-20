@@ -89,6 +89,14 @@ python tools/linekeys.py --check  # 行キーがベクターと一致してい�
 python tools/check-commits.py     # コミットメッセージに道具の署名が入っていないか
 ```
 
+Docker があれば、この全部と、CI がやるビルドまで、CI と同じイメージの中で回せます。手元に Python も .NET SDK も要りません。
+
+```bash
+docker compose run --rm checks
+```
+
+詳しくは [docs/DOCKER.ja.md](docs/DOCKER.ja.md) を見てください。
+
 最後のものが**コミットチェッカー**です。この履歴に名前が載るのは、そのコミットが
 何を言うべきかを決めた人だけで、それを打ち込んだエディターや補助ツールや IDE では
 ありません。次の 2 つでビルドが失敗します。

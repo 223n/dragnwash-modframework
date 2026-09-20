@@ -1,0 +1,33 @@
+# The checks and the builds, in the image docker/Dockerfile describes.
+#
+#   docker compose run --rm checks    every check CI runs
+#   docker compose run --rm build     the core and the libraries (needs libs/)
+#   docker compose run --rm shell     a shell in the same image
+#
+# The working tree is mounted at /work; nothing is copied into the image, so a
+# change on the host is seen immediately. Build output goes to /tmp inside the
+# container (DNW_OUT), which keeps bin/ and obj/ here as the host left them.
+#
+# See docs/DOCKER.md.
+services:
+  checks:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: dragnwash-modframework-ci:local
+    volumes:
+      - .:/work
+    working_dir: /work
+    command: ["docker/checks.sh"]
+
+  build:
+    extends:
+      service: checks
+    command: ["docker/build.sh"]
+
+  shell:
+    extends:
+      service: checks
+    command: ["bash"]
+    stdin_open: true
+    tty: true
