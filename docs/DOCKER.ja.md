@@ -52,5 +52,6 @@ Windows でビルドしたツリーには、すでに `bin/` と `obj/` に Wind
 
 - **`docker compose` がデーモンに繋がらない。** Docker Desktop が起動していないか、Linux エンジンが動いていません。
 - **手元で通るのに Actions で落ちる。** イメージを比べてください。ワークフローは `ghcr.io/tomxv/dragnwash-modframework-ci:latest` を使い、手元の `compose.yaml` は自分のツリーの Dockerfile から作ります。pull したあと `docker compose build` をすれば揃います。
+- **git の履歴を読む検査が、作業ツリー（worktree）だと落ちる。** 作業ツリーの `.git` は親リポジトリのフォルダーを指すファイルで、そこはマウントしていないので、コンテナの中の git には読むものがありません（`fatal: not a git repository`）。`check-repo.py`、`check-commits.py`、ゲームファイルの確認はそこで止まります。作業ツリーではこの 3 つをホスト側で回してください。ビルドなど残りは、ふつうのチェックアウトと同じように動きます。
 - **ビルドのエラーに `/build/...` と出る。** 上で説明したコピーです。ファイルはリポジトリの同じパスのものです。
 - **手元には何も入りません。** イメージを消せば（`docker image rm dragnwash-modframework-ci:local`）跡形もなくなります。

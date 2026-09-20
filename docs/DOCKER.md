@@ -85,6 +85,12 @@ Each job keeps its name (`check`, `consistency`, `preloader`, `installer`,
   pins `ghcr.io/tomxv/dragnwash-modframework-ci:latest`, and your `compose.yaml`
   builds the Dockerfile as it is in your tree. `docker compose build` after
   pulling brings the two back together.
+- **The checks that read the history fail in a git worktree.** In a worktree
+  `.git` is a file pointing into the main repository's folder, which is not
+  mounted, so git inside the container has nothing to read (`fatal: not a git
+  repository`) and `check-repo.py`, `check-commits.py` and the no-game-files
+  check stop there. Run those four on the host in a worktree; the builds and
+  the rest work in the container as they do anywhere.
 - **A build error names `/build/...`.** That is the copy explained above; the
   file is the same one at that path in the repository.
 - **Nothing is ever installed on your machine by this.** Removing the image
