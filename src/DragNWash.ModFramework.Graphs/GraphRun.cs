@@ -517,8 +517,33 @@ namespace DragNWash.ModFramework.Graphs
             }
         }
 
-        /// <summary>Switches a graph off for the session and puts back what it changed.</summary>
-        internal void Stop(Graph graph, string why)
+        /// <summary>
+        /// Switches a graph off for the session, puts back what it changed and
+        /// says how many changes that was.
+        /// </summary>
+        internal int Stop(Graph graph, string why)
+        {
+            int back = Halt(graph, why);
+            _world.Write(GraphLevel.Warning, $"{graph.Where} is switched off for this session because {why}{(back > 0 ? $"; {back} change(s) put back" : "")}.");
+            _world.Unavailable(graph, why);
+            return back;
+        }
+
+        /// <summary>
+        /// Stops a graph because its file is about to be read again, and says
+        /// how many changes were put back. The graph did nothing wrong and is
+        /// about to run again, so this leaves no warning in the log and no mark
+        /// on the Mods screen: a reload that marked every graph unavailable
+        /// would leave the player with a mod that looks broken and is not.
+        /// </summary>
+        internal int StopForReload(Graph graph)
+        {
+            int back = Halt(graph, "the graphs are being read again");
+            _world.Write(GraphLevel.Debug, $"{graph.Where} stopped for a reload{(back > 0 ? $"; {back} change(s) put back" : "")}.");
+            return back;
+        }
+
+        private int Halt(Graph graph, string why)
         {
             graph.Stopped = true;
             graph.StoppedWhy = why;
@@ -527,9 +552,7 @@ namespace DragNWash.ModFramework.Graphs
                 run.Done = true;
             }
             graph.Runs.Clear();
-            int back = TakeBackAll(graph);
-            _world.Write(GraphLevel.Warning, $"{graph.Where} is switched off for this session because {why}{(back > 0 ? $"; {back} change(s) put back" : "")}.");
-            _world.Unavailable(graph, why);
+            return TakeBackAll(graph);
         }
 
         /// <summary>

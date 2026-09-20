@@ -289,8 +289,9 @@ namespace DragNWash.ModFramework.Graphs
             int back = 0;
             foreach (Graph graph in Graphs.ToList())
             {
-                _runner.Stop(graph, "the graphs are being read again");
-                back += _runner.TakeBackAll(graph);
+                // Quietly: a graph that is about to be read again did nothing
+                // wrong, and a warning per graph would say it did.
+                back += _runner.StopForReload(graph);
             }
             // The folders may have changed too (a mod added by hand): the core
             // looks again, and every library that reads data mods sees it.
@@ -316,10 +317,7 @@ namespace DragNWash.ModFramework.Graphs
                 return $"No graph called \"{which}\". The names are: " +
                        string.Join(", ", Graphs.Select(g => g.File).ToArray());
             }
-            _runner.Stop(graph, "it was stopped from the console");
-            int back = _runner.TakeBackAll(graph);
-            graph.Stopped = true;
-            graph.StoppedWhy = "it was stopped by hand";
+            int back = _runner.Stop(graph, "it was stopped by hand");
             string line = $"{graph.Where} stopped for this session; {back} change(s) put back.";
             Log.LogInfo("[graphs] " + line);
             return line;
