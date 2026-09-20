@@ -32,13 +32,14 @@ Drag'n Wash Localization v1.2.0 と一緒にリリースしました。
 ここにあるものはすべて `main` にあり、実験的な扱いです。全部の一覧は [CHANGELOG.md](../CHANGELOG.md) にあります。
 
 - **Overrides 0.1.0：コードのない Mod。** `mod.json` と `overrides/*.json` だけのフォルダーが、コンポーネントのフィールドやマテリアルのプロパティを書き換えます。ほかの Mod と同じく Mods 画面に出てオフにでき、きれいに元に戻せます。2 つの Mod が同じところを書き換えたときは、ログに両方の名前を出します。Inspector の History から、そこでの編集をこの形の Mod として書き出せます（[Overrides（wiki）](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides-ja)）。
-- **操作の登録簿と、そこから出てきたもの**（[計画](API_PLAN.ja.md)の第 1〜3 段階）。各ライブラリが、できることを名前つきの操作（`library.noun.verb`）として登録し、引数は検査して素の値で返します。その 1 つの登録簿から、Console の `op`、**Bridge 0.1.0**（AI クライアント向けの読み取り操作を MCP で。この PC の中だけ、既定はオフ、トークンと、Web ページを断る入口つき）、**コードのグラフ**（ゲームのコードをブロックと分岐で。ページと、ゲームなしで動く Windows のアプリ）ができました。第 4 段階の「ノードグラフで組み立てる」はこれからです。
+- **操作の登録簿と、そこから出てきたもの**（[計画](API_PLAN.ja.md)の第 1〜3 段階）。各ライブラリが、できることを名前つきの操作（`library.noun.verb`）として登録し、引数は検査して素の値で返します。その 1 つの登録簿から、Console の `op`、**Bridge 0.1.0**（AI クライアント向けの読み取り操作を MCP で。この PC の中だけ、既定はオフ、トークンと、Web ページを断る入口つき）、**コードのグラフ**（ゲームのコードをブロックと分岐で。ページと、ゲームなしで動く Windows のアプリ）ができました。第 4 段階の「ノードグラフで組み立てる」は、設計はできていて、実装はこれからです（[GRAPHS.ja.md](GRAPHS.ja.md)）。
 - **Inspector のオブジェクトエクスプローラー。** 読み込まれているものすべてを種類別に（テクスチャ、マテリアル、メッシュ、シェーダー、音、アニメーション、フォント、ScriptableObject に入ったゲームのデータ）Unity の Project ウィンドウのように並べ、**Used by** でどこで使われているかを調べられます。一覧は矢印キーで、Steam Deck やゲームパッドでは十字キーでたどれます（[設計](OBJECT_EXPLORER.ja.md)）。
 - **言語ごとのテクスチャの差し替え**（Assets 1.2.0）。特定の言語を使っている間だけ効き、`fallback.txt` に書いた言語へたどり、元に戻せて、Direct3D 12 では再起動を待ちます。これを土台に Drag'n Wash Localization の絵の翻訳ができています（[設計](https://github.com/TomXV/dragnwash-localization/blob/main/docs/TRANSLATED_TEXTURES.ja.md)）。
 - Inspector の Animator と Rigidbody、シーンとレベル、クラッシュレポートの後始末、Tool window の Steam Deck 対応（トラックパッドの押下が本物のマウスボタンに、十字キーが本物の矢印キーに）。
 
 ## 予定していること
 
+- **グラフ：ブロックとノードで組み立てる**（[計画](API_PLAN.ja.md)の第 4 段階）。「これが起きたら、これをする」だけの、コードのない小さな Mod です。`mod.json` の隣に置く JSON ファイルで、呼べるのは各ライブラリが登録した操作だけ。作るのは Bridge のページで、ブロックかノードで組み立てます。設計は [GRAPHS.ja.md](GRAPHS.ja.md) にあり、決めることは決まっていて、作業の順番も書いてあります。調査はゲームなしで済ませました（`tools/graphs.py` が、登録された操作に照らしてグラフファイルを検査し、実行もします）。実装はこれからです。
 - **Mods 画面に、Mod ごとのお知らせ欄。** 今の画面が出せるのは「使えない機能」と「同じコードを書き換えている」の 2 種類だけです。どちらにも当てはまらないこともあります。たとえば、2 つの Mod が同じ行に違う訳を同梱した場合です（[Localization #28](https://github.com/TomXV/dragnwash-localization/issues/28)）。Mod やライブラリが、Mod の下に一言残せる小さな共通の仕組みを用意します。
 - **他の Mod が同梱する訳。** Drag'n Wash Localization が単独で `<Mod のフォルダー>/Translations/` を読むところまではできました。β版の実験的機能で、既定はオフです（[設計](https://github.com/TomXV/dragnwash-localization/blob/main/docs/MOD_TRANSLATIONS.ja.md)）。2 つ目の翻訳 Mod が同じ約束事を使いたくなったら、フォルダーを見つける処理を Text ライブラリに移します。
 - **Direct3D 12。** 1.3.0 で、このクラッシュ（Unity UUM-140564）のいちばん多いきっかけだった、フォントのアトラスの転送の集中をなくしました。ゲーム中のテクスチャのリロードは、まだ一度に転送します。同じ対策が要るかは、クラッシュレポートの GPU 転送のトレースで確かめます。
