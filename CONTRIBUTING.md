@@ -87,7 +87,15 @@ CI runs what needs no game files, and you can run all of it yourself:
 ```bash
 python tools/check-repo.py        # versions, GUIDs, changelog, documentation links
 python tools/linekeys.py --check  # line keys still match the vectors
+python tools/check-commits.py     # no tool's attribution in the commit messages
 ```
+
+The last one is the **Commit checker**. This history names the people who
+decided what a commit should say, not the editor, the assistant or the IDE that
+typed it, so a `Co-authored-by` line naming a tool, a "Generated with" footer or
+a link to an assistant's session fails the build. A human co-author is welcome.
+If it catches you, reword the commit (`git commit --amend`, or `git rebase -i`
+for an older one) and push again.
 
 The core and the libraries cannot be built on a runner — they need the game's
 assemblies — so **you** are the one who checked them. Say in the pull request
