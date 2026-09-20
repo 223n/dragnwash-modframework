@@ -1037,13 +1037,16 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     return t;
   }
 
-  let counter = 0;
+  // The lowest number free in this file. An id only has to be unique inside
+  // the file, so a number freed by a removed block is used again: a graph with
+  // one handler should call it h1, whatever was made and thrown away before it.
   function nextId(prefix) {
     const used = new Set();
     const walk = list => { for (const s of list || []) { used.add(s.id); walk(s.do); walk(s.then); walk(s.else); walk(s.onError); } };
     for (const h of (open && open.doc.on) || []) { used.add(h.id); walk(h.do); }
-    do { counter++; } while (used.has(prefix + counter));
-    return prefix + counter;
+    let n = 1;
+    while (used.has(prefix + n)) n++;
+    return prefix + n;
   }
 
   // ---- the same graph as nodes --------------------------------------------
