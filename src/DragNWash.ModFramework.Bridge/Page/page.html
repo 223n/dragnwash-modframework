@@ -44,6 +44,8 @@ button[disabled] { opacity: .45; cursor: default; }
 button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 #status { color: var(--muted); font-size: 12px; margin-left: auto; }
 main { display: grid; grid-template-columns: 240px 1fr 6px var(--right, 650px); min-height: 0; }
+/* A view that is not on screen is out of the way: display beats hidden. */
+main[hidden] { display: none; }
 /* Results folded away: the graph takes its room. */
 main.folded { grid-template-columns: 0 1fr 6px var(--right, 650px); }
 main.folded #left { padding: 0; border: 0; overflow: hidden; }
@@ -101,6 +103,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 /* ---- the graphs editor ---------------------------------------------------- */
 .view-tab[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 #graphsView { display: grid; grid-template-columns: 240px 1fr 6px 320px; min-height: 0; }
+/* An id beats "main[hidden]", so the graphs view says it again for itself. */
 #graphsView[hidden] { display: none; }
 #gList, #gSide { background: var(--panel); border-right: 1px solid var(--line); padding: 10px 12px; overflow: auto; min-width: 0; }
 #gSide { border-right: 0; border-left: 1px solid var(--line); }
@@ -124,6 +127,27 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 .blk .tools button { padding: 1px 7px; font-size: 12px; }
 .add { margin: 6px 0 2px 0; display: flex; gap: 6px; align-items: center; }
 .add select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--inset); color: var(--text); font: inherit; }
+#gBar .gap { flex: 1; }
+#gNodes { overflow: auto; padding: 14px; background: var(--ground); }
+#gNodes svg { display: block; }
+.node rect { fill: var(--node); stroke: var(--line); rx: 7; }
+.node.hat rect { fill: var(--accent-soft); stroke: var(--accent); }
+.node.write rect { fill: color-mix(in srgb, var(--back) 22%, var(--node-head)); }
+.node text { font: 12px var(--mono); fill: var(--text); }
+.node .kindtext { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: 10px; fill: var(--muted); }
+.node:hover rect { stroke: var(--accent); }
+.node { cursor: pointer; }
+.wire { stroke: var(--line); fill: none; stroke-width: 1.5; }
+.wire.value { stroke-dasharray: 4 3; stroke: var(--accent); }
+.wirelabel { font: 10px var(--mono); fill: var(--muted); }
+/* dragging a block */
+.blk.dragging { opacity: .45; }
+.blk > .head[draggable="true"] { cursor: grab; }
+.blk.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.blk.drop-after { box-shadow: 0 3px 0 0 var(--accent); }
+.add.drop-into { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: 6px; }
+.blk.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: none; } }
 .log { font: 12px/1.5 var(--mono); background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px; height: 320px; overflow: auto; white-space: pre-wrap; }
 .log .error { color: var(--error); }
 .log .warning { color: var(--warn); }
@@ -168,9 +192,13 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
       <button id="gSave" type="button">Save</button>
       <button id="gRun" type="button" title="Start the first handler now, without waiting for its event">Run</button>
       <button id="gStop" type="button" title="Stop this graph for the session and put back what it changed">Stop</button>
+      <span class="gap"></span>
+      <button id="gAsBlocks" type="button" class="view-tab" aria-pressed="true" title="The graph as blocks, to edit">Blocks</button>
+      <button id="gAsNodes" type="button" class="view-tab" aria-pressed="false" title="The graph as nodes, to see its shape">Nodes</button>
       <span id="gState" class="muted"></span>
     </div>
     <div id="gBlocks" tabindex="0" aria-label="The graph's blocks"></div>
+    <div id="gNodes" hidden aria-label="The graph as nodes"></div>
   </div>
   <div id="gSplit" role="separator" aria-orientation="vertical" tabindex="0"></div>
   <aside id="gSide">
@@ -619,6 +647,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   let logAfter = 0, polling = null, checkSoon = null;
 
   const STATEMENTS = ["call", "set", "if", "wait", "repeat", "while", "each", "log", "stop"];
+  const svgNS2 = "http://www.w3.org/2000/svg";
 
   // ---- the two views ------------------------------------------------------
   const codeView = document.querySelector("main:not(#graphsView)");
@@ -719,6 +748,9 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
       changed(true);
     };
     root.append(add);
+    // Both views are drawn from the same file, so a change shows in whichever
+    // one is on screen.
+    if (asNodes) nodes();
   }
 
   function handlerBlock(h) {
@@ -735,6 +767,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     const body = el("div", { class: "body" });
     statements(body, h.do = h.do || []);
     b.append(body);
+    carry(b, bar, open.doc.on, h);
     return b;
   }
 
@@ -746,6 +779,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     for (const k of STATEMENTS) pick.append(el("option", { value: k }, k));
     pick.onchange = () => { if (pick.value) { list.push(blank(pick.value)); changed(true); } };
     add.append(pick);
+    intoDrop(add, list);
     into.append(add);
   }
 
@@ -833,6 +867,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
       statements(body, st.do = st.do || []);
     }
     if (body.childNodes.length) b.append(body);
+    carry(b, bar, list, st);
     return b;
   }
 
@@ -843,6 +878,109 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     else if (p.type === "boolean") st.args[p.name] = v === "true";
     else st.args[p.name] = v;
     changed();
+  }
+
+  // ---- dragging blocks ----------------------------------------------------
+  // A block is picked up by its head, so the fields inside it stay usable, and
+  // dropped above or below another block of the same kind, or onto the "+ add"
+  // row at the end of a list. A handler only ever lands among handlers, and a
+  // statement among statements; a block cannot be dropped inside itself, which
+  // would take it out of the file altogether.
+  let carrying = null;
+
+  function carry(block, head, list, item) {
+    block._where = { list, item };
+    head.draggable = true;
+    // A field in the head would start the drag instead of taking the text.
+    for (const f of head.querySelectorAll("input, select")) {
+      f.addEventListener("pointerdown", () => { head.draggable = false; });
+      f.addEventListener("pointerup", () => { head.draggable = true; });
+      f.addEventListener("blur", () => { head.draggable = true; });
+    }
+    head.addEventListener("dragstart", e => {
+      carrying = { list, item, handler: list === open.doc.on };
+      block.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      // Firefox starts no drag without this.
+      e.dataTransfer.setData("text/plain", item.id || "");
+      e.stopPropagation();
+    });
+    head.addEventListener("dragend", () => {
+      block.classList.remove("dragging");
+      carrying = null;
+      clearMarks();
+    });
+    block.addEventListener("dragover", e => {
+      if (!fits(list, item)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      clearMarks();
+      const box = block.getBoundingClientRect();
+      block.classList.add(e.clientY < box.top + box.height / 2 ? "drop-before" : "drop-after");
+    });
+    block.addEventListener("drop", e => {
+      if (!fits(list, item)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const box = block.getBoundingClientRect();
+      const before = e.clientY < box.top + box.height / 2;
+      move(list, list.indexOf(item) + (before ? 0 : 1));
+    });
+  }
+
+  function intoDrop(row, list) {
+    row.addEventListener("dragover", e => {
+      if (!fits(list, null)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      clearMarks();
+      row.classList.add("drop-into");
+    });
+    row.addEventListener("drop", e => {
+      if (!fits(list, null)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      move(list, list.length);
+    });
+  }
+
+  // Handlers go among handlers and statements among statements; and nothing
+  // goes inside itself.
+  function fits(list, item) {
+    if (!carrying) return false;
+    const handlers = list === open.doc.on;
+    if (handlers !== carrying.handler) return false;
+    if (item === carrying.item) return true;   // same place: allowed, does nothing
+    return !inside(carrying.item, list);
+  }
+
+  function inside(item, list) {
+    let found = false;
+    const walk = l => {
+      if (!l) return;
+      if (l === list) found = true;
+      for (const st of l) { walk(st.do); walk(st.then); walk(st.else); walk(st.onError); }
+    };
+    walk(item.do); walk(item.then); walk(item.else); walk(item.onError);
+    return found;
+  }
+
+  function move(list, at) {
+    const from = carrying.list, item = carrying.item;
+    const was = from.indexOf(item);
+    if (was < 0) return;
+    from.splice(was, 1);
+    if (from === list && was < at) at--;
+    list.splice(Math.max(0, Math.min(at, list.length)), 0, item);
+    carrying = null;
+    clearMarks();
+    changed(true);
+  }
+
+  function clearMarks() {
+    for (const m of $("gBlocks").querySelectorAll(".drop-before, .drop-after, .drop-into")) {
+      m.classList.remove("drop-before", "drop-after", "drop-into");
+    }
   }
 
   // ---- the pieces a block is made of --------------------------------------
@@ -902,6 +1040,196 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     do { counter++; } while (used.has(prefix + counter));
     return prefix + counter;
   }
+
+  // ---- the same graph as nodes --------------------------------------------
+  // The file is a tree, so the nodes are a tree too: flow runs down the edges
+  // (next, then, else, do, on error) and a result named with "as" is a dashed
+  // wire to the statements that read it. Nothing is drawn here that the blocks
+  // cannot say, so switching between the two views loses nothing. Editing is
+  // done in the blocks: a node opens its block, which is where its fields are.
+  const NW = 260, NH = 38, NGAPY = 20, NGAPX = 56, NPAD = 10;
+  let asNodes = false;
+
+  function nodes() {
+    const root = $("gNodes");
+    root.replaceChildren();
+    if (!open) { root.append(el("p", { class: "muted" }, "Pick a graph on the left, or make one.")); return; }
+    const out = { nodes: [], edges: [] };
+    let y = 0;
+    for (const h of open.doc.on || []) {
+      const hat = { st: h, hat: true, x: 0, y, w: NW, h: NH };
+      out.nodes.push(hat);
+      const after = column(h.do || [], NW + NGAPX, y, out);
+      if ((h.do || []).length) {
+        out.edges.push({ from: hat, to: out.nodes.find(n => n.st === h.do[0]), label: "do" });
+      }
+      y = Math.max(y + NH, after) + NGAPY * 2;
+    }
+    wires(out);
+    root.append(paint(out));
+  }
+
+  // One column of statements; a branch is a column to the right of its owner.
+  function column(items, x, y, out) {
+    let prev = null, bottom = y;
+    for (const st of items) {
+      const node = { st, x, y, w: NW, h: NH, write: writes(st) };
+      out.nodes.push(node);
+      if (prev) out.edges.push({ from: prev, to: node, label: "next" });
+      let below = y + NH;
+      for (const pair of branches(st)) {
+        const label = pair[0], sub = pair[1];
+        if (!sub.length) continue;
+        const end = column(sub, x + NW + NGAPX, below + NGAPY, out);
+        out.edges.push({ from: node, to: out.nodes.find(n => n.st === sub[0]), label });
+        below = end;
+      }
+      bottom = Math.max(bottom, below);
+      y = below + NGAPY;
+      prev = node;
+    }
+    return bottom;
+  }
+
+  function branches(st) {
+    const out = [];
+    if ("if" in st) { out.push(["then", st.then || []]); out.push(["else", st.else || []]); }
+    if ("repeat" in st || "while" in st || "each" in st) out.push(["do", st.do || []]);
+    if (st.onError) out.push(["on error", st.onError]);
+    return out;
+  }
+
+  function writes(st) {
+    if (!("call" in st)) return false;
+    const op = catalog.operations.find(o => o.name === st.call);
+    return !!op && op.kind === "write";
+  }
+
+  // A result named with "as" is read by whatever mentions {"var": name}.
+  function wires(out) {
+    for (const from of out.nodes) {
+      const name = from.st && from.st.as;
+      if (!name || !("call" in from.st)) continue;
+      const looking = JSON.stringify({ var: name });
+      for (const to of out.nodes) {
+        if (to === from || !to.st) continue;
+        const own = Object.assign({}, to.st, { do: 0, then: 0, else: 0, onError: 0 });
+        if (JSON.stringify(own).includes(looking)) out.edges.push({ from, to, label: name, value: true });
+      }
+    }
+  }
+
+  function paint(out) {
+    const w = Math.max.apply(null, out.nodes.map(n => n.x + n.w).concat([200])) + NPAD * 2;
+    const h = Math.max.apply(null, out.nodes.map(n => n.y + n.h).concat([100])) + NPAD * 2;
+    const svg = document.createElementNS(svgNS2, "svg");
+    svg.setAttribute("width", w);
+    svg.setAttribute("height", h);
+    const g = document.createElementNS(svgNS2, "g");
+    g.setAttribute("transform", "translate(" + NPAD + "," + NPAD + ")");
+    svg.append(g);
+    for (const e of out.edges) g.append(edge(e));
+    for (const n of out.nodes) g.append(box(n));
+    return svg;
+  }
+
+  function edge(e) {
+    const g = document.createElementNS(svgNS2, "g");
+    const path = document.createElementNS(svgNS2, "path");
+    const down = e.to.x === e.from.x && e.to.y > e.from.y;
+    const x1 = down ? e.from.x + e.from.w / 2 : e.from.x + e.from.w;
+    const y1 = down ? e.from.y + e.from.h : e.from.y + e.from.h / 2;
+    const x2 = down ? e.to.x + e.to.w / 2 : e.to.x;
+    const y2 = down ? e.to.y : e.to.y + e.to.h / 2;
+    const mx = (x1 + x2) / 2;
+    path.setAttribute("d", down
+      ? "M " + x1 + " " + y1 + " L " + x2 + " " + y2
+      : "M " + x1 + " " + y1 + " C " + mx + " " + y1 + " " + mx + " " + y2 + " " + x2 + " " + y2);
+    path.setAttribute("class", "wire" + (e.value ? " value" : ""));
+    g.append(path);
+    if (e.label && e.label !== "next") {
+      const t = document.createElementNS(svgNS2, "text");
+      t.setAttribute("x", down ? x1 + 6 : (x1 + x2) / 2);
+      t.setAttribute("y", down ? (y1 + y2) / 2 + 4 : (y1 + y2) / 2 - 4);
+      t.setAttribute("class", "wirelabel");
+      t.setAttribute("text-anchor", down ? "start" : "middle");
+      t.textContent = e.label;
+      g.append(t);
+    }
+    return g;
+  }
+
+  function box(n) {
+    const g = document.createElementNS(svgNS2, "g");
+    g.setAttribute("class", "node" + (n.hat ? " hat" : "") + (n.write ? " write" : ""));
+    g.setAttribute("transform", "translate(" + n.x + "," + n.y + ")");
+    const r = document.createElementNS(svgNS2, "rect");
+    r.setAttribute("width", n.w);
+    r.setAttribute("height", n.h);
+    g.append(r);
+    const kind = n.hat ? "when" : (STATEMENTS.find(k => k in n.st) || "?");
+    const k = document.createElementNS(svgNS2, "text");
+    k.setAttribute("x", 10);
+    k.setAttribute("y", 14);
+    k.setAttribute("class", "kindtext");
+    k.textContent = kind + (n.st.id ? "  " + n.st.id : "");
+    g.append(k);
+    const t = document.createElementNS(svgNS2, "text");
+    t.setAttribute("x", 10);
+    t.setAttribute("y", 30);
+    t.textContent = say(n, kind);
+    g.append(t);
+    const title = document.createElementNS(svgNS2, "title");
+    title.textContent = "Click to edit this block";
+    g.append(title);
+    g.onclick = () => openBlock(n.st.id);
+    return g;
+  }
+
+  function say(n, kind) {
+    const st = n.st;
+    const short = v => {
+      const text = v == null ? "" : (typeof v === "object" ? JSON.stringify(v) : String(v));
+      return text.length > 30 ? text.slice(0, 29) + "\u2026" : text;
+    };
+    if (n.hat) return st.event + (st.key ? " " + st.key : "") + (st.seconds != null ? " every " + st.seconds + "s" : "");
+    if (kind === "call") return (st.as ? st.as + " = " : "") + st.call;
+    if (kind === "set") return st.set + " = " + short(st.to);
+    if (kind === "log") return short(st.log);
+    if (kind === "wait") return st.wait + " second(s)";
+    if (kind === "repeat") return st.repeat + " time(s)";
+    if (kind === "while") return short(st.while) + " (max " + (st.max != null ? st.max : 100) + ")";
+    if (kind === "each") return short(st.each) + " as " + (st.as || "item");
+    if (kind === "if") return short(st.if);
+    return "";
+  }
+
+  // A node opens its block: the fields live there, in one place.
+  function openBlock(id) {
+    asNodes = false;
+    paintView();
+    for (const span of $("gBlocks").querySelectorAll(".id")) {
+      if (span.textContent === id) {
+        const blk = span.closest(".blk");
+        blk.scrollIntoView({ block: "center" });
+        blk.classList.remove("flash");
+        void blk.offsetWidth;
+        blk.classList.add("flash");
+        return;
+      }
+    }
+  }
+
+  function paintView() {
+    $("gBlocks").hidden = asNodes;
+    $("gNodes").hidden = !asNodes;
+    $("gAsBlocks").setAttribute("aria-pressed", String(!asNodes));
+    $("gAsNodes").setAttribute("aria-pressed", String(asNodes));
+    if (asNodes) nodes();
+  }
+
+  $("gAsBlocks").onclick = () => { asNodes = false; paintView(); };
+  $("gAsNodes").onclick = () => { asNodes = true; paintView(); };
 
   // ---- checking, saving, running ------------------------------------------
   function changed(redraw) {
