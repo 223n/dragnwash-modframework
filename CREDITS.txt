@@ -1,0 +1,40 @@
+Drag'n Wash ModFramework - credits
+==================================
+
+The framework's code is by TomXV and is under the MIT license (LICENSE.txt in
+the core's folder). The artwork below is not: it was drawn for this project by
+the people named, who keep their rights to it. Do not reuse it in another
+project without asking them.
+
+Artwork
+-------
+
+NotaGames (https://github.com/NotaGames)
+  The framework's logo, and the "Dg" icon shown next to the framework on the
+  Mods screen (icon.png), drawn after the game's own logo with the game
+  developers' agreement.
+
+Mister ERIO (https://github.com/mistererio)
+  The Mods button on the game's Options screen (ModsButton0.png and
+  ModsButton1.png), drawn in the game's menu style.
+
+Code and fixes
+--------------
+
+223n (https://github.com/223n)
+  Fixes across the repository, sent as pull requests.
+
+Thanks
+------
+
+Gator Dragon Games, for making Drag'n Wash and for letting mods like this one
+exist.
+
+Everyone who reported a problem, tried a build on their own machine or asked a
+question that turned into a feature.
+
+---
+
+Are you missing from this list? It is not deliberate: open an issue at
+https://github.com/TomXV/dragnwash-modframework/issues and it will be fixed in
+the next release.

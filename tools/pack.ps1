@@ -5,7 +5,7 @@
 #   BepInEx/plugins/DragNWash.ModFramework.<Library>/DragNWash.ModFramework.<Library>.dll
 #   BepInEx/patchers/DragNWash.ModFramework.Preloader.dll
 #   installer/Install.exe, installer/install-steamdeck.sh, installer/mod-install.example.json
-#   README.md, README.ja.md, CHANGELOG.md
+#   README.md, README.ja.md, CHANGELOG.md, CREDITS.txt
 #
 # Players normally get the framework with a mod that needs it (Drag'n Wash
 # Localization ships it); this zip is for mod authors and for installing by hand.
@@ -106,7 +106,7 @@ foreach ($file in 'CodeGraph.exe', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft
 $GraphHash = (Get-FileHash -LiteralPath (Join-Path $GraphStage 'CodeGraph.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "CodeGraph.exe sha256 $GraphHash"
 
-foreach ($doc in 'README.md', 'README.ja.md', 'CHANGELOG.md') {
+foreach ($doc in 'README.md', 'README.ja.md', 'CHANGELOG.md', 'CREDITS.txt') {
     Copy-Item -LiteralPath (Join-Path $Root $doc) -Destination $Stage
 }
 
