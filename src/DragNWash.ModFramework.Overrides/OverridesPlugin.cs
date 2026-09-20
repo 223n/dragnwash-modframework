@@ -43,6 +43,10 @@ namespace DragNWash.ModFramework.Overrides
                 "Apply the overrides mods in BepInEx/plugins (folders with mod.json and overrides/). Each can also be switched off on the Mods screen.");
 
             Read();
+            // The write operations a graph may call (docs/GRAPHS.md): registered
+            // here because this library already knows how to make these changes
+            // and how to put them back.
+            ObjectWrites.Register();
             AddConsoleCommand();
             SceneManager.sceneLoaded += (scene, mode) => { if (_enabled.Value) StartCoroutine(AfterLoad(scene.name)); };
         }

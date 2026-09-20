@@ -13,10 +13,13 @@ namespace DragNWash.ModFramework.Graphs
     // of a frame the runs may have. Everything a graph can reach comes from the
     // operations registry through GraphRegistry.
     //
-    // The order matters. Files are read at ModFramework.Ready, after every
-    // plugin's Awake, because a file is checked against the operations and
-    // events registered *now*: reading earlier would refuse calls to libraries
-    // that simply had not registered yet.
+    // The order matters. A file is checked against the operations and events
+    // registered at the moment it is read, so reading too early refuses calls
+    // to libraries that simply had not registered yet. ModFramework.Ready is
+    // not that moment: the core raises it inside its own Awake, before the
+    // other plugins have theirs. The first Update is, because BepInEx creates
+    // every plugin in one frame and Unity runs all of their Awake and Start
+    // methods before any Update.
     //
     // An event never starts a run where it is raised. Operations.Happened runs
     // inside the library that raised it - in the middle of a dialogue line, a
@@ -86,8 +89,6 @@ namespace DragNWash.ModFramework.Graphs
             // marks the graphs that used them as waiting instead of failing, and
             // picks them up again when the operations come back.
             ModReload.Unloading += (guid, assembly) => _runner.CheckOperations();
-
-            ModFramework.Ready += Load;
 
             AddConsoleCommand();
         }
@@ -193,6 +194,12 @@ namespace DragNWash.ModFramework.Graphs
 
         private void Update()
         {
+            if (!_read)
+            {
+                // The first frame: every plugin has had its Awake and its Start,
+                // so the registry holds every operation and event there will be.
+                Load();
+            }
             if (!_enabled.Value || !_read)
             {
                 return;
