@@ -1,8 +1,9 @@
 """Commit checker: no tool's attribution in the history, run by CI on every push and pull request.
 
-This repository's history is written in one voice. A commit message must not
-credit the editor, the assistant or the IDE that happened to type it - only the
-people who decided what it should say. A human co-author is fine; a tool is not.
+This repository's history names the people who decided what a commit should say,
+not the editor, the assistant or the IDE that typed it. The check refuses a
+commit whose message credits a tool, and one whose author or committer IS a
+tool. A human co-author, and a human whatever their name, are welcome.
 
     python tools/check-commits.py                 # what is not yet on origin/main
     python tools/check-commits.py <base>..<head>  # an explicit range (CI passes this)
@@ -10,13 +11,15 @@ people who decided what it should say. A human co-author is fine; a tool is not.
 
 A failure's reason is an annotation on the run. To fix one before it is pushed:
 
-    git commit --amend            # the last commit
-    git rebase -i <base>          # an older one, then reword it
+    git commit --amend                       # the message of the last commit
+    git commit --amend --reset-author        # and its author, to you
+    git rebase -i <base>                     # an older one, then reword or edit it
 """
 import re
 import subprocess
 import sys
 
+# ---- messages ---------------------------------------------------------------
 # Attribution that must not appear in a commit message. Each entry is a name for
 # the report and a pattern matched against the whole message, case-insensitively.
 # A co-author who is a person is welcome; these are tools.
@@ -27,7 +30,7 @@ import sys
 # Bridge answers AI clients over MCP, and a commit citing the specification it
 # follows is a normal commit. The @anthropic.com rule needs the at sign, so it
 # catches the address in a trailer and not a link to a page.
-FORBIDDEN = [
+FORBIDDEN_MESSAGE = [
     ("Claude's attribution", r"co-?authored-by:.*\b(claude|anthropic)\b"),
     ("an Anthropic address", r"@anthropic\.com"),
     ("Claude Code's footer", r"generated with \[?claude code"),
@@ -41,7 +44,39 @@ FORBIDDEN = [
     ("Aider's attribution", r"co-?authored-by:.*\baider\b"),
 ]
 
+# ---- identities -------------------------------------------------------------
+# The author and the committer of every commit are checked too: a message can be
+# written in this repository's voice while the commit itself is signed by a tool.
+#
+# Addresses are matched whole, names only where no person would use them. Claude
+# is a person's name - a translator called Claude, committing from their own
+# address, passes - so the name rules ask for a model or a bot suffix after it.
+#
+# What is meant to pass, and does: dependabot[bot] and github-actions[bot],
+# which open the dependency pull requests; GitHub <noreply@github.com>, the
+# committer GitHub writes when a pull request is merged from the web; and every
+# person's own address, including the GitHub noreply addresses people use.
+FORBIDDEN_EMAIL = [
+    ("an Anthropic address", r"@anthropic\.com$"),
+    ("a Claude account", r"^(\d+\+)?claude([-.]?code)?(\[bot\])?@"),
+    ("a Copilot account", r"^(\d+\+)?(github[-.]?)?copilot(\[bot\])?@"),
+    ("a Cursor account", r"^(\d+\+)?cursor([-.]?agent)?(\[bot\])?@"),
+    ("a Codex account", r"^(\d+\+)?codex(\[bot\])?@"),
+    ("a Devin account", r"^(\d+\+)?devin([-.]?ai)?(\[bot\])?@"),
+    ("an Aider account", r"^(\d+\+)?aider(\[bot\])?@"),
+]
+
+FORBIDDEN_NAME = [
+    ("Claude", r"^claude\[bot\]$|^claude[ -](code|opus|sonnet|haiku|ai|\d)"),
+    ("Copilot", r"^(github )?copilot(\[bot\])?$"),
+    ("Cursor", r"^cursor([ -]agent)?(\[bot\])?$"),
+    ("Codex", r"^codex([ -]cli)?(\[bot\])?$"),
+    ("Devin", r"^devin([ -]ai)?(\[bot\])?$"),
+    ("Aider", r"^aider(\[bot\])?$"),
+]
+
 SEPARATOR = "\x1e"  # a record separator no commit message contains
+FIELDS = "%H%x1e%an%x1e%ae%x1e%cn%x1e%ce%x1e%B%x1e"
 
 
 def git(*args):
@@ -64,11 +99,37 @@ def default_range():
 
 
 def commits(rev_range):
-    out = git("log", "--format=%H%x1e%B%x1e", rev_range)
+    out = git("log", "--format=" + FIELDS, rev_range)
     if out is None:
         return None
-    records = out.split(SEPARATOR)
-    return [(records[i].strip(), records[i + 1]) for i in range(0, len(records) - 1, 2)]
+    parts = out.split(SEPARATOR)
+    found = []
+    for i in range(0, len(parts) - 5, 6):
+        found.append({
+            "sha": parts[i].strip(),
+            "author_name": parts[i + 1],
+            "author_email": parts[i + 2],
+            "committer_name": parts[i + 3],
+            "committer_email": parts[i + 4],
+            "message": parts[i + 5],
+        })
+    return found
+
+
+def offender(commit):
+    """The first rule this commit breaks, as (what, where), or None."""
+    for who, pattern in FORBIDDEN_MESSAGE:
+        if re.search(pattern, commit["message"], re.I):
+            return who, "its commit message"
+    for role in ("author", "committer"):
+        name, email = commit[role + "_name"], commit[role + "_email"]
+        for who, pattern in FORBIDDEN_EMAIL:
+            if re.search(pattern, email, re.I):
+                return who, f"its {role} ({name} <{email}>)"
+        for who, pattern in FORBIDDEN_NAME:
+            if re.search(pattern, name.strip(), re.I):
+                return who, f"its {role} ({name} <{email}>)"
+    return None
 
 
 def main(argv):
@@ -90,16 +151,16 @@ def main(argv):
         return 0
 
     errors = []
-    for sha, message in found:
-        subject = message.strip().split("\n")[0][:72]
-        for who, pattern in FORBIDDEN:
-            if re.search(pattern, message, re.I):
-                errors.append(
-                    f"{sha[:7]} carries {who} in its commit message: \"{subject}\". "
-                    f"This history names only the people who decided what the commit should say. "
-                    f"Reword it (git commit --amend, or git rebase -i) and push again."
-                )
-                break
+    for commit in found:
+        broke = offender(commit)
+        if broke:
+            who, where = broke
+            subject = commit["message"].strip().split("\n")[0][:72]
+            errors.append(
+                f"{commit['sha'][:7]} carries {who} in {where}: \"{subject}\". "
+                f"This history names only the people who decided what the commit should say. "
+                f"Fix it (git commit --amend, add --reset-author for the author, or git rebase -i) and push again."
+            )
 
     if errors:
         for e in errors:
