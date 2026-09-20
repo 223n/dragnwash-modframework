@@ -102,6 +102,8 @@ namespace DragNWash.ModFramework.Graphs
 
         public void Write(GraphLevel level, string line)
         {
+            // The editor on the page shows the same lines, so it keeps a copy.
+            GraphLog.Add(level, line);
             line = "[graphs] " + line;
             switch (level)
             {

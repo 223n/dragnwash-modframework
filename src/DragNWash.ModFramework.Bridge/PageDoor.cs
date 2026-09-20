@@ -159,8 +159,24 @@ namespace DragNWash.ModFramework.Bridge
             catch (Exception ex) { return JsonAnswer(400, new Dictionary<string, object> { ["ok"] = false, ["error"] = "Not JSON: " + ex.Message }); }
             string name = Json.String(request, "name");
             Operation op = Operations.Find(name);
-            // The page reads: any read operation, the page-only ones included; nothing that writes.
-            if (op == null || op.Kind != OperationKind.Read) return JsonAnswer(200, new Dictionary<string, object> { ["ok"] = false, ["error"] = $"No read operation named {name}." });
+            // The page reads any read operation, the page-only ones included. It
+            // writes only through an operation meant for it alone - the graphs
+            // editor saving, running and stopping a graph (docs/GRAPHS.md,
+            // decision 2). A write anyone else may call (objects.member.set, and
+            // whatever comes later) is refused here: the page runs in a browser,
+            // and one that could change the game directly would be a way around
+            // every other check. MCP never sees a write at all.
+            bool pageOnlyWrite = op != null && op.Kind == OperationKind.Write
+                && (op.Audience & OperationAudience.Page) != 0
+                && (op.Audience & (OperationAudience.Mcp | OperationAudience.Graphs)) == 0;
+            if (op == null || (op.Kind != OperationKind.Read && !pageOnlyWrite))
+            {
+                return JsonAnswer(200, new Dictionary<string, object>
+                {
+                    ["ok"] = false,
+                    ["error"] = op == null ? $"No operation named {name}." : $"{name} is not an operation this page may call.",
+                });
+            }
             var args = request != null && request.TryGetValue("args", out object a) && a is Dictionary<string, object> d ? d : new Dictionary<string, object>();
             OperationResult result = null;
             var done = new ManualResetEvent(false);

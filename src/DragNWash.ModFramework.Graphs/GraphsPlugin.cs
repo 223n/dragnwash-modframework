@@ -55,6 +55,19 @@ namespace DragNWash.ModFramework.Graphs
 
         internal List<Graph> Graphs => _runner != null ? _runner.Graphs : new List<Graph>();
 
+        /// <summary>What the checker works against: the operations and events registered now.</summary>
+        internal IGraphWorld World => _world;
+
+        /// <summary>
+        /// Starts one handler because the editor asked, not because its event
+        /// happened: the same start the runner makes, with no values, so a
+        /// person can try a graph without waiting for the thing it answers.
+        /// </summary>
+        internal void StartFromPage(Graph graph, GraphHandler handler)
+        {
+            _runner.Start(graph, handler, null);
+        }
+
         private void Awake()
         {
             Log = Logger;
@@ -81,6 +94,7 @@ namespace DragNWash.ModFramework.Graphs
             _runner = new GraphRunner(_world);
 
             RegisterOwnEvents();
+            GraphsOperations.Register();
 
             // Queued here, started in Update: see the note at the top.
             Operations.Happened += Queue;

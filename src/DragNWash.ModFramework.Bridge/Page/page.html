@@ -97,12 +97,45 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 .edge-label { font-family: var(--sans); font-size: 10.5px; paint-order: stroke; stroke: var(--ground); stroke-width: 3px; }
 @media (max-width: 900px) { #split { display: none; } main, main.folded { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; } main.folded #left { display: none; } #left, #right { border: 0; border-bottom: 1px solid var(--line); max-height: 40vh; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- the graphs editor ---------------------------------------------------- */
+.view-tab[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+#graphsView { display: grid; grid-template-columns: 240px 1fr 6px 320px; min-height: 0; }
+#graphsView[hidden] { display: none; }
+#gList, #gSide { background: var(--panel); border-right: 1px solid var(--line); padding: 10px 12px; overflow: auto; min-width: 0; }
+#gSide { border-right: 0; border-left: 1px solid var(--line); }
+#gList h2, #gSide h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0; }
+#gSplit { background: var(--line); cursor: col-resize; }
+#gStage { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
+#gBar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+#gBar label { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+#gBar input { width: 140px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--inset); color: var(--text); font: inherit; }
+#gBlocks { overflow: auto; padding: 14px; background: var(--ground); }
+.blk { border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; background: var(--node); }
+.blk > .head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border-radius: 7px 7px 0 0; background: var(--node-head); }
+.blk > .head .kind { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.blk.hat > .head { background: var(--accent-soft); }
+.blk.write > .head { background: color-mix(in srgb, var(--back) 22%, var(--node-head)); }
+.blk .body { padding: 4px 8px 8px 20px; }
+.blk .id { color: var(--muted); font: 11px var(--mono); }
+.blk input, .blk select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--inset); color: var(--text); font: 12px var(--mono); max-width: 260px; }
+.blk .slot { display: inline-flex; gap: 4px; align-items: center; margin: 2px 6px 2px 0; font-size: 12px; color: var(--muted); }
+.blk .tools { margin-left: auto; display: flex; gap: 4px; }
+.blk .tools button { padding: 1px 7px; font-size: 12px; }
+.add { margin: 6px 0 2px 0; display: flex; gap: 6px; align-items: center; }
+.add select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--inset); color: var(--text); font: inherit; }
+.log { font: 12px/1.5 var(--mono); background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px; height: 320px; overflow: auto; white-space: pre-wrap; }
+.log .error { color: var(--error); }
+.log .warning { color: var(--warn); }
+.log .at { color: var(--muted); }
 </style>
 </head>
 <body>
 <header>
   <h1 id="title"><b>Drag'n Wash</b> code graph</h1>
   <button id="open" type="button" title="Open assemblies (a DLL, several, or a folder)" hidden>Open…</button>
+  <button id="toCode" type="button" class="view-tab" aria-pressed="true" title="The game's code as blocks and branches">Code</button>
+  <button id="toGraphs" type="button" class="view-tab" aria-pressed="false" title="Graphs: mods with no code">Graphs</button>
   <button id="side" type="button" title="Show or fold the search results" aria-pressed="true">Results</button>
   <button id="back" type="button" title="Back" disabled>←</button>
   <button id="fwd" type="button" title="Forward" disabled>→</button>
@@ -120,6 +153,32 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   </div>
   <div id="split" role="separator" aria-orientation="vertical" aria-label="Drag to resize the details" tabindex="0"></div>
   <aside id="right"><div id="details"><h2>Details</h2><p class="muted">Nothing open yet.</p></div></aside>
+</main>
+
+<main id="graphsView" hidden>
+  <aside id="gList">
+    <h2>Graphs</h2>
+    <ul class="list" id="graphList"><li class="muted" style="cursor:default">Loading…</li></ul>
+    <button id="gNew" type="button">New graph</button>
+  </aside>
+  <div id="gStage">
+    <div id="gBar">
+      <label>Mod folder <input id="gFolder" type="text" spellcheck="false" placeholder="MyGraphs"></label>
+      <label>Name <input id="gName" type="text" spellcheck="false" placeholder="scene-notes"></label>
+      <button id="gSave" type="button">Save</button>
+      <button id="gRun" type="button" title="Start the first handler now, without waiting for its event">Run</button>
+      <button id="gStop" type="button" title="Stop this graph for the session and put back what it changed">Stop</button>
+      <span id="gState" class="muted"></span>
+    </div>
+    <div id="gBlocks" tabindex="0" aria-label="The graph's blocks"></div>
+  </div>
+  <div id="gSplit" role="separator" aria-orientation="vertical" tabindex="0"></div>
+  <aside id="gSide">
+    <h2>Problems</h2>
+    <ul class="list" id="gProblems"><li class="muted" style="cursor:default">None.</li></ul>
+    <h2>Log</h2>
+    <div id="gLog" class="log"></div>
+  </aside>
 </main>
 <script>
 "use strict";
@@ -525,7 +584,429 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     e.preventDefault();
   });
 
+  // The editor (below) signs in with this page and calls through the same door.
+  window.dnwCall = call;
+  window.dnwStatus = setStatus;
+
   start().catch(e => setStatus(e.message, true));
+})();
+</script>
+
+<script>
+"use strict";
+// The graphs editor: the same file the game reads, shown as blocks. It calls the
+// page-only graphs.* operations through the door this page already signed in at
+// (docs/GRAPHS.md, "The editor"). Nothing is fetched from anywhere; every block
+// and every list here is drawn by this code.
+//
+// This first version edits blocks through their fields, with buttons to add,
+// move and remove a statement. Dragging a block, and the node view, are not
+// built yet: the file is the same either way, so they can arrive later without
+// changing anything that is saved.
+(function () {
+  const $ = id => document.getElementById(id);
+  const call = (n, a) => window.dnwCall(n, a);
+  const el = (tag, attrs, text) => {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  };
+
+  let catalog = { operations: [], events: [] };
+  let graphs = [];              // what graphs.list said
+  let open = null;              // { modGuid, file, folder, name, doc }
+  let logAfter = 0, polling = null, checkSoon = null;
+
+  const STATEMENTS = ["call", "set", "if", "wait", "repeat", "while", "each", "log", "stop"];
+
+  // ---- the two views ------------------------------------------------------
+  const codeView = document.querySelector("main:not(#graphsView)");
+  function show(which) {
+    const g = which === "graphs";
+    $("graphsView").hidden = !g;
+    codeView.hidden = g;
+    $("toCode").setAttribute("aria-pressed", g ? "false" : "true");
+    $("toGraphs").setAttribute("aria-pressed", g ? "true" : "false");
+    if (g) { refresh(); poll(); } else if (polling) { clearInterval(polling); polling = null; }
+  }
+  $("toCode").onclick = () => show("code");
+  $("toGraphs").onclick = () => show("graphs");
+
+  // ---- what the game says -------------------------------------------------
+  async function refresh() {
+    try {
+      if (!catalog.operations.length) catalog = await call("graphs.catalog");
+      graphs = await call("graphs.list");
+      drawList();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  }
+
+  function drawList() {
+    const ul = $("graphList");
+    ul.replaceChildren();
+    if (!graphs.length) {
+      ul.append(el("li", { class: "muted", style: "cursor:default" }, "No graphs yet. New graph makes one."));
+      return;
+    }
+    for (const g of graphs) {
+      const li = el("li", { tabindex: "0" });
+      li.append(el("div", null, g.file));
+      li.append(el("div", { class: "muted", style: "font-size:12px" }, g.mod + " · " + g.state));
+      li.onclick = () => openGraph(g);
+      li.onkeydown = e => { if (e.key === "Enter") openGraph(g); };
+      ul.append(li);
+    }
+  }
+
+  async function openGraph(g) {
+    try {
+      const r = await call("graphs.read", { mod_guid: g.mod_guid, file: g.file });
+      const doc = JSON.parse(r.text);
+      const name = g.file.replace(/^graphs\//, "").replace(/\.json$/, "");
+      open = { modGuid: g.mod_guid, file: g.file, folder: folderOf(g), name, doc };
+      $("gFolder").value = open.folder || "";
+      $("gName").value = name;
+      $("gState").textContent = g.state;
+      draw();
+      check();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  }
+
+  // The list gives the mod's name, not its folder; the folder is what save
+  // needs, so it is asked for once and remembered per mod while the page is open.
+  const folders = {};
+  function folderOf(g) { return folders[g.mod_guid] || ""; }
+
+  $("gNew").onclick = () => {
+    open = {
+      modGuid: null, file: null, folder: $("gFolder").value || "MyGraphs", name: $("gName").value || "new-graph",
+      doc: { format: 1, name: "New graph", on: [{ id: "h1", event: "scene.loaded", do: [{ id: "s1", log: "a scene loaded" }] }] },
+    };
+    $("gFolder").value = open.folder;
+    $("gName").value = open.name;
+    $("gState").textContent = "not saved yet";
+    draw();
+    check();
+  };
+
+  // ---- drawing the blocks -------------------------------------------------
+  function draw() {
+    const root = $("gBlocks");
+    root.replaceChildren();
+    if (!open) {
+      root.append(el("p", { class: "muted" }, "Pick a graph on the left, or make one."));
+      return;
+    }
+    const head = el("div", { class: "blk" });
+    const bar = el("div", { class: "head" });
+    bar.append(el("span", { class: "kind" }, "graph"));
+    bar.append(field("text", open.doc.name || "", v => { open.doc.name = v; changed(); }, "its name"));
+    head.append(bar);
+    root.append(head);
+
+    for (const h of open.doc.on || []) root.append(handlerBlock(h));
+
+    const add = el("div", { class: "add" });
+    add.append(el("button", { type: "button" }, "+ handler"));
+    add.lastChild.onclick = () => {
+      open.doc.on = open.doc.on || [];
+      open.doc.on.push({ id: nextId("h"), event: catalog.events.length ? catalog.events[0].name : "scene.loaded", do: [] });
+      changed(true);
+    };
+    root.append(add);
+  }
+
+  function handlerBlock(h) {
+    const b = el("div", { class: "blk hat" });
+    const bar = el("div", { class: "head" });
+    bar.append(el("span", { class: "kind" }, "when"));
+    const events = catalog.events.map(e => e.name);
+    bar.append(choice(events, h.event, v => { h.event = v; changed(true); }));
+    if (h.event === "timer.every") bar.append(slot("every", field("number", h.seconds != null ? h.seconds : 5, v => { h.seconds = Number(v); changed(); })));
+    if (h.event === "key.pressed") bar.append(slot("key", field("text", h.key || "F6", v => { h.key = v; changed(); })));
+    bar.append(el("span", { class: "id" }, h.id));
+    bar.append(tools(open.doc.on, h, () => changed(true)));
+    b.append(bar);
+    const body = el("div", { class: "body" });
+    statements(body, h.do = h.do || []);
+    b.append(body);
+    return b;
+  }
+
+  function statements(into, list) {
+    for (const st of list) into.append(statementBlock(list, st));
+    const add = el("div", { class: "add" });
+    const pick = el("select");
+    pick.append(el("option", { value: "" }, "+ add…"));
+    for (const k of STATEMENTS) pick.append(el("option", { value: k }, k));
+    pick.onchange = () => { if (pick.value) { list.push(blank(pick.value)); changed(true); } };
+    add.append(pick);
+    into.append(add);
+  }
+
+  function blank(kind) {
+    const id = nextId("s");
+    if (kind === "call") return { id, call: catalog.operations.length ? catalog.operations[0].name : "", args: {} };
+    if (kind === "set") return { id, set: "", to: "" };
+    if (kind === "if") return { id, if: true, then: [], else: [] };
+    if (kind === "wait") return { id, wait: 1 };
+    if (kind === "repeat") return { id, repeat: 3, do: [] };
+    if (kind === "while") return { id, while: true, max: 100, do: [] };
+    if (kind === "each") return { id, each: "", as: "item", max: 50, do: [] };
+    if (kind === "log") return { id, log: "" };
+    return { id, stop: true };
+  }
+
+  function statementBlock(list, st) {
+    const kind = STATEMENTS.find(k => k in st) || "?";
+    const op = kind === "call" ? catalog.operations.find(o => o.name === st.call) : null;
+    const b = el("div", { class: "blk" + (op && op.kind === "write" ? " write" : "") });
+    const bar = el("div", { class: "head" });
+    bar.append(el("span", { class: "kind" }, kind));
+
+    if (kind === "call") {
+      const names = catalog.operations.map(o => o.name);
+      bar.append(choice(names, st.call, v => { st.call = v; st.args = {}; changed(true); }));
+      if (op) {
+        bar.append(el("span", { class: "muted", style: "font-size:12px" }, op.kind === "write" ? "changes the game" : "reads"));
+        bar.title = op.description || "";
+      }
+      bar.append(slot("as", field("text", st.as || "", v => { st.as = v || undefined; changed(); })));
+    } else if (kind === "set") {
+      bar.append(field("text", st.set || "", v => { st.set = v; changed(); }, "variable"));
+      bar.append(slot("to", expr(st.to, v => { st.to = v; changed(); })));
+    } else if (kind === "log") {
+      bar.append(expr(st.log, v => { st.log = v; changed(); }));
+    } else if (kind === "wait") {
+      bar.append(field("number", st.wait, v => { st.wait = Number(v); changed(); }, "seconds"));
+    } else if (kind === "repeat") {
+      bar.append(field("number", st.repeat, v => { st.repeat = Number(v); changed(); }, "times"));
+    } else if (kind === "while") {
+      bar.append(expr(st.while, v => { st.while = v; changed(); }));
+      bar.append(slot("max", field("number", st.max != null ? st.max : 100, v => { st.max = Number(v); changed(); })));
+    } else if (kind === "each") {
+      bar.append(expr(st.each, v => { st.each = v; changed(); }));
+      bar.append(slot("as", field("text", st.as || "item", v => { st.as = v; changed(); })));
+      bar.append(slot("max", field("number", st.max != null ? st.max : 50, v => { st.max = Number(v); changed(); })));
+    } else if (kind === "if") {
+      bar.append(expr(st.if, v => { st.if = v; changed(); }));
+    }
+    bar.append(el("span", { class: "id" }, st.id));
+    bar.append(tools(list, st, () => changed(true)));
+    b.append(bar);
+
+    const body = el("div", { class: "body" });
+    if (kind === "call" && op) {
+      for (const p of op.parameters || []) {
+        st.args = st.args || {};
+        const has = p.name in st.args;
+        const row = el("div");
+        row.append(slot(p.name + (p.required ? " *" : ""), p.choices && p.choices.length
+          ? choice([""].concat(p.choices), has ? String(st.args[p.name]) : "", v => { setArg(st, p, v); })
+          : p.type === "boolean"
+            ? choice(["", "true", "false"], has ? String(st.args[p.name]) : "", v => { setArg(st, p, v); })
+            : expr(has ? st.args[p.name] : "", v => { setArg(st, p, v); })));
+        if (p.description) row.append(el("span", { class: "muted", style: "font-size:11px" }, " " + p.description));
+        body.append(row);
+      }
+      if (st.onError) { body.append(el("div", { class: "slot" }, "on error")); statements(body, st.onError); }
+      else {
+        const add = el("div", { class: "add" });
+        const btn = el("button", { type: "button" }, "+ on error");
+        btn.onclick = () => { st.onError = []; changed(true); };
+        add.append(btn);
+        body.append(add);
+      }
+    }
+    if (kind === "if") {
+      body.append(el("div", { class: "slot" }, "then"));
+      statements(body, st.then = st.then || []);
+      body.append(el("div", { class: "slot" }, "else"));
+      statements(body, st.else = st.else || []);
+    }
+    if (kind === "repeat" || kind === "while" || kind === "each") {
+      statements(body, st.do = st.do || []);
+    }
+    if (body.childNodes.length) b.append(body);
+    return b;
+  }
+
+  function setArg(st, p, v) {
+    st.args = st.args || {};
+    if (v === "" || v == null) delete st.args[p.name];
+    else if (p.type === "number") st.args[p.name] = Number(v);
+    else if (p.type === "boolean") st.args[p.name] = v === "true";
+    else st.args[p.name] = v;
+    changed();
+  }
+
+  // ---- the pieces a block is made of --------------------------------------
+  function field(type, value, onchange, title) {
+    const i = el("input", { type: type === "number" ? "number" : "text" });
+    i.value = value == null ? "" : value;
+    if (title) i.title = title;
+    i.onchange = () => onchange(i.value);
+    return i;
+  }
+  function choice(options, value, onchange) {
+    const sel = el("select");
+    for (const o of options) sel.append(el("option", { value: o }, o === "" ? "—" : o));
+    sel.value = value == null ? "" : value;
+    sel.onchange = () => onchange(sel.value);
+    return sel;
+  }
+  function slot(label, control) {
+    const s = el("span", { class: "slot" }, label + " ");
+    s.append(control);
+    return s;
+  }
+  // An expression is a value or a small object ({"var":…}, {"event":…}, {"join":…}).
+  // Typed as text here; a value that parses as JSON is kept as JSON, so the round
+  // blocks of the design can read it later without any change to the file.
+  function expr(value, onchange) {
+    const text = value == null ? "" : (typeof value === "object" ? JSON.stringify(value) : String(value));
+    const i = el("input", { type: "text", title: "A value, or JSON such as {\"var\":\"count\"}" });
+    i.value = text;
+    i.onchange = () => {
+      const t = i.value.trim();
+      if (t.startsWith("{") || t.startsWith("[")) { try { onchange(JSON.parse(t)); return; } catch (e) { /* keep it as text */ } }
+      if (t === "true") return onchange(true);
+      if (t === "false") return onchange(false);
+      if (t !== "" && !isNaN(Number(t))) return onchange(Number(t));
+      onchange(i.value);
+    };
+    return i;
+  }
+  function tools(list, item, after) {
+    const t = el("span", { class: "tools" });
+    const up = el("button", { type: "button", title: "Move up" }, "↑");
+    const down = el("button", { type: "button", title: "Move down" }, "↓");
+    const del = el("button", { type: "button", title: "Remove" }, "✕");
+    up.onclick = () => { const i = list.indexOf(item); if (i > 0) { list.splice(i, 1); list.splice(i - 1, 0, item); after(); } };
+    down.onclick = () => { const i = list.indexOf(item); if (i >= 0 && i < list.length - 1) { list.splice(i, 1); list.splice(i + 1, 0, item); after(); } };
+    del.onclick = () => { const i = list.indexOf(item); if (i >= 0) { list.splice(i, 1); after(); } };
+    t.append(up, down, del);
+    return t;
+  }
+
+  let counter = 0;
+  function nextId(prefix) {
+    const used = new Set();
+    const walk = list => { for (const s of list || []) { used.add(s.id); walk(s.do); walk(s.then); walk(s.else); walk(s.onError); } };
+    for (const h of (open && open.doc.on) || []) { used.add(h.id); walk(h.do); }
+    do { counter++; } while (used.has(prefix + counter));
+    return prefix + counter;
+  }
+
+  // ---- checking, saving, running ------------------------------------------
+  function changed(redraw) {
+    if (redraw) draw();
+    clearTimeout(checkSoon);
+    checkSoon = setTimeout(check, 350);
+  }
+
+  async function check() {
+    if (!open) return;
+    try {
+      const r = await call("graphs.check", { text: JSON.stringify(open.doc, null, 2) });
+      const ul = $("gProblems");
+      ul.replaceChildren();
+      if (r.ok) {
+        ul.append(el("li", { class: "muted", style: "cursor:default" }, "None. " +
+          (r.changes.length ? "It changes: " + r.changes.join(", ") : "It only reads.")));
+      } else {
+        for (const p of r.problems) ul.append(el("li", { style: "cursor:default; color: var(--error)" }, p));
+      }
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  }
+
+  $("gSave").onclick = async () => {
+    if (!open) return;
+    try {
+      const r = await call("graphs.save", {
+        folder: $("gFolder").value.trim(),
+        name: $("gName").value.trim(),
+        text: JSON.stringify(open.doc, null, 2),
+      });
+      folders[r.mod_guid] = $("gFolder").value.trim();
+      open.modGuid = r.mod_guid;
+      open.file = r.file;
+      window.dnwStatus("Saved " + r.path + (r.created ? " (a new mod)" : "") + ".");
+      await refresh();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  };
+
+  $("gRun").onclick = async () => {
+    if (!open || !open.file) return window.dnwStatus("Save it first.", true);
+    const first = (open.doc.on || [])[0];
+    if (!first) return;
+    try {
+      await call("graphs.run", { file: open.file, handler: first.id });
+      window.dnwStatus("Started " + first.id + ".");
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  };
+
+  $("gStop").onclick = async () => {
+    if (!open || !open.file) return;
+    try {
+      const r = await call("graphs.stop", { file: open.file });
+      window.dnwStatus(r.said);
+      await refresh();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  };
+
+  // ---- the live log -------------------------------------------------------
+  function poll() {
+    if (polling) return;
+    polling = setInterval(async () => {
+      if ($("graphsView").hidden) return;
+      try {
+        const r = await call("graphs.log", { after: logAfter });
+        logAfter = r.next;
+        if (!r.lines.length) return;
+        const box = $("gLog");
+        const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+        for (const l of r.lines) {
+          const line = el("div", { class: l.level });
+          line.append(el("span", { class: "at" }, l.at + " "));
+          line.append(document.createTextNode(l.text));
+          box.append(line);
+        }
+        while (box.childNodes.length > 400) box.removeChild(box.firstChild);
+        if (stick) box.scrollTop = box.scrollHeight;
+      } catch (e) { /* the game may be away; the next tick tries again */ }
+    }, 1000);
+  }
+
+  // The side panel's width, dragged as the code graph's is.
+  (function () {
+    const split = $("gSplit"), view = $("graphsView");
+    let from = 0, width = 320;
+    split.addEventListener("pointerdown", e => {
+      from = e.clientX; width = $("gSide").getBoundingClientRect().width;
+      split.setPointerCapture(e.pointerId);
+      const move = ev => {
+        const w = Math.min(640, Math.max(220, width + (from - ev.clientX)));
+        view.style.gridTemplateColumns = `240px 1fr 6px ${w}px`;
+      };
+      const up = ev => { split.releasePointerCapture(e.pointerId); split.removeEventListener("pointermove", move); split.removeEventListener("pointerup", up); };
+      split.addEventListener("pointermove", move);
+      split.addEventListener("pointerup", up);
+    });
+  })();
 })();
 </script>
 </body>
