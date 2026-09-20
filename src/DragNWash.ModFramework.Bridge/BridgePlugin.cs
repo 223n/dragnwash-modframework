@@ -142,11 +142,18 @@ namespace DragNWash.ModFramework.Bridge
                     Application.OpenURL(url);
                     return "Opened the page in the browser (the link works once, within a minute).";
                 },
-                Operations.Parameter("focus", OperationType.String, "What to show: m:<method id> or t:<type name>; the search when left out."));
+                Operations.Parameter("focus", OperationType.String, "What to show: m:<method id>, t:<type name>, or v:graphs for the graphs editor; the search when left out."));
             // The Inspector's Graph buttons and the console open the page; a graph
             // of a data mod has no business opening windows on this computer.
             Operation open = Operations.Find("bridge.page.open");
             if (open != null) open.Audience = OperationAudience.Console | OperationAudience.Page;
+        }
+
+        private void OpenPage(string focus)
+        {
+            var args = focus == null ? null : new Dictionary<string, object> { ["focus"] = focus };
+            OperationResult opened = Operations.CallNow("bridge.page.open", args, "bridge tab");
+            TW.ShowNotice(opened.Ok ? Convert.ToString(opened.Value) : opened.Error);
         }
 
         // CodeGraph.exe, next to this DLL, on Windows: it signs in with the token by itself,
@@ -227,31 +234,56 @@ namespace DragNWash.ModFramework.Bridge
                 : "On, but the developer tools are off, so it is not listening.";
             GUI.Label(new Rect(x, y, inner, 44), status, s.WrappedLabel);
             y += 48;
-            float bx = x;
-            if (GUI.Button(new Rect(bx, y, 120, row), Server != null || _enabled.Value ? "Turn off" : "Turn on", _enabled.Value ? s.SelectedButton : s.Button))
+            // The row wraps: six buttons do not fit a narrow window, and the
+            // last of them was walking off the edge.
+            float bx = x, by = y;
+            bool Button(string label, float width)
+            {
+                if (bx > x && bx + width > x + inner)
+                {
+                    bx = x;
+                    by += row + 6;
+                }
+                bool pressed = GUI.Button(new Rect(bx, by, width, row), label, label == "Turn off" || label == "Turn on" ? (_enabled.Value ? s.SelectedButton : s.Button) : s.Button);
+                bx += width + 8;
+                return pressed;
+            }
+
+            if (Button(Server != null || _enabled.Value ? "Turn off" : "Turn on", 120))
             {
                 _enabled.Value = !_enabled.Value;
             }
-            bx += 128;
-            if (GUI.Button(new Rect(bx, y, 130, row), "Copy setup", s.Button))
+            // The page is where graphs are made, so it needs a way in that does
+            // not go through the game's code: the Inspector's Graph buttons open
+            // it at a method, which is no help to somebody writing a graph.
+            if (Button("Open page", 120))
+            {
+                OpenPage(null);
+            }
+            // The same page, on the editor: somebody writing a graph has no
+            // reason to arrive at the game's code first.
+            if (Button("Graphs", 120))
+            {
+                OpenPage("v:graphs");
+            }
+            if (Button("Copy setup", 130))
             {
                 GUIUtility.systemCopyBuffer = Setup;
                 TW.ShowNotice("The Claude Code setup command, with the token, is on the clipboard.");
             }
-            bx += 138;
-            if (GUI.Button(new Rect(bx, y, 120, row), "New token", s.Button))
+            if (Button("New token", 120))
             {
                 BridgeToken.Renew();
                 McpProtocol.EndAll();
                 PageDoor.EndAll();
                 TW.ShowNotice("New token made; every client was disconnected and needs the new setup.");
             }
-            bx += 128;
-            if (GUI.Button(new Rect(bx, y, 150, row), "Disconnect all", s.Button))
+            if (Button("Disconnect all", 150))
             {
                 McpProtocol.EndAll();
                 PageDoor.EndAll();
             }
+            y = by;
             y += row + 10;
             if (_note.Length > 0)
             {

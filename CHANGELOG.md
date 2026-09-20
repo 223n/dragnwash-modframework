@@ -8,6 +8,19 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - Experimental, not in a release. `codegraph-standalone/` (CodeGraphStandalone.exe, Windows): the code graph of any .NET assembly without the game (docs/CODE_GRAPH_STANDALONE.md). Opens DLLs, a folder (leaving out .NET's and Unity's own unless `--all`) or a Mono Unity game's folder, by Open…, the command line or a drop; refuses IL2CPP games with the reason. Shows the Bridge's page in WebView2 and answers its calls inside the process (`WebResourceRequested`), with no port and no network.
 
+## 2026-09-20: a way into the editor
+
+The core and the preloader patcher go to 1.4.3, the Bridge to 0.1.2.
+
+### Bridge 0.1.2
+
+- **Open page** and **Graphs** on the Bridge tab of the F1 window. The page could only be opened from a method in the Inspector's Code view, which is no help to somebody who wants to write a graph: **Graphs** opens the same page with the editor already in front (`bridge.page.open` takes `focus=v:graphs`), and **Open page** opens it at the code graph as before. Both views still switch inside the page.
+- The row of buttons wraps instead of walking off the edge of a narrow window.
+
+### Core 1.4.3
+
+- No change; follows the release.
+
 ## 2026-09-20: which mod has which key
 
 The core and the preloader patcher go to 1.4.2, Graphs to 0.1.1. Additive, as before.

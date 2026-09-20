@@ -6,6 +6,10 @@ Where Drag'n Wash ModFramework is going. Plans change; dates are given only when
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
 
+## Released: 1.4.3 (2026-09-20)
+
+- **A way into the editor.** The Bridge tab has **Open page** (the code graph) and **Graphs** (the editor), and its buttons wrap in a narrow window. Until now the page could only be opened from a method in the Inspector's Code view.
+
 ## Released: 1.4.2 (2026-09-20)
 
 - **Which mod has which key.** A graph answering `key.pressed` names the other mods with a setting on that key, in the log, the console, the Mods screen and the page. Nobody owns a key, so nothing is refused; it is said, once, where a person will see it (`ModFramework.WhoElseUses`).

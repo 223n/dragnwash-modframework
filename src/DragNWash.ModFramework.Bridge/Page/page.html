@@ -274,6 +274,9 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
       if (!j.ok) { setStatus(j.error || "Could not sign in: open the page again from the F1 window.", true); tellApp("lost"); return; }
     }
     signedIn = true;
+    // "v:<name>" asks for a view rather than a method or a type: the button in
+    // the game's Bridge tab that opens the page straight on the graphs editor.
+    if (focus && focus.startsWith("v:")) { window.dnwView && window.dnwView(focus.slice(2)); return; }
     if (focus) go(focus, true);
   }
 
@@ -651,6 +654,8 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 
   // ---- the two views ------------------------------------------------------
   const codeView = document.querySelector("main:not(#graphsView)");
+  // The page can be opened straight on a view (a "v:<name>" focus).
+  window.dnwView = which => show(which === "graphs" ? "graphs" : "code");
   function show(which) {
     const g = which === "graphs";
     $("graphsView").hidden = !g;
