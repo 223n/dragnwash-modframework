@@ -3,15 +3,21 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace DragNWash.ModFramework.Overrides
+namespace DragNWash.ModFramework
 {
-    // A small JSON reader for the overrides files: objects become
-    // Dictionary<string, object>, arrays List<object>, numbers double, and
-    // strings, true, false and null themselves. Unity's JsonUtility left the
-    // "overrides" array empty in the game, so the files are read here instead.
-    internal static class Json
+    /// <summary>
+    /// A small JSON reader for the files data mods are made of (mod.json, the
+    /// overrides and graphs beside it): objects become
+    /// <see cref="Dictionary{String, Object}"/>, arrays <see cref="List{Object}"/>,
+    /// numbers <see cref="double"/>, and strings, true, false and null
+    /// themselves. Unity's <c>JsonUtility</c> left a list of objects empty in
+    /// the game, so the files are read here instead;
+    /// <see cref="Operations.ToJson"/> writes JSON. Since 1.4.0.
+    /// </summary>
+    public static class Json
     {
-        internal static object Parse(string text)
+        /// <summary>Reads a JSON text. Throws <see cref="FormatException"/> when it is not JSON.</summary>
+        public static object Parse(string text)
         {
             var reader = new Reader(text ?? "");
             reader.Space();
@@ -21,17 +27,20 @@ namespace DragNWash.ModFramework.Overrides
             return value;
         }
 
-        internal static string String(Dictionary<string, object> o, string key)
+        /// <summary>The value of a key as text, or null.</summary>
+        public static string String(Dictionary<string, object> o, string key)
         {
             return o != null && o.TryGetValue(key, out object v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : null;
         }
 
-        internal static int Int(Dictionary<string, object> o, string key)
+        /// <summary>The value of a key as a whole number, or 0.</summary>
+        public static int Int(Dictionary<string, object> o, string key)
         {
             return o != null && o.TryGetValue(key, out object v) && v is double d ? (int)d : 0;
         }
 
-        internal static bool Bool(Dictionary<string, object> o, string key)
+        /// <summary>The value of a key as true or false, or false.</summary>
+        public static bool Bool(Dictionary<string, object> o, string key)
         {
             return o != null && o.TryGetValue(key, out object v) && (v is bool b ? b : v is string s && s.Equals("true", StringComparison.OrdinalIgnoreCase));
         }

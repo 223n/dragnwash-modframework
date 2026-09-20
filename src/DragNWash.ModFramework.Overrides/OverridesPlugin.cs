@@ -49,7 +49,7 @@ namespace DragNWash.ModFramework.Overrides
 
         private void Read()
         {
-            GameOverrides.Loaded = OverrideFiles.Scan(Paths.PluginPath);
+            GameOverrides.Loaded = OverrideFiles.Scan();
             foreach (OverrideFiles.Mod mod in GameOverrides.Loaded)
             {
                 ListOnModsScreen(mod);
@@ -176,6 +176,9 @@ namespace DragNWash.ModFramework.Overrides
         internal string Reload()
         {
             int restored = OverrideApplier.TakeBackAll();
+            // The folders may have changed too (a mod added by hand): the core
+            // looks again, and every library that reads data mods sees it.
+            DataMods.Rescan();
             Read();
             int written = _enabled.Value ? OverrideApplier.Apply(newRootsOnly: false) : 0;
             string line = $"Overrides reloaded: {restored} value(s) put back, {GameOverrides.Loaded.Sum(m => m.Overrides.Count)} override(s) read, {written} value(s) written.";

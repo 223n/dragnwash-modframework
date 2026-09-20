@@ -121,38 +121,42 @@ internal sealed class Manifest
             public string Key => $"{Scene}|{Path}|{Component}|{Index}|{Member}|{Material}|{Property}";
         }
 
-        internal static List<Mod> Scan(string pluginsFolder)
+        // The core finds the mods with no code and lists them on the Mods
+        // screen (DataMods); this library reads the overrides folder of those
+        // that have one, and knows nothing of the rest.
+        internal static List<Mod> Scan()
         {
             var mods = new List<Mod>();
-            if (!Directory.Exists(pluginsFolder)) return mods;
-            foreach (string folder in Directory.GetDirectories(pluginsFolder).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+            foreach (DataMod found in DataMods.With("overrides"))
             {
-                string manifest = System.IO.Path.Combine(folder, "mod.json");
-                string overrides = System.IO.Path.Combine(folder, "overrides");
-                if (!System.IO.File.Exists(manifest) || !Directory.Exists(overrides)) continue;
-                Mod mod = Read(folder, manifest, overrides);
+                Mod mod = Read(found);
                 mod.Order = mods.Count;
                 mods.Add(mod);
             }
             return mods;
         }
 
-        private static Mod Read(string folder, string manifestPath, string overridesFolder)
+        private static Mod Read(DataMod found)
         {
-            string folderName = System.IO.Path.GetFileName(folder);
-            var mod = new Mod { Folder = folder, ManifestPath = manifestPath, Name = folderName };
-            try
+            string overridesFolder = found.FolderFor("overrides");
+            var mod = new Mod
             {
-                mod.Manifest = Manifest.From(Json.Parse(System.IO.File.ReadAllText(manifestPath)));
-            }
-            catch (Exception ex)
-            {
-                mod.Manifest = new Manifest();
-                mod.Problems.Add("mod.json could not be read: " + ex.Message);
-            }
-            if (!string.IsNullOrEmpty(mod.Manifest.name)) mod.Name = mod.Manifest.name;
-            mod.Version = string.IsNullOrEmpty(mod.Manifest.version) ? "1.0.0" : mod.Manifest.version;
-            mod.Guid = !string.IsNullOrEmpty(mod.Manifest.guid) ? mod.Manifest.guid : "overrides." + Slug(folderName);
+                Folder = found.Folder,
+                ManifestPath = found.ManifestPath,
+                Name = found.Name,
+                Version = found.Version,
+                Guid = found.Guid,
+                Manifest = new Manifest
+                {
+                    guid = found.Guid,
+                    name = found.Name,
+                    authors = found.Authors,
+                    description = found.Description,
+                    version = found.Version,
+                    website = found.Website,
+                },
+            };
+            mod.Problems.AddRange(found.Problems);
 
             foreach (string path in Directory.GetFiles(overridesFolder, "*.json").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
             {
