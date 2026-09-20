@@ -66,6 +66,10 @@ namespace DragNWash.ModFramework.Graphs
                 {
                     Pair(content, "Needs", string.Join(", ", graph.Needs.ToArray()), Bad);
                 }
+                foreach (string share in graph.Shares)
+                {
+                    Pair(content, "Key shared", share, Color.white);
+                }
                 foreach (string clash in graph.Clashes)
                 {
                     // Why an edit may seem to do nothing: somebody else writes

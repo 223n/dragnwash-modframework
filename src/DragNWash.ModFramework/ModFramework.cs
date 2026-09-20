@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using BepInEx.Logging;
+using UnityEngine;
 
 namespace DragNWash.ModFramework
 {
@@ -30,7 +31,7 @@ namespace DragNWash.ModFramework
         /// may still change between minor versions; from 1.0 on, breaking changes
         /// only come with a new major version. Keep in sync with the csproj.
         /// </summary>
-        public const string Version = "1.4.1";
+        public const string Version = "1.4.2";
 
         private static ManualLogSource _log;
         private static readonly Dictionary<string, ModInfo> Infos = new Dictionary<string, ModInfo>(StringComparer.Ordinal);
@@ -73,6 +74,28 @@ namespace DragNWash.ModFramework
                 if (Infos.TryGetValue(guid, out ModInfo info) && !string.IsNullOrEmpty(info.DisplayName)) return info.DisplayName;
             }
             return BepInEx.Bootstrap.Chainloader.PluginInfos.TryGetValue(guid, out BepInEx.PluginInfo plugin) && plugin.Metadata != null ? plugin.Metadata.Name : guid;
+        }
+
+        /// <summary>
+        /// Who else answers a key. Every loaded plugin keeps its shortcuts in its
+        /// own settings, so two mods can sit on one key without either of them
+        /// knowing; this says which mods have a setting for
+        /// <paramref name="key"/>, as <c>Drag'n Wash Localization: [Debug]
+        /// DumpDialogueKey</c>, leaving out <paramref name="exceptGuid"/> (your
+        /// own mod). It is a report and nothing more: a player may well want one
+        /// key to do two things, and only they can say. Since 1.4.2.
+        /// </summary>
+        public static IReadOnlyList<string> WhoElseUses(KeyCode key, string exceptGuid = null)
+        {
+            if (key == KeyCode.None)
+            {
+                return new List<string>();
+            }
+            return Mods.KeyBindings.All()
+                .Where(b => b.Shortcut.MainKey == key && !string.Equals(b.Guid, exceptGuid, StringComparison.Ordinal))
+                .Select(b => $"{b.Mod}: {b.Setting}")
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
         }
 
         /// <summary>

@@ -20,7 +20,7 @@ namespace DragNWash.ModFramework.Graphs
         public const string Guid = "com.tomxv.dragnwash.modframework.graphs";
 
         /// <summary>The library's version.</summary>
-        public const string Version = "0.1.0";
+        public const string Version = "0.1.1";
 
         /// <summary>What was read from one graph file, and how it is going.</summary>
         public sealed class GraphReport
@@ -51,6 +51,12 @@ namespace DragNWash.ModFramework.Graphs
             public int Failures { get; internal set; }
             /// <summary>Whether it runs, and if not, why not.</summary>
             public string State { get; internal set; }
+            /// <summary>
+            /// Keys this graph answers that another mod answers as well, as
+            /// <c>F6 is also Drag'n Wash Localization: [Debug] DumpDialogueKey;
+            /// both answer it</c>. Nobody owns a key: this only says so.
+            /// </summary>
+            public IReadOnlyList<string> Shares { get; internal set; }
             /// <summary>
             /// Values this graph changed that another mod changes too, as
             /// <c>Sun [Light] intensity - also changed by graph:...</c>. The
@@ -97,6 +103,7 @@ namespace DragNWash.ModFramework.Graphs
                 Failures = graph.Failures,
                 State = State(graph),
                 Clashes = Clashes(graph),
+                Shares = graph.Shares.ToList(),
             };
         }
 

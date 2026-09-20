@@ -173,6 +173,9 @@ namespace DragNWash.ModFramework.Graphs
             _keys.Clear();
             foreach (Graph graph in _runner.Graphs)
             {
+                // Said again from scratch: a mod may have been switched off, or
+                // its key changed, since the last look.
+                graph.Shares.Clear();
                 foreach (GraphHandler handler in graph.Handlers)
                 {
                     if (handler.Event != GraphEvents.Key || string.IsNullOrEmpty(handler.Key))
@@ -185,7 +188,37 @@ namespace DragNWash.ModFramework.Graphs
                         continue;
                     }
                     _keys.Add(new KeyValuePair<KeyboardShortcut, string>(new KeyboardShortcut(code), handler.Key));
+                    SayWhoElseUses(graph, handler, code);
                 }
+            }
+        }
+
+        // Nobody owns a key. Another mod may have a setting on the same one, and
+        // then both answer it - which is a surprise worth naming once, on the
+        // graph and in the log, rather than a rule to enforce: a player may well
+        // want one key to do two things.
+        private readonly HashSet<string> _saidKey = new HashSet<string>(StringComparer.Ordinal);
+
+        private void SayWhoElseUses(Graph graph, GraphHandler handler, KeyCode code)
+        {
+            IReadOnlyList<string> others;
+            try
+            {
+                others = ModFramework.WhoElseUses(code, GameGraphs.Guid);
+            }
+            catch (MissingMethodException)
+            {
+                return;   // an older core: it cannot say, and that is no error
+            }
+            if (others.Count == 0)
+            {
+                return;
+            }
+            string said = $"{handler.Key} is also {string.Join(", ", others.ToArray())}; both answer it.";
+            graph.Shares.Add(said);
+            if (_saidKey.Add(graph.Where + "|" + handler.Key))
+            {
+                Log.LogInfo($"[graphs] {graph.Where}: {said}");
             }
         }
 
@@ -296,6 +329,7 @@ namespace DragNWash.ModFramework.Graphs
                 if (r.Reads.Count > 0) lines.Add("  reads " + string.Join(", ", r.Reads.ToArray()));
                 if (r.Changes.Count > 0) lines.Add("  changes " + string.Join(", ", r.Changes.ToArray()));
                 if (r.Needs.Count > 0) lines.Add("  needs " + string.Join(", ", r.Needs.ToArray()));
+                foreach (string share in r.Shares) lines.Add("  key: " + share);
                 foreach (string clash in r.Clashes) lines.Add("  also: " + clash);
                 foreach (string p in r.Problems) lines.Add("  " + p);
                 if (r.Started > 0) lines.Add($"  {r.Running} run(s) going, {r.Started} started, {r.Failures} failure(s) in a row");

@@ -48,6 +48,10 @@ namespace DragNWash.ModFramework.Graphs
         // Libraries an operation it names belongs to but which are not installed.
         internal List<string> Needs = new List<string>();
 
+        // Keys another mod answers too, in words, for the Mods screen and the
+        // console. Filled when the keys are watched, cleared on a reload.
+        internal List<string> Shares = new List<string>();
+
         // ---- while the game runs ----
         internal Dictionary<string, object> Variables = new Dictionary<string, object>(StringComparer.Ordinal);
         internal List<GraphRun> Runs = new List<GraphRun>();

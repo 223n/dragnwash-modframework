@@ -8,6 +8,18 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - Experimental, not in a release. `codegraph-standalone/` (CodeGraphStandalone.exe, Windows): the code graph of any .NET assembly without the game (docs/CODE_GRAPH_STANDALONE.md). Opens DLLs, a folder (leaving out .NET's and Unity's own unless `--all`) or a Mono Unity game's folder, by Open…, the command line or a drop; refuses IL2CPP games with the reason. Shows the Bridge's page in WebView2 and answers its calls inside the process (`WebResourceRequested`), with no port and no network.
 
+## 2026-09-20: which mod has which key
+
+The core and the preloader patcher go to 1.4.2, Graphs to 0.1.1. Additive, as before.
+
+### Core 1.4.2
+
+- `ModFramework.WhoElseUses(key, exceptGuid)`: which other mods have a setting on a keyboard key, as *Drag'n Wash Localization: [Debug] DumpDialogueKey*. Every BepInEx plugin keeps its shortcuts in its own settings and nobody asks anybody else, so two mods can sit on one key without either of them knowing; the framework can see all of them, so it can at least say so.
+
+### Graphs 0.1.1
+
+- A graph that answers `key.pressed` says who else answers that key - in the log, in the console's `graphs`, on the mod's **Graphs** page (*Key shared*) and in `graphs.list` for the page. It is said once per key and worked out again at every reload, and nothing is refused: a player may well want one key to do two things, and only they can say. (The framework's own F1 is still refused.)
+
 ## 2026-09-20: graphs, and who changed what
 
 The core and the preloader patcher go to 1.4.1; Overrides to 0.1.1, the Bridge to 0.1.1, the Inspector to 1.1.1; and the **Graphs** library 0.1.0 arrives, experimental like the rest of the new ones. Everything is additive: mods built on 1.4.0 need no change.

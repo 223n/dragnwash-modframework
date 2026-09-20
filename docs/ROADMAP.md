@@ -6,6 +6,10 @@ Where Drag'n Wash ModFramework is going. Plans change; dates are given only when
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
 
+## Released: 1.4.2 (2026-09-20)
+
+- **Which mod has which key.** A graph answering `key.pressed` names the other mods with a setting on that key, in the log, the console, the Mods screen and the page. Nobody owns a key, so nothing is refused; it is said, once, where a person will see it (`ModFramework.WhoElseUses`).
+
 ## Released: 1.4.1 (2026-09-20)
 
 - **Graphs 0.1.0: mods with no code that do things** (stage 4 of the [plan](API_PLAN.md), [design](GRAPHS.md)). A folder with a `mod.json` and `graphs/*.json` answers the events the libraries raise and calls the operations they registered; every file is checked before anything runs, all the graphs share a millisecond a frame, and a graph that fails three times in a row is switched off with its changes put back. The first writes are `objects.member.set`, `objects.material.set` and `objects.active.set` in the Overrides library, and the editor - blocks to drag, and the same graph drawn as nodes - is the Graphs tab of the Bridge's page.

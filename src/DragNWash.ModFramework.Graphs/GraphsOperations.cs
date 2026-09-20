@@ -138,6 +138,7 @@ namespace DragNWash.ModFramework.Graphs
                 ["started"] = r.Started,
                 ["failures"] = r.Failures,
                 ["clashes"] = r.Clashes.ToList(),
+                ["shares"] = r.Shares.ToList(),
             };
         }
 
