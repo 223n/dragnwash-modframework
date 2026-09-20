@@ -143,6 +143,10 @@ namespace DragNWash.ModFramework.Bridge
                     return "Opened the page in the browser (the link works once, within a minute).";
                 },
                 Operations.Parameter("focus", OperationType.String, "What to show: m:<method id> or t:<type name>; the search when left out."));
+            // The Inspector's Graph buttons and the console open the page; a graph
+            // of a data mod has no business opening windows on this computer.
+            Operation open = Operations.Find("bridge.page.open");
+            if (open != null) open.Audience = OperationAudience.Console | OperationAudience.Page;
         }
 
         // CodeGraph.exe, next to this DLL, on Windows: it signs in with the token by itself,

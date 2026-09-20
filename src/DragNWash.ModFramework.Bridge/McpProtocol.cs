@@ -154,7 +154,7 @@ namespace DragNWash.ModFramework.Bridge
         }
 
         // What AI clients get: read operations, except those kept for the page on this computer (the game's code).
-        private static bool Offered(Operation op) => op.Kind == OperationKind.Read && !op.PageOnly;
+        private static bool Offered(Operation op) => op.Kind == OperationKind.Read && (op.Audience & OperationAudience.Mcp) != 0;
 
         private static List<object> Tools()
         {
@@ -205,7 +205,7 @@ namespace DragNWash.ModFramework.Bridge
 
             OperationResult result = null;
             var done = new ManualResetEvent(false);
-            Operations.Call(op.Name, args, "mcp:" + session.Client, r => { result = r; done.Set(); });
+            Operations.Call(op.Name, args, "mcp:" + session.Client, r => { result = r; done.Set(); }, OperationAudience.Mcp);
             bool inTime = done.WaitOne(CallTimeoutMs);
             session.Calls++;
             Record(session.Client, tool, inTime && result.Ok);

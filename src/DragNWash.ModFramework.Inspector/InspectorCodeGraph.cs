@@ -249,26 +249,26 @@ namespace DragNWash.ModFramework.Inspector
                 args => Get().Graph(args.String("method"), args.Bool("stub", false)),
                 Operations.Parameter("method", OperationType.String, method, true),
                 Operations.Parameter("stub", OperationType.Boolean, "For a coroutine: the method itself (which only builds its state machine) instead of the state machine's body."));
-            if (op != null) op.PageOnly = true;
+            if (op != null) op.Audience = OperationAudience.Console | OperationAudience.Page;
 
             op = Operations.Register(g, "code.type", "A type of the game: its methods in groups (Unity messages, public, private) and the calls between them.", OperationKind.Read,
                 "{ type, assembly, base, groups: [{ name, methods }] }",
                 args => Get().TypeGraph(args.String("type")),
                 Operations.Parameter("type", OperationType.String, "The type: its full name or, when unique, its name.", true));
-            if (op != null) op.PageOnly = true;
+            if (op != null) op.Audience = OperationAudience.Console | OperationAudience.Page;
 
             op = Operations.Register(g, "code.callers", "The methods of the game that call a method (a coroutine's calls count as its method's).", OperationKind.Read,
                 "a list of { id, name }",
                 args => Get().CallersOf(Id(Get().FindMethod(args.String("method")))),
                 Operations.Parameter("method", OperationType.String, method, true));
-            if (op != null) op.PageOnly = true;
+            if (op != null) op.Audience = OperationAudience.Console | OperationAudience.Page;
 
             op = Operations.Register(g, "code.search", "Types and methods of the game whose name contains the text.", OperationKind.Read,
                 "a list of { kind, id, name }",
                 args => Get().Search(args.String("text"), Math.Max(1, Math.Min(200, args.Int("max", 50)))),
                 Operations.Parameter("text", OperationType.String, "Part of the name.", true),
                 Operations.Parameter("max", OperationType.Number, "At most this many (1 to 200; 50 when left out)."));
-            if (op != null) op.PageOnly = true;
+            if (op != null) op.Audience = OperationAudience.Console | OperationAudience.Page;
 
             op = Operations.Register(g, "code.stats", "How big the code index is and what the last scans cost.", OperationKind.Read,
                 "{ assemblies, methods, index_ms, listeners_ms, listeners_components }",
@@ -285,7 +285,7 @@ namespace DragNWash.ModFramework.Inspector
                         ["listeners_components"] = _listenersComponents,
                     };
                 });
-            if (op != null) op.PageOnly = true;
+            if (op != null) op.Audience = OperationAudience.Console | OperationAudience.Page;
         }
     }
 }

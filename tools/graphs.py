@@ -72,11 +72,13 @@ LIBRARIES = {
 
 REGISTER = re.compile(r'Operations\.Register\(\s*[^,]+,\s*"([a-z0-9_.]+)"\s*,\s*"((?:[^"\\]|\\.)*)"\s*,\s*OperationKind\.(\w+)')
 PARAMETER = re.compile(r'Operations\.Parameter\(\s*"([a-z0-9_]+)"\s*,\s*OperationType\.(\w+)\s*,\s*(?:\$?"(?:[^"\\]|\\.)*"|\w+)\s*(?:,\s*(true|false))?\s*((?:,\s*"[^"]*")*)\)')
+AUDIENCES = ("Console", "Page", "Mcp", "Graphs")
+
 PARAMETER_VAR = re.compile(r'OperationParameter\s+(\w+)\s*=\s*(Operations\.Parameter\(.*\));\s*$', re.M)
 
 
 def operations():
-    """Every operation registered in src/: name -> {library, kind, page_only, parameters}."""
+    """Every operation registered in src/: name -> {library, kind, audience, parameters}."""
     found = {}
     for path in sorted(SRC.glob("*/**/*.cs")):
         if "obj" in path.parts or "bin" in path.parts or path.name == "Operations.cs":
@@ -88,7 +90,7 @@ def operations():
         for i, m in enumerate(starts):
             end = starts[i + 1].start() if i + 1 < len(starts) else len(text)
             body = text[m.end():end]
-            # Up to the next registration: its parameters, and "op.PageOnly = true" after it.
+            # Up to the next registration: its parameters, and "op.Audience = ..." after it.
             # Operations.Parameter appears nowhere else in these files.
             params = {}
             for pm in PARAMETER.finditer(body):
@@ -102,11 +104,20 @@ def operations():
             found[m.group(1)] = {
                 "library": library,
                 "kind": m.group(3).lower(),
-                "page_only": "PageOnly = true" in body,
+                "audience": audience(body),
                 "description": m.group(2),
                 "parameters": params,
             }
     return found
+
+
+def audience(body):
+    """Who the registration says may call it: every flag named after op.Audience = ..."""
+    m = re.search(r"\.Audience\s*=\s*([^;]+);", body)
+    if not m:
+        return set(AUDIENCES)
+    named = set(re.findall(r"OperationAudience\.(\w+)", m.group(1)))
+    return set(AUDIENCES) if "Anyone" in named else {a for a in AUDIENCES if a in named}
 
 
 def parameter(pm):
@@ -120,10 +131,10 @@ def inventory():
     for name, op in ops.items():
         row = libraries.setdefault(op["library"], {"read": 0, "write": 0, "page_only": 0, "names": []})
         row[op["kind"]] += 1
-        row["page_only"] += op["page_only"]
+        row["page_only"] += page_only(op)
         row["names"].append(name)
     print(f"{len(ops)} operations: {sum(o['kind'] == 'read' for o in ops.values())} read, "
-          f"{sum(o['kind'] == 'write' for o in ops.values())} write, {sum(o['page_only'] for o in ops.values())} page only; "
+          f"{sum(o['kind'] == 'write' for o in ops.values())} write, {sum(page_only(o) for o in ops.values())} page only; "
           f"{sum(for_graphs(o) for o in ops.values())} a graph could call.")
     for library, row in sorted(libraries.items()):
         print(f"  {library}: {row['read']} read, {row['write']} write, {row['page_only']} page only: {', '.join(sorted(row['names']))}")
@@ -131,9 +142,13 @@ def inventory():
 
 
 def for_graphs(op):
-    # Page-only operations show the game's own code (content policy); the Bridge's
-    # operations open pages and hand out sign-ins. Neither is for graphs.
-    return not op["page_only"] and op["library"] != "Bridge"
+    # Each registration says who its operation is for; what shows the game's own
+    # code (content policy) and the Bridge's own operations leave graphs out.
+    return "Graphs" in op["audience"]
+
+
+def page_only(op):
+    return "Page" in op["audience"] and "Mcp" not in op["audience"]
 
 
 # ---- checking a graph ------------------------------------------------------------
@@ -589,7 +604,8 @@ def test():
     expect("inspector.member.get has its parameters", set(ops["inspector.member.get"]["parameters"]) == {"path", "component", "index", "member", "private"})
     expect("assets.textures.list has filter and max", set(ops["assets.textures.list"]["parameters"]) == {"filter", "max"})
     expect("log.read's level has choices", ops["log.read"]["parameters"]["level"]["choices"] is not None)
-    expect("code.graph is page only", ops["code.graph"]["page_only"])
+    expect("code.graph is for the page and the console only", ops["code.graph"]["audience"] == {"Console", "Page"})
+    expect("the events the libraries register are in the design", set(EVENTS) >= {"scene.loaded", "dialogue.line.showing", "saves.written"})
 
     graph = example_graph()
     problems, uses = check(graph, ops)

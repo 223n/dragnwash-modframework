@@ -10,6 +10,11 @@ namespace DragNWash.ModFramework.Saves
         internal static void Register()
         {
             string g = GameSaves.Guid;
+            // The library's own event in the registry, raised where it already
+            // tells its listeners.
+            Operations.RegisterEvent(g, "saves.written", "The game wrote a save slot.",
+                Operations.Parameter("slot", OperationType.String, "The slot's name."));
+            GameSaves.SaveWritten += slot => Operations.Raise("saves.written", new Dictionary<string, object> { ["slot"] = slot });
             Operations.Register(g, "saves.list", "The game's save slots, with the level each is at and how many copies the history keeps.", OperationKind.Read,
                 "a list of { slot, name, level, copies }", args =>
                     GameSaves.Slots().Select(slot => (object)new Dictionary<string, object>

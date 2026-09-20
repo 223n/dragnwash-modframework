@@ -14,7 +14,7 @@ namespace DragNWash.ModFramework.ToolWindow
         internal static void Register()
         {
             ConsoleCommands.Register(ToolWindow.Guid, "op",
-                "op | op <name> key=value ... | op help <name>  (the operations mods registered; read ones change nothing)",
+                "op | op events | op <name> key=value ... | op help <name>  (the operations mods registered; read ones change nothing)",
                 Run, Complete);
 
             Operations.Register(ToolWindow.Guid, "log.read", "The last lines of the console log, newest last, optionally only from one source or at a level and above.",
@@ -51,6 +51,10 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 return args.Length < 2 ? "op help <name>" : Describe(args[1]);
             }
+            if (args[0].Equals("events", StringComparison.OrdinalIgnoreCase))
+            {
+                return Events();
+            }
             var values = new Dictionary<string, object>(StringComparer.Ordinal);
             for (int i = 1; i < args.Length; i++)
             {
@@ -58,7 +62,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 if (eq <= 0) return $"\"{args[i]}\" is not key=value. {Describe(args[0])}";
                 values[args[i].Substring(0, eq)] = args[i].Substring(eq + 1);
             }
-            OperationResult result = Operations.CallNow(args[0], values, "console");
+            OperationResult result = Operations.CallNow(args[0], values, "console", OperationAudience.Console);
             return result.Ok ? ForPeople(result.Value) : result.Error;
         }
 
@@ -86,7 +90,22 @@ namespace DragNWash.ModFramework.ToolWindow
             var sb = new StringBuilder($"{all.Count} operation(s); op help <name> describes one.\n");
             foreach (Operation op in all)
             {
-                sb.Append(op.Kind == OperationKind.Write ? "  [write] " : "  ").Append(op.Name).Append("  ").Append(op.Description).Append('\n');
+                sb.Append(op.Lasting ? "  [write, lasting] " : op.Kind == OperationKind.Write ? "  [write] " : "  ").Append(op.Name).Append("  ").Append(op.Description).Append('\n');
+            }
+            return sb.ToString().TrimEnd('\n');
+        }
+
+        // The events libraries registered, which graphs answer by name.
+        private static string Events()
+        {
+            IReadOnlyList<OperationEvent> all = Operations.AllEvents;
+            if (all.Count == 0) return "No events are registered.";
+            var sb = new StringBuilder($"{all.Count} event(s).\n");
+            foreach (OperationEvent e in all)
+            {
+                sb.Append("  ").Append(e.Name);
+                if (e.Values.Count > 0) sb.Append('(').Append(string.Join(", ", e.Values.Select(v => v.Name).ToArray())).Append(')');
+                sb.Append("  ").Append(e.Description).Append('\n');
             }
             return sb.ToString().TrimEnd('\n');
         }
@@ -113,7 +132,7 @@ namespace DragNWash.ModFramework.ToolWindow
         {
             if (args.Length <= 1)
             {
-                return new[] { "help" }.Concat(Operations.All.Select(o => o.Name));
+                return new[] { "help", "events" }.Concat(Operations.All.Select(o => o.Name));
             }
             if (args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
             {

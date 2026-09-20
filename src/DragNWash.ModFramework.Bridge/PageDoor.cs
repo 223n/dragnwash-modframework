@@ -165,7 +165,7 @@ namespace DragNWash.ModFramework.Bridge
             var args = request != null && request.TryGetValue("args", out object a) && a is Dictionary<string, object> d ? d : new Dictionary<string, object>();
             OperationResult result = null;
             var done = new ManualResetEvent(false);
-            Operations.Call(op.Name, args, "page", r => { result = r; done.Set(); });
+            Operations.Call(op.Name, args, "page", r => { result = r; done.Set(); }, OperationAudience.Page);
             if (!done.WaitOne(CallTimeoutMs))
             {
                 BridgePlugin.Log.LogWarning($"[bridge] The page's call to {op.Name} got no answer within 10 seconds.");

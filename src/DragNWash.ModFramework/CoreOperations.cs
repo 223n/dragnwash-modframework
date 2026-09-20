@@ -67,6 +67,32 @@ namespace DragNWash.ModFramework
                     }
                     return new Dictionary<string, object> { ["active"] = SceneManager.GetActiveScene().name, ["loaded"] = loaded, ["build"] = build };
                 });
+            RegisterEvents(g);
+        }
+
+        // The core's events, handed to the registry so anything built on it (a
+        // graph of a data mod) can answer them by name. The core hears them
+        // through GameEvents like any mod, so a listener that throws is logged
+        // and the game's own event is never touched. Quitting is left out: a run
+        // cannot wait while the game quits, and nothing it did would be seen.
+        private static void RegisterEvents(string g)
+        {
+            Operations.RegisterEvent(g, "game.started", "Once, when the title screen is first shown.");
+            Operations.RegisterEvent(g, "scene.loaded", "After a scene is loaded.",
+                Operations.Parameter("scene", OperationType.String, "The scene's name."),
+                Operations.Parameter("mode", OperationType.String, "How it was loaded: Single or Additive."));
+            Operations.RegisterEvent(g, "scene.unloaded", "After a scene is unloaded.",
+                Operations.Parameter("scene", OperationType.String, "The scene's name."));
+            GameEvents.OnGameStarted(g, () => Operations.Raise("game.started"));
+            GameEvents.OnSceneLoaded(g, (scene, mode) => Operations.Raise("scene.loaded", new Dictionary<string, object>
+            {
+                ["scene"] = scene.name,
+                ["mode"] = mode.ToString(),
+            }));
+            GameEvents.OnSceneUnloaded(g, scene => Operations.Raise("scene.unloaded", new Dictionary<string, object>
+            {
+                ["scene"] = scene.name,
+            }));
         }
     }
 }

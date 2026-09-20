@@ -162,7 +162,7 @@ when scene loaded
 
 ## What is missing
 
-Today (2026-09-20) the registry has **28 operations: 27 read, 1 write**. Leaving out the 5 page-only ones (`code.*`, which show the game's code) and the Bridge's `bridge.page.open` (the only write), **a graph could call 22, all reads**. So a graph can look and write to the log, and nothing else. That is useful for mod makers (reports, checks, "tell me when this happens"), not yet for players.
+Today (2026-09-20) the registry has **31 operations: 30 read, 1 write**. Leaving out the 5 page-only ones (`code.*`, which show the game's code) and the Bridge's `bridge.page.open` (the only write), **a graph could call 25, all reads**. So a graph can look and write to the log, and nothing else. That is useful for mod makers (reports, checks, "tell me when this happens"), not yet for players.
 
 | Library | Operations a graph could call |
 |---|---|

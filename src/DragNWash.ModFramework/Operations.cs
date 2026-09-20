@@ -17,6 +17,29 @@ namespace DragNWash.ModFramework
         Write,
     }
 
+    /// <summary>
+    /// Who may call an operation. A library says who its operation is for
+    /// (<see cref="Operation.Audience"/>), and each door asks with its own flag:
+    /// the console, the Bridge's page on this computer, an AI client over MCP,
+    /// a graph. Since 1.4.0.
+    /// </summary>
+    [Flags]
+    public enum OperationAudience
+    {
+        /// <summary>Nobody in particular: a call from inside the framework, which is not checked.</summary>
+        None = 0,
+        /// <summary>The console in the F1 window, on this computer.</summary>
+        Console = 1,
+        /// <summary>The Bridge's page on this computer (the code graph, the editor).</summary>
+        Page = 2,
+        /// <summary>An AI client over MCP.</summary>
+        Mcp = 4,
+        /// <summary>A graph of a data mod.</summary>
+        Graphs = 8,
+        /// <summary>Everyone above: the default of a newly registered operation.</summary>
+        Anyone = Console | Page | Mcp | Graphs,
+    }
+
     /// <summary>The kind of value an operation's parameter takes.</summary>
     public enum OperationType
     {
@@ -63,12 +86,19 @@ namespace DragNWash.ModFramework
         /// <summary>One line on what it returns.</summary>
         public string Returns { get; internal set; }
         /// <summary>
-        /// True for an operation only the Bridge's page on this computer (and the
-        /// console) may call, never an AI client over MCP: set it right after
-        /// <see cref="Operations.Register"/>. For what shows the game's own code
-        /// (docs/CODE_GRAPH.md). Since 1.4.0.
+        /// Who may call it: <see cref="OperationAudience.Anyone"/> unless the
+        /// library narrows it right after <see cref="Operations.Register"/>. What
+        /// shows the game's own code is <c>Console | Page</c>, so no AI client and
+        /// no graph gets it (docs/CODE_GRAPH.md). Since 1.4.0.
         /// </summary>
-        public bool PageOnly { get; set; }
+        public OperationAudience Audience { get; set; } = OperationAudience.Anyone;
+        /// <summary>
+        /// True for a write that outlives the session: it changes a file, a save
+        /// or a setting, and quitting the game does not undo it. Said in stronger
+        /// words than a write on the Mods screen, and never offered to graphs.
+        /// Since 1.4.0.
+        /// </summary>
+        public bool Lasting { get; set; }
 
         internal Func<OperationArgs, object> Run;
     }
@@ -106,6 +136,35 @@ namespace DragNWash.ModFramework
         {
             return _values.TryGetValue(name, out object v) && v is bool b ? b : fallback;
         }
+
+        /// <summary>
+        /// Said by a write operation while it runs: what it changed, and how to
+        /// put it back. The caller gets it in <see cref="OperationResult.TakenBackBy"/>
+        /// (a graph keeps them and runs them, newest first, when it is switched
+        /// off, reloaded or fails), and the registry raises
+        /// <see cref="Operations.Written"/> with it, so the Inspector's History
+        /// can list the change beside the ones made by hand. Say it once, after
+        /// the change is made; a write that cannot be put back says nothing and
+        /// is never offered to graphs. Since 1.4.0.
+        /// </summary>
+        /// <param name="label">What changed, for people: <c>Dragon/Body.enabled</c>.</param>
+        /// <param name="undo">Puts it back. It must not throw.</param>
+        /// <param name="before">The value before, as text, for the History.</param>
+        /// <param name="after">The value now, as text.</param>
+        public void TakeBack(string label, Action undo, string before = null, string after = null)
+        {
+            if (undo == null)
+            {
+                return;
+            }
+            Label = label ?? "";
+            Undo = undo;
+            Before = before;
+            After = after;
+        }
+
+        internal string Label, Before, After;
+        internal Action Undo;
     }
 
     /// <summary>What a call gave back.</summary>
@@ -120,9 +179,49 @@ namespace DragNWash.ModFramework
         public object Value { get; internal set; }
         /// <summary>Why it failed, for people.</summary>
         public string Error { get; internal set; }
+        /// <summary>
+        /// Put back what this call changed, when the write said how
+        /// (<see cref="OperationArgs.TakeBack"/>); null for everything else.
+        /// Since 1.4.0.
+        /// </summary>
+        public OperationTakeBack TakenBackBy { get; internal set; }
 
         /// <summary>The result as JSON: the value, or <c>{"error": "..."}</c>.</summary>
         public string ToJson(bool indented = false) => Ok ? Operations.ToJson(Value, indented) : Operations.ToJson(new Dictionary<string, object> { ["error"] = Error }, indented);
+    }
+
+    /// <summary>
+    /// One change a write operation made, and how to put it back. Since 1.4.0.
+    /// </summary>
+    public sealed class OperationTakeBack
+    {
+        /// <summary>The operation that made it.</summary>
+        public string Operation { get; internal set; }
+        /// <summary>Who asked for it: <c>console</c>, <c>page</c>, <c>graph:&lt;mod&gt;/&lt;file&gt;</c>.</summary>
+        public string Caller { get; internal set; }
+        /// <summary>What changed, for people.</summary>
+        public string Label { get; internal set; }
+        /// <summary>The value before and the value now, as text; either may be null.</summary>
+        public string Before { get; internal set; }
+        /// <summary>The value before and the value now, as text; either may be null.</summary>
+        public string After { get; internal set; }
+
+        internal Action Undo;
+
+        /// <summary>Puts the change back. Runs on the main thread; true when it did not throw.</summary>
+        public bool Run()
+        {
+            try
+            {
+                Undo();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ModFramework.Log.LogWarning($"[op] Putting back {Label} ({Operation}) failed: {ex.Message}");
+                return false;
+            }
+        }
     }
 
     /// <summary>
@@ -132,7 +231,7 @@ namespace DragNWash.ModFramework
     /// Calls run on the main thread; every call is logged with who made it.
     /// Experimental. Since 1.4.0.
     /// </summary>
-    public static class Operations
+    public static partial class Operations
     {
         private static readonly Dictionary<string, Operation> Registered = new Dictionary<string, Operation>(StringComparer.Ordinal);
         private static readonly Queue<Action> MainThreadQueue = new Queue<Action>();
@@ -144,7 +243,7 @@ namespace DragNWash.ModFramework
         internal static void Install()
         {
             _mainThread = Thread.CurrentThread;
-            ModReload.Unloading += (guid, assembly) => RemoveOwner(guid);
+            ModReload.Unloading += (guid, assembly) => { RemoveOwner(guid); RemoveOwnerEvents(guid); };
         }
 
         /// <summary>
@@ -237,7 +336,7 @@ namespace DragNWash.ModFramework
         /// against the parameters: text is turned into numbers and true/false
         /// where the parameter says so.
         /// </summary>
-        public static OperationResult CallNow(string name, IDictionary<string, object> args, string caller)
+        public static OperationResult CallNow(string name, IDictionary<string, object> args, string caller, OperationAudience asking = OperationAudience.None, bool measureResult = true)
         {
             if (_mainThread != null && Thread.CurrentThread != _mainThread)
             {
@@ -247,6 +346,12 @@ namespace DragNWash.ModFramework
             if (op == null)
             {
                 return Fail($"No operation named \"{name}\". \"op\" in the console lists them.");
+            }
+            // A door says who it is; a call from inside the framework says nothing
+            // and is not checked.
+            if (asking != OperationAudience.None && (op.Audience & asking) == 0)
+            {
+                return Fail($"{name} is not offered here.");
             }
             var values = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (OperationParameter p in op.Parameters)
@@ -267,17 +372,41 @@ namespace DragNWash.ModFramework
                 }
             }
             OperationResult result;
+            var call = new OperationArgs(values);
             try
             {
-                object value = op.Run(new OperationArgs(values));
-                string json = ToJson(value);
-                result = json.Length > MaxResultChars
+                object value = op.Run(call);
+                // The cap is for what leaves this computer (the Bridge); a caller
+                // that keeps the result in memory, a graph, skips it, and turning
+                // a long result into JSON with it.
+                string json = measureResult ? ToJson(value) : null;
+                result = json != null && json.Length > MaxResultChars
                     ? Fail($"The result is {json.Length} characters, more than {MaxResultChars}; ask for less (a narrower path, a smaller max).")
                     : new OperationResult { Ok = true, Value = value };
             }
             catch (Exception ex)
             {
                 result = Fail((ex is System.Reflection.TargetInvocationException && ex.InnerException != null ? ex.InnerException : ex).Message);
+            }
+            if (result.Ok && call.Undo != null)
+            {
+                result.TakenBackBy = new OperationTakeBack
+                {
+                    Operation = name,
+                    Caller = caller ?? "?",
+                    Label = call.Label,
+                    Before = call.Before,
+                    After = call.After,
+                    Undo = call.Undo,
+                };
+                try
+                {
+                    Written?.Invoke(result.TakenBackBy);
+                }
+                catch (Exception ex)
+                {
+                    ModFramework.Log.LogWarning($"[op] A listener of Operations.Written threw on {name}: {ex.Message}");
+                }
             }
             string argText = string.Join(" ", values.Select(kv => kv.Key + "=" + kv.Value).ToArray());
             string line = $"[op] {caller ?? "?"}: {name}{(argText.Length > 0 ? " " + argText : "")} -> {(result.Ok ? "ok" : result.Error)}";
@@ -287,16 +416,25 @@ namespace DragNWash.ModFramework
         }
 
         /// <summary>
+        /// Raised after a write operation that said how to put itself back
+        /// (<see cref="OperationArgs.TakeBack"/>): what changed, who asked, the
+        /// value before and the value now. The Inspector lists these in its
+        /// History, so a change a graph made can be seen and undone there.
+        /// Since 1.4.0.
+        /// </summary>
+        public static event Action<OperationTakeBack> Written;
+
+        /// <summary>
         /// Calls an operation from any thread: it runs on the main thread at the
         /// next frame, and <paramref name="done"/> gets the result there.
         /// </summary>
-        public static void Call(string name, IDictionary<string, object> args, string caller, Action<OperationResult> done)
+        public static void Call(string name, IDictionary<string, object> args, string caller, Action<OperationResult> done, OperationAudience asking = OperationAudience.None, bool measureResult = true)
         {
             lock (MainThreadQueue)
             {
                 MainThreadQueue.Enqueue(() =>
                 {
-                    OperationResult r = CallNow(name, args, caller);
+                    OperationResult r = CallNow(name, args, caller, asking, measureResult);
                     try { done?.Invoke(r); }
                     catch (Exception ex) { ModFramework.Log.LogWarning($"[op] The callback for {name} threw: {ex.Message}"); }
                 });
