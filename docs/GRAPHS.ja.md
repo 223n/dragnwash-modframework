@@ -358,6 +358,8 @@ Python のスケッチ（`tools/graphs.py --test`）は、例のグラフを操�
 6. ページ：`graphs.*` の操作、ページの扉のページ専用の書き込み、Graphs のタブ（ブロック、次にノード）。
 7. 文書：プレイヤーと作り手のための wiki のページ。Overrides のページでグラフに触れます。
 
+第 2 段階から第 7 段階までは `main` にあります（2026-09-20）。Wiki のページも公開しました（[Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs-ja)）。第 6 段階で残っているのはブロックのドラッグとノード表示、第 5 段階の `saves.flags.set` は決定 5 のとおり保留です。
+
 ## 決めたこと
 
 2026-09-20 にオーナーが決めました。

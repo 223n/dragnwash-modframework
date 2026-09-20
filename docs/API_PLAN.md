@@ -95,7 +95,7 @@ The Inspector's Code view already reads a method's IL through Mono.Cecil, and kn
 
 ## Stage 4: building with blocks and nodes
 
-Designed in detail in [GRAPHS.md](GRAPHS.md) (not built yet).
+Designed in detail in [GRAPHS.md](GRAPHS.md), and built on `main` (2026-09-20): the library runs graphs, the Overrides library holds the first three writes, and the editor is the Bridge page's Graphs tab. Not released yet; blocks are moved with buttons, and the node view is still to draw.
 
 - A **graph** is data: events (a scene loaded, a key pressed, a dialogue line shown), operations (read and write), a little flow (if, wait, repeat with a limit) and values.
 - **Blocks** (as in Scratch) and **nodes** are two ways to edit the same graph file.

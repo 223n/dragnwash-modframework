@@ -359,6 +359,8 @@ The Python sketch (`tools/graphs.py --test`) runs the example graph with stand-i
 6. The page: `graphs.*` operations, the page door's page-only writes, the Graphs tab with blocks, then nodes.
 7. Docs: a wiki page for players and makers; the Overrides page mentions graphs.
 
+Steps 2 to 7 are done and on `main` (2026-09-20), the wiki page included ([Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs)). What is left of step 6 is dragging blocks and the node view; `saves.flags.set` of step 5 waits, as decision 5 says.
+
 ## Decisions
 
 Decided by the owner on 2026-09-20.
