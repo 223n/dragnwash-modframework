@@ -175,3 +175,12 @@ All six are built on `experimental/object-explorer-build`:
 6. Show hidden; sub-folders by type for Data (and Other).
 
 Later, and not in this design: sound playback, exporting (asset tool step 3), material overrides that ship with a mod (Assets library), a way to walk a prefab's children other than their paths in the list.
+
+## Decisions
+
+Decided by the owner on 2026-09-20, after the first version was in the game; each keeps what was built.
+
+1. **GameObjects outside the scenes stay read-only.** They are what the game makes its objects from, so a change there would show in everything made afterwards and would be hard to put back. A change is made on the object in the scene instead.
+2. **The list is made at a scene load and on Refresh**, not on a timer: listing a few thousand objects costs a few milliseconds, and paying it every second buys nothing.
+3. **Objects Unity hides (HideFlags) stay out until Show hidden.** Most of them are Unity's own, and they outnumber what a person is looking for.
+4. **The read operations `inspector.loaded.*` stay open to AI clients** (audience Anyone). They read what is loaded, never the game's code, which is what the page-only `code.*` operations are for.
