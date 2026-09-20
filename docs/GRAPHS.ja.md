@@ -2,7 +2,7 @@
 
 [English](GRAPHS.md)
 
-> **作ってあり、まだリリースしていません**（2026-09-20）。[API の計画](API_PLAN.ja.md)の第 4 段階は一通り揃いました。Graphs ライブラリがグラフのファイルを読み、検査し、実行します（`src/DragNWash.ModFramework.Graphs`）。最初の書き込み操作は Overrides ライブラリにあります（`objects.member.set`、`objects.material.set`、`objects.active.set`）。**エディター**は Bridge のページの Graphs タブです。エディターにまだ無いのは、ブロックのドラッグ（いまは各項目を入力し、ボタンで並べ替えます）とノード表示です。どちらも同じファイルの見せ方なので、保存されるものは変わりません。ゲームなしでできた調査は[調査](#調査)にあり、そのために書いた `tools/graphs.py` の検査器とインタープリターは、いまも同じ規則を見ています。決めたことは末尾にあります。
+> **作ってあり、まだリリースしていません**（2026-09-20）。[API の計画](API_PLAN.ja.md)の第 4 段階は一通り揃いました。Graphs ライブラリがグラフのファイルを読み、検査し、実行します（`src/DragNWash.ModFramework.Graphs`）。最初の書き込み操作は Overrides ライブラリにあります（`objects.member.set`、`objects.material.set`、`objects.active.set`）。**エディター**は Bridge のページの Graphs タブです。まだ無いのは、エディターのブロックのドラッグ（いまは各項目を入力し、ボタンで並べ替えます）とノード表示（どちらも同じファイルの見せ方なので、保存されるものは変わりません）、それに[書き込みを安全に保つには](#書き込みを安全に保つには)の 3 番目です。`Operations.Written` を聞いているものがまだ無いので、Inspector の History にグラフの書き込みは並びません。2 つの Mod が同じところを変えたときに Mods 画面で知らせる仕組みも、overrides の行どうしにはありますが、グラフの書き込みにはありません。取り消しも、ほかのグラフが上書きしたかどうかを見ずに、自分の値を書き戻します。ゲームなしでできた調査は[調査](#調査)にあり、そのために書いた `tools/graphs.py` の検査器とインタープリターは、いまも同じ規則を見ています。決めたことは末尾にあります。
 
 グラフは、コードのない小さな Mod です。「これが起きたら、これをする」。たとえば「シーンが読み込まれたら、1 秒待って、何があるかを見て、ログに 1 行書く」。`mod.json` のあるフォルダーに入れる JSON のファイルで、[オーバーライドの Mod（wiki）](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides)と同じ形です。呼べるのは、ライブラリが登録した[操作](API_PLAN.ja.md)だけで、コンソールの `op` や Bridge が出しているものと同じです。グラフは Bridge のページで、ブロック（Scratch のような）かノードとして作ります。どちらも同じファイルの見え方の違いです。
 
@@ -358,7 +358,7 @@ Python のスケッチ（`tools/graphs.py --test`）は、例のグラフを操�
 6. ページ：`graphs.*` の操作、ページの扉のページ専用の書き込み、Graphs のタブ（ブロック、次にノード）。
 7. 文書：プレイヤーと作り手のための wiki のページ。Overrides のページでグラフに触れます。
 
-第 2 段階から第 7 段階までは `main` にあります（2026-09-20）。Wiki のページも公開しました（[Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs-ja)）。第 6 段階で残っているのはブロックのドラッグとノード表示、第 5 段階の `saves.flags.set` は決定 5 のとおり保留です。
+第 2 段階から第 7 段階までは `main` にあります（2026-09-20）。Wiki のページも公開しました（[Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs-ja)）。残っているのは、ブロックのドラッグとノード表示（第 6 段階）、決定 5 のとおり保留の `saves.flags.set`（第 5 段階）、そして書き込みを安全に保つ 5 つのうち 2 つ（History への記録と、ぶつかったときの知らせ）です。上の本文はそれらが在るように書いてありますが、まだありません。
 
 ## 決めたこと
 
