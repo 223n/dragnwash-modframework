@@ -2,7 +2,7 @@
 
 [English](DESIGN.md)
 
-状態: 2026 年 9 月。中核は 1.3.0、ライブラリは Text 1.0.0、Dialogue 1.1.0、Tool window 1.1.1、Assets 1.2.0、Flags and saves 1.0.1、Inspector 1.0.0 としてリリースしました。Overrides と Bridge は 0.1.0 で、`main` にはありますがまだリリースしていません。予定や将来と書いた部分はまだ実装していません。どの部分についても、Issue で議論してください。
+状態: 2026 年 9 月。中核は 1.4.0、ライブラリは Tool window 1.2.0、Dialogue 1.2.0、Assets 1.2.0、Text 1.1.0、Flags and saves 1.1.0、Inspector 1.1.0、Overrides 0.1.0、Bridge 0.1.0 としてリリースしました。Graphs 0.1.0 は `main` にありますが、まだリリースしていません。予定や将来と書いた部分はまだ実装していません。どの部分についても、Issue で議論してください。
 
 このメモが設計として挙げていた機能は、いずれも実装済みです。[Mod reload (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload-ja)、[Inspector (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector-ja)、[Console (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Console-ja)、[Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets-ja)、[Dialogue (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue-ja) はすべて 1.2.0 までに入っていて、いまどう動くかは各 wiki ページにあります。設計だけで未実装のものは [ROADMAP.ja.md](ROADMAP.ja.md) にまとめています。
 
