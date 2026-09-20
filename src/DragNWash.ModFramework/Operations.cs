@@ -108,10 +108,19 @@ namespace DragNWash.ModFramework
     {
         private readonly Dictionary<string, object> _values;
 
-        internal OperationArgs(Dictionary<string, object> values)
+        internal OperationArgs(Dictionary<string, object> values, string caller)
         {
             _values = values;
+            Caller = caller ?? "?";
         }
+
+        /// <summary>
+        /// Who asked: <c>console</c>, <c>page</c>, <c>mcp:&lt;client&gt;</c>,
+        /// <c>graph:&lt;mod&gt;/&lt;file&gt;</c>. A write uses it to say who
+        /// changed a value, and to tell one caller's changes from another's.
+        /// Since 1.4.0.
+        /// </summary>
+        public string Caller { get; }
 
         /// <summary>True when the call gave this argument.</summary>
         public bool Has(string name) => _values.ContainsKey(name);
@@ -157,6 +166,22 @@ namespace DragNWash.ModFramework
             {
                 return;
             }
+            TakeBack(label, () => { undo(); return true; }, before, after);
+        }
+
+        /// <summary>
+        /// The same, for a write that can find its change already gone: the
+        /// object destroyed, or somebody else's value in its place. It returns
+        /// true when it put the value back and false when it left what it found
+        /// alone, so a caller counting what it undid counts changes, not tries.
+        /// Since 1.4.0.
+        /// </summary>
+        public void TakeBack(string label, Func<bool> undo, string before = null, string after = null)
+        {
+            if (undo == null)
+            {
+                return;
+            }
             Label = label ?? "";
             Undo = undo;
             Before = before;
@@ -164,7 +189,7 @@ namespace DragNWash.ModFramework
         }
 
         internal string Label, Before, After;
-        internal Action Undo;
+        internal Func<bool> Undo;
     }
 
     /// <summary>What a call gave back.</summary>
@@ -181,7 +206,7 @@ namespace DragNWash.ModFramework
         public string Error { get; internal set; }
         /// <summary>
         /// Put back what this call changed, when the write said how
-        /// (<see cref="OperationArgs.TakeBack"/>); null for everything else.
+        /// (<see cref="OperationArgs.TakeBack(string, Action, string, string)"/>); null for everything else.
         /// Since 1.4.0.
         /// </summary>
         public OperationTakeBack TakenBackBy { get; internal set; }
@@ -206,15 +231,19 @@ namespace DragNWash.ModFramework
         /// <summary>The value before and the value now, as text; either may be null.</summary>
         public string After { get; internal set; }
 
-        internal Action Undo;
+        internal Func<bool> Undo;
 
-        /// <summary>Puts the change back. Runs on the main thread; true when it did not throw.</summary>
+        /// <summary>
+        /// Puts the change back. Runs on the main thread. True when the value
+        /// was put back; false when there was nothing to put back - the object
+        /// is gone, or somebody else wrote the member after this write did - and
+        /// false when putting it back threw.
+        /// </summary>
         public bool Run()
         {
             try
             {
-                Undo();
-                return true;
+                return Undo();
             }
             catch (Exception ex)
             {
@@ -372,7 +401,7 @@ namespace DragNWash.ModFramework
                 }
             }
             OperationResult result;
-            var call = new OperationArgs(values);
+            var call = new OperationArgs(values, caller);
             try
             {
                 object value = op.Run(call);
@@ -417,7 +446,7 @@ namespace DragNWash.ModFramework
 
         /// <summary>
         /// Raised after a write operation that said how to put itself back
-        /// (<see cref="OperationArgs.TakeBack"/>): what changed, who asked, the
+        /// (<see cref="OperationArgs.TakeBack(string, Action, string, string)"/>): what changed, who asked, the
         /// value before and the value now. The Inspector lists these in its
         /// History, so a change a graph made can be seen and undone there.
         /// Since 1.4.0.

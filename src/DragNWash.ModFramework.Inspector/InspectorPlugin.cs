@@ -69,6 +69,10 @@ namespace DragNWash.ModFramework.Inspector
                 InspectorTab.Install();
                 InspectorOperations.Register();
                 InspectorCodeGraph.Register();
+                // What other mods change through a write operation - a graph,
+                // the console, the page - is listed in the History beside the
+                // edits made here, with who made it.
+                Operations.Written += InspectorHistory.RecordWrite;
                 GameEvents.OnSceneLoaded(Inspector.Guid, (scene, mode) => InspectorCodeGraph.OnSceneLoaded());
                 // The outline, the pick mode and the gizmo draw in the game's
                 // screen space, outside the window.
@@ -101,6 +105,7 @@ namespace DragNWash.ModFramework.Inspector
 
         private void OnDestroy()
         {
+            Operations.Written -= InspectorHistory.RecordWrite;
             InspectorFreeCamera.Stop();
             if (InspectorBodies.Paused) InspectorBodies.Resume();
             TW.BlockGameInput(Inspector.Guid, false);

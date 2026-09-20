@@ -66,6 +66,12 @@ namespace DragNWash.ModFramework.Graphs
                 {
                     Pair(content, "Needs", string.Join(", ", graph.Needs.ToArray()), Bad);
                 }
+                foreach (string clash in graph.Clashes)
+                {
+                    // Why an edit may seem to do nothing: somebody else writes
+                    // the same value, and the later write is the one that stands.
+                    Pair(content, "Also changed", clash.Replace(" - also changed by ", ": "), Color.white);
+                }
                 if (graph.Started > 0)
                 {
                     Pair(content, "Runs", $"{graph.Running} going, {graph.Started} started this session" +

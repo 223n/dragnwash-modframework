@@ -1479,9 +1479,13 @@ namespace DragNWash.ModFramework.Inspector
                 if (ry + lineH >= _scrollHistory.y && ry <= _scrollHistory.y + view.height)
                 {
                     GUIStyle nameStyle = e.Reverted ? _mutedCell : _cell;
-                    GUI.Label(new Rect(0, ry, inner - 160, row), Drawable($"{e.Time:HH:mm:ss}  {e.Member}" + (e.Reverted ? "  (reverted)" : "")), nameStyle);
+                    string by = e.By != null ? "  by " + e.By : "";
+                    GUI.Label(new Rect(0, ry, inner - 160, row), Drawable($"{e.Time:HH:mm:ss}  {e.Member}{by}" + (e.Reverted ? "  (put back)" : "")), nameStyle);
                     GUI.Label(new Rect(0, ry + row, inner - 160, row), Drawable($"{e.Label}:  {InspectorModel.Format(e.Before)}  ->  {InspectorModel.Format(e.After)}"), _mutedCell);
-                    if (GUI.Button(new Rect(inner - 154, ry + 2, 72, row - 4), e.Reverted ? "Redo" : "Revert", s.Button))
+                    // A change another mod made can be put back, but not made
+                    // again from here: it is the mod's to repeat.
+                    bool canPress = e.Undo == null || !e.Reverted;
+                    if (canPress && GUI.Button(new Rect(inner - 154, ry + 2, 72, row - 4), e.Reverted ? "Redo" : "Revert", s.Button))
                     {
                         bool redo = e.Reverted;
                         string problem = redo ? InspectorHistory.Reapply(e) : InspectorHistory.Revert(e);

@@ -27,6 +27,13 @@ namespace DragNWash.ModFramework.Inspector
             // it was made (the object may be gone by the time it is exported).
             public InspectorExport.Place Where;
             public object Target;
+            // Set for a change another mod made through an operation: who asked
+            // (graph:<mod>/<file>, console, page) and the registry's own way of
+            // putting it back. Such an entry has no Set of its own, cannot be
+            // done again once put back, and is not exported as an override: it
+            // belongs to the mod that made it, not to this session's edits.
+            public string By;
+            public Func<bool> Undo;
         }
 
         private static readonly List<Entry> Entries = new List<Entry>();
@@ -49,6 +56,35 @@ namespace DragNWash.ModFramework.Inspector
                 Originals[key] = before;
             }
             Entries.Add(new Entry { Key = key, Label = label, Member = member, Before = before, After = after, Time = DateTime.Now, Get = get, Set = set, Target = target, Where = InspectorExport.PlaceOf(target, member) });
+            if (Entries.Count > 500)
+            {
+                Entries.RemoveAt(0);
+            }
+        }
+
+        /// <summary>
+        /// A change another mod made through a write operation, as the registry
+        /// tells it (<see cref="Operations.Written"/>). It is listed beside the
+        /// edits made by hand so a person can see that a graph moved something,
+        /// and put that one change back without stopping the whole graph.
+        /// </summary>
+        internal static void RecordWrite(OperationTakeBack w)
+        {
+            if (w == null)
+            {
+                return;
+            }
+            Entries.Add(new Entry
+            {
+                Key = "op|" + w.Operation + "|" + w.Label,
+                Label = w.Label ?? "",
+                Member = w.Operation,
+                Before = w.Before,
+                After = w.After,
+                Time = DateTime.Now,
+                By = w.Caller,
+                Undo = w.Run,
+            });
             if (Entries.Count > 500)
             {
                 Entries.RemoveAt(0);
@@ -90,6 +126,17 @@ namespace DragNWash.ModFramework.Inspector
         // Puts back the value before the entry; the entry stays, marked.
         internal static string Revert(Entry e)
         {
+            if (e.Undo != null)
+            {
+                // The write's own take-back: it knows whether the value is still
+                // the one it wrote, and leaves somebody else's change alone.
+                // False means there was nothing to put back: the object is gone,
+                // or somebody wrote the value after this change did. The entry
+                // stays as it is, so the row still says what happened.
+                bool ok = e.Undo();
+                e.Reverted = ok;
+                return ok ? null : "it was left as it is: the value is not the one that change made any more";
+            }
             try
             {
                 e.Set(e.Before);
@@ -104,6 +151,10 @@ namespace DragNWash.ModFramework.Inspector
 
         internal static string Reapply(Entry e)
         {
+            if (e.Undo != null)
+            {
+                return $"{e.By} made this change; it cannot be made again from here";
+            }
             try
             {
                 e.Set(e.After);
@@ -116,17 +167,19 @@ namespace DragNWash.ModFramework.Inspector
             }
         }
 
-        // The latest edit that still stands.
+        // The latest edit made here that still stands. A change another mod made
+        // is passed over: "Undo last" is for this session's own edits, and a
+        // graph's write is put back from its own row, or by stopping the graph.
         internal static string Undo()
         {
             for (int i = Entries.Count - 1; i >= 0; i--)
             {
-                if (!Entries[i].Reverted)
+                if (!Entries[i].Reverted && Entries[i].Undo == null)
                 {
                     return Revert(Entries[i]) ?? $"Reverted {Entries[i].Member}.";
                 }
             }
-            return "Nothing to undo.";
+            return "Nothing of your own to undo.";
         }
 
         internal static void Clear()

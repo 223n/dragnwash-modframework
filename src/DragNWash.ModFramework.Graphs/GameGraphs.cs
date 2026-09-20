@@ -51,6 +51,13 @@ namespace DragNWash.ModFramework.Graphs
             public int Failures { get; internal set; }
             /// <summary>Whether it runs, and if not, why not.</summary>
             public string State { get; internal set; }
+            /// <summary>
+            /// Values this graph changed that another mod changes too, as
+            /// <c>Sun [Light] intensity - also changed by graph:...</c>. The
+            /// later write is the one that stands, so a person can see why an
+            /// edit seems to do nothing. Empty when nothing met.
+            /// </summary>
+            public IReadOnlyList<string> Clashes { get; internal set; }
         }
 
         /// <summary>Every graph found at startup, or at the last <see cref="Reload"/>.</summary>
@@ -89,7 +96,59 @@ namespace DragNWash.ModFramework.Graphs
                 Started = graph.RunsStarted,
                 Failures = graph.Failures,
                 State = State(graph),
+                Clashes = Clashes(graph),
             };
+        }
+
+        // What this graph wrote that somebody else writes too. It is asked of
+        // the library that owns the writes, through the registry and by name:
+        // the Graphs library knows no operation, and when the Overrides library
+        // is not installed there is simply nothing to say.
+        private static IReadOnlyList<string> Clashes(Graph graph)
+        {
+            var found = new List<string>();
+            if (Operations.Find("objects.writes") == null)
+            {
+                return found;
+            }
+            string me = $"graph:{graph.ModGuid}/{graph.File}";
+            OperationResult result = Operations.CallNow("objects.writes", null, GameGraphs.Guid);
+            if (!result.Ok || !(result.Value is System.Collections.IList rows))
+            {
+                return found;
+            }
+            foreach (object row in rows)
+            {
+                if (!(row is IDictionary<string, object> write)) continue;
+                var also = write.TryGetValue("also", out object a) ? a as System.Collections.IList : null;
+                string by = write.TryGetValue("by", out object b) ? b as string : null;
+                bool mine = by == me || (also != null && also.Cast<object>().Any(x => (x as string) == me));
+                if (!mine) continue;
+                var others = new List<string>();
+                if (by != null && by != me) others.Add(by);
+                if (also != null) others.AddRange(also.Cast<object>().Select(x => x as string).Where(x => x != null && x != me));
+                if (others.Count == 0) continue;
+                string target = write.TryGetValue("target", out object t) ? t as string : "something";
+                found.Add($"{target} - also changed by {string.Join(", ", others.Distinct().Select(Who).ToArray())}");
+            }
+            return found;
+        }
+
+        // A caller's name for the Mods screen: "graph:<mod guid>/<file>" is what
+        // the log and the registry use, but a player knows the mod by its name.
+        private static string Who(string caller)
+        {
+            if (caller == null || !caller.StartsWith("graph:", System.StringComparison.Ordinal))
+            {
+                return caller ?? "something else";
+            }
+            string rest = caller.Substring("graph:".Length);
+            int slash = rest.IndexOf('/');
+            if (slash < 0) return rest;
+            string guid = rest.Substring(0, slash), file = rest.Substring(slash + 1);
+            Graph graph = (GraphsPlugin.Instance != null ? GraphsPlugin.Instance.Graphs : new List<Graph>())
+                .FirstOrDefault(g => g.ModGuid == guid && g.File == file);
+            return graph != null ? graph.Where : rest;
         }
 
         internal static string State(Graph graph)

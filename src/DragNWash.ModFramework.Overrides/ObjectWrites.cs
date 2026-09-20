@@ -56,6 +56,10 @@ namespace DragNWash.ModFramework.Overrides
                 Operations.Parameter("path", OperationType.String, "The object's path in the scene.", true),
                 Operations.Parameter("active", OperationType.Boolean, "True shows it, false hides it.", true),
                 Operations.Parameter("scene", OperationType.String, "Only an object in this scene."));
+
+            Operations.Register(g, "objects.writes",
+                "What this library has changed in the game this session and who asked for it, with the other mods that changed the same thing. Reading it changes nothing.",
+                OperationKind.Read, "[{ target, by, also, value }]", args => WriteLedger.Report());
         }
 
         // ---- the three writes --------------------------------------------------
@@ -95,11 +99,7 @@ namespace DragNWash.ModFramework.Overrides
             object before = m.Get();
             m.Set(value);
             string label = $"{Path(go)} [{c.GetType().Name}] {memberName}";
-            // The component may be destroyed before the take-back runs; putting
-            // a value into a destroyed object throws, so it is checked first and
-            // the take-back quietly does nothing rather than failing the graph.
-            args.TakeBack(label, () => { if (c != null) { try { m.Set(before); } catch { } } },
-                Show(before), Show(value));
+            PutBack(args, WriteLedger.KeyOf(c, memberName), label, before, value, m.Get, m.Set, c);
 
             return new Dictionary<string, object>
             {
@@ -148,8 +148,7 @@ namespace DragNWash.ModFramework.Overrides
             object before = mp.Get();
             mp.Set(value);
             string label = $"{Path(go)} [{r.GetType().Name}] material {material.name} {property}";
-            args.TakeBack(label, () => { if (material != null) { try { mp.Set(before); } catch { } } },
-                Show(before), Show(value));
+            PutBack(args, WriteLedger.KeyOf(material, property), label, before, value, mp.Get, mp.Set, material);
 
             return new Dictionary<string, object>
             {
@@ -166,15 +165,72 @@ namespace DragNWash.ModFramework.Overrides
             GameObject go = Find(args);
             bool active = args.Bool("active");
             bool before = go.activeSelf;
+            GameObject target = go;
             go.SetActive(active);
-            args.TakeBack($"{Path(go)} active", () => { if (go != null) { try { go.SetActive(before); } catch { } } },
-                Show(before), Show(active));
+            PutBack(args, WriteLedger.KeyOf(go, "active"), $"{Path(go)} active", before, active,
+                () => target.activeSelf, v => target.SetActive((bool)v), go);
             return new Dictionary<string, object>
             {
                 ["path"] = Path(go),
                 ["before"] = before,
                 ["after"] = active,
             };
+        }
+
+        // ---- putting it back ---------------------------------------------------
+
+        // Notes the write in the ledger (so two mods meeting on one member are
+        // seen, here and on the Mods screen) and says how to undo it.
+        //
+        // Two things the undo looks at before it writes: the object may be gone
+        // by then, and putting a value into a destroyed object throws; and
+        // somebody else may have written the member since, in which case putting
+        // our value back would quietly undo theirs. Either way it leaves the
+        // value alone and says so, rather than failing the graph.
+        private static void PutBack(OperationArgs args, string key, string label, object before, object after,
+            Func<object> get, Action<object> set, UnityEngine.Object owner)
+        {
+            string caller = args.Caller;
+            WriteLedger.Note note = WriteLedger.Record(key, label, caller, after, get, owner, out string other);
+            if (other != null)
+            {
+                OverridesPlugin.Log.LogWarning(
+                    $"[overrides] {other} and {caller} both change {label}; the value from {caller} is used (it wrote last).");
+            }
+            args.TakeBack(label, () =>
+            {
+                if (owner == null)
+                {
+                    WriteLedger.Forget(note);
+                    return false;
+                }
+                if (!WriteLedger.StillOurs(note, caller, after))
+                {
+                    string since = WriteLedger.LastWriter(note);
+                    if (since == null || since == caller)
+                    {
+                        // Our own earlier write, already put back by the take-back
+                        // after it: nothing to say, and nobody to blame.
+                        OverridesPlugin.Log.LogDebug($"[overrides] {label} is already back where it was.");
+                    }
+                    else
+                    {
+                        OverridesPlugin.Log.LogInfo(
+                            $"[overrides] {label} was left as it is: {since} changed it after {caller} did.");
+                    }
+                    return false;
+                }
+                try
+                {
+                    set(before);
+                }
+                catch
+                {
+                    return false;
+                }
+                WriteLedger.Forget(note);
+                return true;
+            }, Show(before), Show(after));
         }
 
         // ---- finding things ----------------------------------------------------

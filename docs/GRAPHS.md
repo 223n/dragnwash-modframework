@@ -2,7 +2,7 @@
 
 [日本語](GRAPHS.ja.md)
 
-> **Built, not released** (2026-09-20). Stage 4 of the [API plan](API_PLAN.md), whole: the Graphs library reads, checks and runs graph files (`src/DragNWash.ModFramework.Graphs`), the first write operations are in the Overrides library (`objects.member.set`, `objects.material.set`, `objects.active.set`), and the **editor** is the Graphs tab of the Bridge's page. What is not built yet: in the editor, dragging blocks and the node view (both are views of the same file, so neither changes what is saved); of [How writes stay safe](#how-writes-stay-safe), point 3 - nothing listens to `Operations.Written`, so the Inspector's History does not list a graph's writes - and the Mods-screen note when two mods change the same member, which overrides rows have among themselves but graph writes do not. A take-back also puts its value back without checking whether another graph wrote over it since. The research done without the game is in [Research](#research); the checker and interpreter written for it, in `tools/graphs.py`, still check the same rules. The decisions are at the end.
+> **Built, not released** (2026-09-20). Stage 4 of the [API plan](API_PLAN.md), whole: the Graphs library reads, checks and runs graph files (`src/DragNWash.ModFramework.Graphs`), the first write operations are in the Overrides library (`objects.member.set`, `objects.material.set`, `objects.active.set`), and the **editor** is the Graphs tab of the Bridge's page. All five of [How writes stay safe](#how-writes-stay-safe) are in, the History and the note among them, and a take-back puts back only what it wrote itself. What is not built: in the editor, dragging blocks and the node view - both are views of the same file, so neither changes what is saved. The research done without the game is in [Research](#research); the checker and interpreter written for it, in `tools/graphs.py`, still check the same rules. The decisions are at the end.
 
 A graph is a small mod with no code: *when this happens, do these things*. "When a scene loads, wait a second, look at what it has, write a line to the log." It is a JSON file in a folder with a `mod.json`, like an [overrides mod (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides), and it can only call the [operations](API_PLAN.md) the libraries registered, the same ones the console's `op` and the Bridge offer. People make graphs on the Bridge's page, as blocks (as in Scratch) or as nodes; both are views of the same file.
 
@@ -359,7 +359,7 @@ The Python sketch (`tools/graphs.py --test`) runs the example graph with stand-i
 6. The page: `graphs.*` operations, the page door's page-only writes, the Graphs tab with blocks, then nodes.
 7. Docs: a wiki page for players and makers; the Overrides page mentions graphs.
 
-Steps 2 to 7 are done and on `main` (2026-09-20), the wiki page included ([Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs)). Left over: dragging blocks and the node view (step 6); `saves.flags.set` (step 5), which waits by decision 5; and two of the five ways writes stay safe - the History hook and the conflict note - which are written above as though they were there and are not.
+Steps 2 to 7 are done and on `main` (2026-09-20), the wiki page included ([Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs)). Left over: dragging blocks and the node view (step 6), and `saves.flags.set` (step 5), which waits by decision 5.
 
 ## Decisions
 

@@ -273,8 +273,25 @@ namespace DragNWash.ModFramework.Overrides
             object original = get();
             set(value);
             Writes[key] = new Written { By = o, Target = target, Set = set, Original = original };
+            NoteInLedger(o, target, get, value);
             Count(o);
             return true;
+        }
+
+        // The same ledger the write operations use, so a row and a graph meeting
+        // on one member are seen as meeting. A row writing over another row is
+        // already said above, in words that name the rows; only somebody else's
+        // change is worth a line here.
+        private static void NoteInLedger(Override o, UnityEngine.Object target, Func<object> get, object value)
+        {
+            string member = o.Material != null ? o.Property : o.Member;
+            WriteLedger.Record(WriteLedger.KeyOf(target, member), o.Target, "overrides:" + o.Mod.Name,
+                value, get, target, out string other);
+            if (other != null && !other.StartsWith("overrides:", StringComparison.Ordinal))
+            {
+                OverridesPlugin.Log.LogWarning(
+                    $"[overrides] {other} and {o.Mod.Name} both change {o.Target}; the value from {o.Mod.Name} is used (it wrote last).");
+            }
         }
 
         private static void Count(Override o)

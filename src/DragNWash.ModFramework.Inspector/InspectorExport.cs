@@ -180,6 +180,10 @@ namespace DragNWash.ModFramework.Inspector
             for (int i = all.Count - 1; i >= 0; i--)
             {
                 InspectorHistory.Entry e = all[i];
+                // A change another mod made through an operation belongs to that
+                // mod, not to this session's edits: it is not exported, and it is
+                // not worth listing as left out either.
+                if (e.Undo != null) continue;
                 if (!seen.Add(e.Key)) continue;
                 string label = $"{e.Label} {e.Member}";
                 Place where = e.Where;

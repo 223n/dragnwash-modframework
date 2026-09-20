@@ -296,6 +296,7 @@ namespace DragNWash.ModFramework.Graphs
                 if (r.Reads.Count > 0) lines.Add("  reads " + string.Join(", ", r.Reads.ToArray()));
                 if (r.Changes.Count > 0) lines.Add("  changes " + string.Join(", ", r.Changes.ToArray()));
                 if (r.Needs.Count > 0) lines.Add("  needs " + string.Join(", ", r.Needs.ToArray()));
+                foreach (string clash in r.Clashes) lines.Add("  also: " + clash);
                 foreach (string p in r.Problems) lines.Add("  " + p);
                 if (r.Started > 0) lines.Add($"  {r.Running} run(s) going, {r.Started} started, {r.Failures} failure(s) in a row");
             }
@@ -338,10 +339,10 @@ namespace DragNWash.ModFramework.Graphs
                 return $"No graph called \"{which}\". The names are: " +
                        string.Join(", ", Graphs.Select(g => g.File).ToArray());
             }
+            // StopByHand writes the same thing to the log already; saying it
+            // twice only makes the log harder to read.
             int back = _runner.StopByHand(graph);
-            string line = $"{graph.Where} stopped for this session; {back} change(s) put back.";
-            Log.LogInfo("[graphs] " + line);
-            return line;
+            return $"{graph.Where} stopped for this session; {back} change(s) put back.";
         }
 
         // ---- the Mods screen ---------------------------------------------------
