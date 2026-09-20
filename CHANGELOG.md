@@ -8,6 +8,12 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - Experimental, not in a release. `codegraph-standalone/` (CodeGraphStandalone.exe, Windows): the code graph of any .NET assembly without the game (docs/CODE_GRAPH_STANDALONE.md). Opens DLLs, a folder (leaving out .NET's and Unity's own unless `--all`) or a Mono Unity game's folder, by Open…, the command line or a drop; refuses IL2CPP games with the reason. Shows the Bridge's page in WebView2 and answers its calls inside the process (`WebResourceRequested`), with no port and no network.
 
+## 2026-09-20: graphs, and who changed what
+
+The core and the preloader patcher go to 1.4.1; Overrides to 0.1.1, the Bridge to 0.1.1, the Inspector to 1.1.1; and the **Graphs** library 0.1.0 arrives, experimental like the rest of the new ones. Everything is additive: mods built on 1.4.0 need no change.
+
+Three of the things 1.4.0's notes said about write operations were not true when it shipped - a change another mod made was not listed in the Inspector's History, two mods changing one value were not named, and a take-back could put back a value somebody else had written since. They are true now, and were tried in the game with two graphs set on one value.
+
 ### Graphs 0.1.0
 
 - New library, experimental: **mods with no code that do things** — *when this happens, do these things*. A folder in `BepInEx/plugins` with a `mod.json` and `graphs/*.json` (one mod on the Mods screen with its overrides, through the core's `DataMods`) answers the events the libraries raise and calls the operations they registered: nothing else, no methods by name, no reflection, no files, no network of its own. See docs/GRAPHS.md.
@@ -16,12 +22,26 @@ Versions of the core and of each library are separate, and follow semantic versi
 - An event never starts a run where it is raised: events are queued and the runs begin in the library's own frame, so a graph's work never lands inside a dialogue line or a scene load. The library owns two events of its own, `timer.every` and `key.pressed` (the framework's F1 is refused).
 - A **Graphs** page on each mod's details: what each graph answers, what it reads, what it changes, what it needs, how it is going, and **Stop for this session**. Console: `graphs`, `graphs reload` (the files are read again, changes put back, nothing carried over) and `graphs stop <file or name>`.
 - Every call is made as `graph:<mod GUID>/<file>`, so a change can be traced back to the graph that made it; a call slower than 5 ms is logged with its graph, as a slow `GameEvents` handler is.
-- **The first writes a graph may call** (the Overrides library): `objects.member.set` (a component's field or property), `objects.material.set` (a material's property) and `objects.active.set` (an object shown or hidden). Each says how to put itself back, so a graph's changes are undone when it is switched off, reloaded or fails three times, and the registry raises `Operations.Written` with the value before and after. None of them outlives the session.
-- **An editor on the Bridge's page**, beside the code graph: a **Graphs** tab that lists the graphs, shows one as blocks - a hat block per handler, the operations of the registry with their parameters as slots, writes in their own colour - checks it as you type (the same check the game makes, by statement id), saves it into a data mod's `graphs/` folder (making the mod when it does not exist, keeping the file it replaces as `.bak`), starts a handler without waiting for its event, stops a graph, and shows the library's log as it happens. A block is picked up by its head and dropped above or below another, or onto the *+ add* row at the end of a list, so a statement moves between lists as well as within one; a handler only lands among handlers, and nothing can be dropped inside itself. The **Nodes** view draws the same file as boxes - flow down the edges (next, then, else, do, on error), a result named with `as` as a dashed wire to what reads it, writes in their own colour - and a node opens its block, where the fields are.
-- **Who changed what, and nobody undoing anybody else.** The Overrides library keeps one ledger of the values it writes - an overrides row and a graph meet there whatever path each of them spelled - so: two mods changing the same member are named once in the log and on the mod's Graphs page (*Also changed: cars/car_3 (2) active: Clash Test graphs/second.json*); a take-back puts back only what it wrote itself, and leaves alone a value somebody else has written since, saying so in the log; and what a stop reports is what it really put back, not how many take-backs it tried. `objects.writes` lists it all for the Mods screen.
-- The **Inspector's History** lists what other mods change through a write operation, with who asked (`graph:<mod>/<file>`, `console`, `page`). One such change can be put back from its row without stopping the graph, and **Undo last** and Ctrl+Z pass them over: they are for this session's own edits. They are not exported as overrides either.
-- For a write operation: `OperationArgs.Caller` says who asked, and `OperationArgs.TakeBack` takes a `Func<bool>` that says whether it put the value back, so a caller counting changes counts changes and not tries. The `Action` form still works.
 - For the editor, the Graphs library registers `graphs.catalog`, `graphs.list`, `graphs.read`, `graphs.check`, `graphs.log`, `graphs.save`, `graphs.run` and `graphs.stop`, all for the page and the console alone - an AI client over MCP never sees them, and neither does a graph.
+
+### Overrides 0.1.1
+
+- **The first writes a graph may call** (the Overrides library): `objects.member.set` (a component's field or property), `objects.material.set` (a material's property) and `objects.active.set` (an object shown or hidden). Each says how to put itself back, so a graph's changes are undone when it is switched off, reloaded or fails three times, and the registry raises `Operations.Written` with the value before and after. None of them outlives the session.
+- **Who changed what, and nobody undoing anybody else.** The Overrides library keeps one ledger of the values it writes - an overrides row and a graph meet there whatever path each of them spelled - so: two mods changing the same member are named once in the log and on the mod's Graphs page (*Also changed: cars/car_3 (2) active: Clash Test graphs/second.json*); a take-back puts back only what it wrote itself, and leaves alone a value somebody else has written since, saying so in the log; and what a stop reports is what it really put back, not how many take-backs it tried. `objects.writes` lists it all for the Mods screen.
+
+### Bridge 0.1.1
+
+- **An editor on the Bridge's page**, beside the code graph: a **Graphs** tab that lists the graphs, shows one as blocks - a hat block per handler, the operations of the registry with their parameters as slots, writes in their own colour - checks it as you type (the same check the game makes, by statement id), saves it into a data mod's `graphs/` folder (making the mod when it does not exist, keeping the file it replaces as `.bak`), starts a handler without waiting for its event, stops a graph, and shows the library's log as it happens. A block is picked up by its head and dropped above or below another, or onto the *+ add* row at the end of a list, so a statement moves between lists as well as within one; a handler only lands among handlers, and nothing can be dropped inside itself. The **Nodes** view draws the same file as boxes - flow down the edges (next, then, else, do, on error), a result named with `as` as a dashed wire to what reads it, writes in their own colour - and a node opens its block, where the fields are.
+- The page's door accepts a **write** that is offered to the page alone (`graphs.save`, `graphs.run`, `graphs.stop`), and nothing else: a write anyone else may call is refused there, and MCP never sees a write at all.
+- Fixed: a view that is off screen is really off screen. The two views were told apart by the `hidden` attribute alone, which `display: grid` wins against, so the code graph stayed under the editor.
+
+### Inspector 1.1.1
+
+- The **Inspector's History** lists what other mods change through a write operation, with who asked (`graph:<mod>/<file>`, `console`, `page`). One such change can be put back from its row without stopping the graph, and **Undo last** and Ctrl+Z pass them over: they are for this session's own edits. They are not exported as overrides either.
+
+### Core 1.4.1
+
+- For a write operation: `OperationArgs.Caller` says who asked, and `OperationArgs.TakeBack` takes a `Func<bool>` that says whether it put the value back, so a caller counting changes counts changes and not tries. The `Action` form still works.
 
 ## 2026-09-20: mods with no code, the operations registry and the Bridge
 

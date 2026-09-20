@@ -28,10 +28,8 @@ $Plugins = @(
     'DragNWash.ModFramework.Saves',
     'DragNWash.ModFramework.Inspector',
     'DragNWash.ModFramework.Overrides',
-    'DragNWash.ModFramework.Bridge'
-    # The Graphs library is on main but not in a release yet: without the write
-    # operations and the editor, a graph can read and log but not change the
-    # game. Add 'DragNWash.ModFramework.Graphs' here when it ships.
+    'DragNWash.ModFramework.Bridge',
+    'DragNWash.ModFramework.Graphs'
 )
 $Patcher = 'DragNWash.ModFramework.Preloader'
 
