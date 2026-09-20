@@ -317,7 +317,7 @@ namespace DragNWash.ModFramework.Graphs
                 return $"No graph called \"{which}\". The names are: " +
                        string.Join(", ", Graphs.Select(g => g.File).ToArray());
             }
-            int back = _runner.Stop(graph, "it was stopped by hand");
+            int back = _runner.StopByHand(graph);
             string line = $"{graph.Where} stopped for this session; {back} change(s) put back.";
             Log.LogInfo("[graphs] " + line);
             return line;

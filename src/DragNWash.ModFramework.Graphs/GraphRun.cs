@@ -530,6 +530,20 @@ namespace DragNWash.ModFramework.Graphs
         }
 
         /// <summary>
+        /// Stops a graph because a person asked - the console's "graphs stop",
+        /// or the button on the Mods screen - and says how many changes were put
+        /// back. Nothing is wrong with the graph, so this leaves no mark on the
+        /// Mods screen: a mark there reads as "this cannot be used in this
+        /// version of the game", which is not what happened.
+        /// </summary>
+        internal int StopByHand(Graph graph)
+        {
+            int back = Halt(graph, "it was stopped by hand");
+            _world.Write(GraphLevel.Info, $"{graph.Where} is stopped for this session{(back > 0 ? $"; {back} change(s) put back" : "")}.");
+            return back;
+        }
+
+        /// <summary>
         /// Stops a graph because its file is about to be read again, and says
         /// how many changes were put back. The graph did nothing wrong and is
         /// about to run again, so this leaves no warning in the log and no mark

@@ -92,18 +92,26 @@ namespace DragNWash.ModFramework.Graphs
             HorizontalLayoutGroup pad = row.AddComponent<HorizontalLayoutGroup>();
             pad.padding = new RectOffset(24, 0, 4, 4);
             pad.childControlHeight = true;
-            pad.childControlWidth = false;
+            // The layout group has to control the width for the button's
+            // LayoutElement to mean anything; without it the button keeps a new
+            // RectTransform's 100 px and the label is cut to "Stop for ...".
+            pad.childControlWidth = true;
             pad.childForceExpandWidth = false;
 
             var button = new GameObject("Stop", typeof(RectTransform), typeof(Image), typeof(Button));
             ((RectTransform)button.transform).SetParent(rowRect, false);
             button.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
             LayoutElement size = button.AddComponent<LayoutElement>();
-            size.minWidth = 260f;
-            size.minHeight = Size * 1.8f;
+            size.minWidth = 300f;
+            size.preferredWidth = 300f;
+            size.minHeight = Size * 2f;
 
             TMP_Text label = Text(button.transform, "Stop for this session", Size, FontStyles.Normal, Color.white);
             label.alignment = TextAlignmentOptions.Center;
+            // On one line: wrapped, the label grew past the button and printed
+            // over the line above it.
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.overflowMode = TextOverflowModes.Ellipsis;
             var labelRect = (RectTransform)label.transform;
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
