@@ -352,20 +352,22 @@ The Python sketch (`tools/graphs.py --test`) runs the example graph with stand-i
 ## Order of work
 
 1. Research (above).
-2. The registry: `lasting`, `OperationArgs.TakeBack`, `Operations.Written`, a call without the JSON check for graphs, and an *offered to graphs* mark (decision 1).
+2. The registry: `lasting`, `OperationArgs.TakeBack`, `Operations.Written`, a call without the JSON check for graphs, an *audience* per operation (decision 1), and the event registry `Operations.RegisterEvent`, with each library raising its own events through it (decision 8).
 3. The loader: data mods found once (decision 3); Overrides moved onto it, unchanged for players.
 4. The Graphs library: reading, checking, running with the budget and limits, failures, take-backs, the console's `graphs`, the Mods screen's graphs page. Tried with graph files written by hand, reads only.
 5. The first writes: `objects.member.set`, `objects.material.set`, `objects.active.set` (with take-backs and History).
 6. The page: `graphs.*` operations, the page door's page-only writes, the Graphs tab with blocks, then nodes.
 7. Docs: a wiki page for players and makers; the Overrides page mentions graphs.
 
-## Open decisions
+## Decisions
 
-1. **Which operations graphs may call.** Recommendation: an *audience* on each operation replacing `PageOnly` (console, page, MCP, graphs), so a library can offer an operation to people but not to graphs; `bridge.*` and `code.*` are not for graphs.
-2. **The page writes through its own door, never MCP.** Recommendation: yes; the page door accepts page-only writes (saving and running graphs), MCP stays read-only as decided, and a separate decision is needed before any AI client may write a graph.
-3. **One loader for data mods.** Recommendation: A, in the core (it already has `RegisterDataMod` and the `mod.json.disabled` switch), so a mod of graphs only needs no Overrides library, and neither library depends on the other.
-4. **Graphs that write: disclosure or a prompt.** Recommendation: disclosure on the Mods screen, as for overrides and network use, since every write is taken back when the mod is switched off; no prompt.
-5. **Lasting writes (saves).** Recommendation: not in the first version. When they come, a graph that uses one says so in the warning colour, and the Saves tab's snapshot is its undo.
-6. **The editor: own drawing code or Blockly.** Recommendation: own code, as the code graph; Blockly is a large library to ship inside the Bridge, and the block set here is small (9 statements, 19 operators).
-7. **Where the object writes live.** `objects.member.set` and its kin need what the Overrides library already has (value parsing, finding objects by path, putting values back), and players who install a graph mod have Overrides, but not the Inspector (a tool for mod makers). Recommendation: in the Overrides library, named `objects.*`, with the Inspector's History joining through `Operations.Written`.
-8. **Events owned by libraries.** The events are hard-coded in the Graphs library in this design. Recommendation: later, a small event registry beside the operations (`Operations.RegisterEvent`, raised by each library), so Dialogue owns the dialogue events and a mod can add its own; not needed for the first version.
+Decided by the owner on 2026-09-20.
+
+1. **Which operations graphs may call: each operation says who it is for.** `PageOnly` becomes an *audience* (console, page, MCP, graphs), so a library can offer an operation to people but not to graphs. `bridge.*` and `code.*` are not for graphs.
+2. **The page writes through its own door, never MCP.** The page door accepts the page-only writes that saving and running graphs need; MCP stays read-only, and letting an AI client write a graph is a decision of its own, not taken here.
+3. **One loader for data mods, in the core**, which already has `RegisterDataMod` and the `mod.json.disabled` switch. A mod of graphs alone needs no Overrides library, and neither library depends on the other.
+4. **Graphs that write say so on the Mods screen**, as overrides and network use do; no prompt before a run, since every write is taken back when the mod is switched off.
+5. **Lasting writes (saves) are not in the first version.** When they come, a graph that uses one says so in the warning colour, and the Saves tab's snapshot is its undo.
+6. **The editor is drawn by our own code**, as the code graph is. Blockly is a large library to ship inside the Bridge, and the block set here is small (9 statements, 19 operators).
+7. **The object writes live in the Overrides library**, named `objects.*`: it already has the value parsing, the finding of objects by path and the putting back, and players who install a graph mod have it, while the Inspector (a tool for mod makers) they do not. The Inspector's History joins through `Operations.Written`.
+8. **Events are owned by the libraries that raise them, from the first version.** A small event registry beside the operations (`Operations.RegisterEvent`, raised by each library) replaces the hard-coded table: Dialogue owns the dialogue events, Flags and saves its own, Graphs its `timer.every` and `key.pressed`, and a mod can add events of its own. The events in the table above stay as they are; they are registered by their libraries instead of listed in the Graphs library.
