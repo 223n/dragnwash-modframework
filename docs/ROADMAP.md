@@ -6,6 +6,16 @@ Where Drag'n Wash ModFramework is going. Plans change; dates are given only when
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
 
+## Released: 1.4.0 (2026-09-20)
+
+Released together with Drag'n Wash Localization v1.4.0. The core and the preloader patcher go to 1.4.0; the Tool window and Dialogue to 1.2.0; Text, Flags and saves and the Inspector to 1.1.0; Assets to 1.2.0. Everything below is marked experimental; see [CHANGELOG.md](../CHANGELOG.md) for the whole list.
+
+- **Overrides 0.1.0: a mod with no code.** A folder with `mod.json` and `overrides/*.json` changes a component's field or a material's property, is listed and switched off on the Mods screen like any other mod, and is taken back cleanly; when two mods change the same thing the log names both. The Inspector's History exports the edits made there as one of these mods ([Overrides (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides)).
+- **Operations, and what came out of them** (stages 1 to 3 of the [plan](API_PLAN.md)). Every library registers what it can do as a named operation (`library.noun.verb`), checked arguments and plain results; from that one registry come the console's `op`, **Bridge 0.1.0** (the read operations for AI clients over MCP, this computer only, off by default, with a token and a door that refuses web pages) and the **code graph** (the game's code as blocks and branches, on a page and in a Windows app that needs no game). Stage 4, building with node graphs, is designed but not built ([GRAPHS.md](GRAPHS.md)).
+- **An object explorer in the Inspector.** Every loaded object by kind (textures, materials, meshes, shaders, sounds, animations, fonts, the game's ScriptableObject data), like Unity's Project window, with **Used by** to find where each is used, and the arrow keys - or, on the Steam Deck and any gamepad, the d-pad - to walk the list ([design](OBJECT_EXPLORER.md)).
+- **Texture replacements per language** (Assets 1.2.0): replacements that apply only while a given language is in use, fall back to the languages a `fallback.txt` names, can be taken back, and wait for a restart on Direct3D 12. For Drag'n Wash Localization's translated pictures, which are built on it ([design](https://github.com/TomXV/dragnwash-localization/blob/main/docs/TRANSLATED_TEXTURES.md)).
+- Animators and Rigidbodies in the Inspector, scenes and levels, crash-report follow-ups, and the Tool window's Steam Deck input (a trackpad click is a real mouse button, the d-pad real arrow keys).
+
 ## Released: 1.3.0 (2026-09-19)
 
 Released together with Drag'n Wash Localization v1.3.0.
@@ -27,15 +37,10 @@ Released together with Drag'n Wash Localization v1.2.0.
 - Inspector 1.0.0, a new library that stays experimental.
 - A new logo by NotaGames and a drawn Mods button by Mister ERIO.
 
-## Built, in the next release
+## Built, not released
 
-Everything here is on `main` and marked experimental. See [CHANGELOG.md](../CHANGELOG.md) for the whole list.
-
-- **Overrides 0.1.0: a mod with no code.** A folder with `mod.json` and `overrides/*.json` changes a component's field or a material's property, is listed and switched off on the Mods screen like any other mod, and is taken back cleanly; when two mods change the same thing the log names both. The Inspector's History exports the edits made there as one of these mods ([Overrides (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides)).
-- **Operations, and what came out of them** (stages 1 to 3 of the [plan](API_PLAN.md)). Every library registers what it can do as a named operation (`library.noun.verb`), checked arguments and plain results; from that one registry come the console's `op`, **Bridge 0.1.0** (the read operations for AI clients over MCP, this computer only, off by default, with a token and a door that refuses web pages) and the **code graph** (the game's code as blocks and branches, on a page and in a Windows app that needs no game). Stage 4, building with node graphs, is designed but not built ([GRAPHS.md](GRAPHS.md)).
-- **An object explorer in the Inspector.** Every loaded object by kind (textures, materials, meshes, shaders, sounds, animations, fonts, the game's ScriptableObject data), like Unity's Project window, with **Used by** to find where each is used, and the arrow keys - or, on the Steam Deck and any gamepad, the d-pad - to walk the list ([design](OBJECT_EXPLORER.md)).
-- **Texture replacements per language** (Assets 1.2.0): replacements that apply only while a given language is in use, fall back to the languages a `fallback.txt` names, can be taken back, and wait for a restart on Direct3D 12. For Drag'n Wash Localization's translated pictures, which are built on it ([design](https://github.com/TomXV/dragnwash-localization/blob/main/docs/TRANSLATED_TEXTURES.md)).
-- Animators and Rigidbodies in the Inspector, scenes and levels, crash-report follow-ups, and the Tool window's Steam Deck input (a trackpad click is a real mouse button, the d-pad real arrow keys).
+- **Graphs 0.1.0: mods with no code that do things** (stage 4 of the [plan](API_PLAN.md), [design](GRAPHS.md)). A folder with a `mod.json` and `graphs/*.json` answers the events the libraries raise and calls the operations they registered; every file is checked before anything runs, all the graphs share a millisecond a frame, and a graph that fails three times in a row is switched off with its changes put back. It is on `main` and was tried in the game, but it stays out of a release until the first write operations and the editor are there: without them a graph can read and log, not change the game.
+- **The code graph without the game** (`codegraph-standalone/`, [design](CODE_GRAPH_STANDALONE.md)): the same page over any .NET assembly, with no port and no network. A tool for this repository's own work, not part of a release.
 
 ## Planned
 

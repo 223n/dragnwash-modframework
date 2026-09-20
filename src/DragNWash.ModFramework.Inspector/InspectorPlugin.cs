@@ -19,7 +19,7 @@ namespace DragNWash.ModFramework.Inspector
         public const string Guid = "com.tomxv.dragnwash.modframework.inspector";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
 
         /// <summary>
         /// Selects <paramref name="target"/> in the Inspector tab and opens the
