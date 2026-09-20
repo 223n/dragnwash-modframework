@@ -23,6 +23,9 @@ See [docs/DESIGN.md](docs/DESIGN.md) for goals and the order of work, [Playing w
 | **Tool window** | `com.tomxv.dragnwash.modframework.toolwindow` | One shared F1 window for developer tools, off until **Developer tools** is turned on in Options → Mods, where each mod adds tabs (`ToolWindow`) |
 | **Assets** | `com.tomxv.dragnwash.modframework.assets` | Fonts for any language and texture and asset bundle loading, without the Direct3D 12 crash (`GameFonts`, `GameAssets`) |
 | **Flags and saves** | `com.tomxv.dragnwash.modframework.saves` | Save slots, flags and a history of every save (`GameSaves`, `GameFlags`) |
+| **Inspector** (experimental) | `com.tomxv.dragnwash.modframework.inspector` | An Inspector tab in the F1 window: every loaded scene and object, their components and values, the game's code, and every loaded object by kind ([Inspector](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector)) |
+| **Overrides** (experimental) | `com.tomxv.dragnwash.modframework.overrides` | Runs mods that have no code: a folder of values to change in the game, made with the Inspector ([Overrides](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides)) |
+| **Bridge** (experimental) | `com.tomxv.dragnwash.modframework.bridge` | Offers the read operations to AI clients on this computer over MCP, and serves the code graph's page. Off by default ([Bridge](https://github.com/TomXV/dragnwash-modframework/wiki/Bridge)) |
 
 Each library is its own plugin with its own version; install the ones the mods you use need. See [CHANGELOG.md](CHANGELOG.md) for versions.
 

@@ -23,6 +23,9 @@
 | **Tool window** | `com.tomxv.dragnwash.modframework.toolwindow` | 開発ツール用の共通の F1 ウィンドウ（Options → Mods の「Developer tools」をオンにするまで開かない）に、Mod ごとにタブを足す（`ToolWindow`） |
 | **Assets** | `com.tomxv.dragnwash.modframework.assets` | どの言語でも表示できるフォント、テクスチャとアセットバンドルの読み込みを、Direct3D 12 でクラッシュさせずに行う（`GameFonts`、`GameAssets`） |
 | **Flags and saves** | `com.tomxv.dragnwash.modframework.saves` | セーブスロット、フラグ、すべてのセーブの履歴（`GameSaves`、`GameFlags`） |
+| **Inspector**（実験的） | `com.tomxv.dragnwash.modframework.inspector` | F1 の窓の Inspector タブ。読み込まれているシーンとオブジェクト、そのコンポーネントと値、ゲームのコード、読み込まれているものすべてを種類別に（[Inspector](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector-ja)） |
+| **Overrides**（実験的） | `com.tomxv.dragnwash.modframework.overrides` | コードのない Mod を動かします。Inspector で作った、ゲームの値を書き換えるだけのフォルダーです（[Overrides](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides-ja)） |
+| **Bridge**（実験的） | `com.tomxv.dragnwash.modframework.bridge` | この PC の AI クライアントに読み取り操作を MCP で渡し、コードのグラフのページを出します。既定はオフ（[Bridge](https://github.com/TomXV/dragnwash-modframework/wiki/Bridge-ja)） |
 
 ライブラリはそれぞれ独自のバージョンを持つ別のプラグインです。使う Mod が必要とするものを入れてください。バージョンは [CHANGELOG.md](CHANGELOG.md) を参照してください。
 
