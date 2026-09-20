@@ -28,6 +28,7 @@ CHANGELOG_NAMES = {
     "DragNWash.ModFramework.Inspector": "Inspector",
     "DragNWash.ModFramework.Overrides": "Overrides",
     "DragNWash.ModFramework.Bridge": "Bridge",
+    "DragNWash.ModFramework.Graphs": "Graphs",
 }
 
 errors = []

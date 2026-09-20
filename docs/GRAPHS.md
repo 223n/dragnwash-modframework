@@ -2,7 +2,7 @@
 
 [日本語](GRAPHS.ja.md)
 
-> **Designed, not built** (2026-09-20). Stage 4 of the [API plan](API_PLAN.md), on the branch `experimental/graphs`. The research done without the game is in [Research](#research); a checker and a small interpreter written for that research are in `tools/graphs.py`. The open decisions for the owner are at the end.
+> **Built, not released** (2026-09-20). Stage 4 of the [API plan](API_PLAN.md). The Graphs library reads, checks and runs graph files (`src/DragNWash.ModFramework.Graphs`); the registry, the event registry and the data-mod loader it stands on are in the core. What is not built yet is the **editor**: graphs are written by hand until the page's Graphs tab exists ([The editor](#the-editor)), and the first writes ([Order of work](#order-of-work), step 5) are not in yet either, so a graph can read and log but not change the game. The research done without the game is in [Research](#research); the checker and interpreter written for it, in `tools/graphs.py`, still check the same rules. The decisions are at the end.
 
 A graph is a small mod with no code: *when this happens, do these things*. "When a scene loads, wait a second, look at what it has, write a line to the log." It is a JSON file in a folder with a `mod.json`, like an [overrides mod (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides), and it can only call the [operations](API_PLAN.md) the libraries registered, the same ones the console's `op` and the Bridge offer. People make graphs on the Bridge's page, as blocks (as in Scratch) or as nodes; both are views of the same file.
 

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
-using DragNWash.ModFramework.Overrides;
 
 namespace DragNWash.ModFramework.Bridge
 {
