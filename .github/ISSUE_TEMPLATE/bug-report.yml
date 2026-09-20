@@ -1,0 +1,70 @@
+name: 不具合の報告 / Bug report
+description: フレームワークやライブラリ、インストーラーがおかしい / Something in the framework, a library or the installer is wrong
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        セキュリティの問題は公開の Issue ではなく [非公開のフォーム](https://github.com/TomXV/dragnwash-modframework/security/advisories/new) へお願いします。
+        Security problems go to the [private form](https://github.com/TomXV/dragnwash-modframework/security/advisories/new), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きたか / What happened
+      description: 期待した動きと、実際の動きを書いてください。What you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現の手順 / Steps to reproduce
+      placeholder: |
+        1. ゲームを起動して / Start the game
+        2. Options → Mods を開いて / Open Options → Mods
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: バージョン / Versions
+      description: フレームワーク（Options → Mods に出ます）、ゲーム、BepInEx。Framework (shown in Options → Mods), game, BepInEx.
+      placeholder: ModFramework 1.3.0 / game 2026.09.14 / BepInEx 5.4.23.5
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 環境 / Platform
+      options:
+        - Windows (x64)
+        - Windows on ARM
+        - Steam Deck (SteamOS)
+        - Linux (other)
+        - macOS
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: ほかに入れている Mod / Other mods installed
+      description: Options → Mods の一覧のとおりに。As listed in Options → Mods. 「なし」でも構いません / "None" is a fine answer.
+  - type: textarea
+    id: log
+    attributes:
+      label: ログ / Log
+      description: |
+        `BepInEx/LogOutput.log`。長いときは貼らずにファイルを添付してください。クラッシュしたなら、クラッシュレポーターが保存したレポートも。
+        `BepInEx/LogOutput.log` — attach the file instead of pasting it when it is long. If the game crashed, the crash reporter's saved report helps too.
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 確認 / Checklist
+      options:
+        - label: 最新のリリースで確認した / Reproduced on the latest release
+          required: true
+        - label: Mod をすべて外すと起きないことを確かめた（ゲーム本体の不具合ではない）/ It does not happen with every mod removed, so it is not the game itself
+          required: true

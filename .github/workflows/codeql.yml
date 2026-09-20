@@ -1,0 +1,52 @@
+name: CodeQL
+
+# Code scanning: GitHub reads the C# in this repository and reports what looks
+# like a security problem on the Security tab, and as a comment on the line in
+# a pull request that introduces one. SECURITY.md says what to do with a real
+# finding; this is the machine's first pass, not a substitute for it.
+#
+# build-mode: none on purpose. The core and the libraries compile against the
+# game's own assemblies, which this repository must never contain, so nothing
+# here can be built on a runner (see ci.yml). CodeQL's C# analysis reads the
+# source without building it, which works without the game — it simply knows
+# less about the types that come from the missing assemblies, so a finding
+# that depends on one of them may be missed. The desktop projects (the
+# installer, the crash reporter, Code Graph) are read the same way.
+#
+# Python is not scanned: tools/ is maintainer tooling that runs on the
+# repository itself, not code that ships to players.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays, so a new query added to CodeQL finds old code too.
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze C#
+    runs-on: ubuntu-latest
+    permissions:
+      # Writing the results to the Security tab.
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          build-mode: none
+
+      - name: Analyse
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"

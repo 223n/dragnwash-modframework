@@ -82,6 +82,13 @@ The **Build** workflow (Actions) builds the release zip on GitHub: on every push
 - Material from the game follows [docs/CONTENT_POLICY.md](docs/CONTENT_POLICY.md): made by hand or changed into something new is fine, the game's data unchanged is not.
 - Code that touches game classes stays `internal`; mods only see the framework's own types.
 
+## Taking part
+
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) — how to set up, what the rules above mean in practice, and what to put in a pull request.
+- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- **Security:** please report a vulnerability privately, not in an issue — [SECURITY.md](SECURITY.md).
+- **Sponsoring:** [GitHub Sponsors](https://github.com/sponsors/TomXV), if you want to and can. The framework is free and stays free either way.
+
 ## A note to the developers
 
 This is an unofficial fan project and is not affiliated with Gator Dragon Games. It contains none of the game's assets or code as they are (see [docs/CONTENT_POLICY.md](docs/CONTENT_POLICY.md)) and does not modify the game's files (BepInEx loads it at runtime). If the development team has any concerns, please open an issue or contact the maintainer, and it will be changed or taken down.

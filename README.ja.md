@@ -82,6 +82,13 @@ Actions の **Build** ワークフローが、リリース用の zip を GitHub 
 - ゲーム由来のものは [docs/CONTENT_POLICY.ja.md](docs/CONTENT_POLICY.ja.md) に従います。手で作ったものや手を加えて新しくしたものはよく、ゲームのデータそのままは入れません
 - ゲームのクラスに触るコードは `internal` にとどめ、Mod にはフレームワーク自身の型だけを見せます
 
+## 参加について
+
+- **コントリビューション：** [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md)（準備の手順、上の決まりの実際、プルリクエストに書くこと）
+- **行動規範：** [CODE_OF_CONDUCT.ja.md](CODE_OF_CONDUCT.ja.md)
+- **セキュリティ：** 脆弱性は Issue ではなく非公開で報告してください。[SECURITY.ja.md](SECURITY.ja.md)
+- **スポンサー：** [GitHub Sponsors](https://github.com/sponsors/TomXV)。そうしたくて、できるならば。いずれにせよフレームワークは無料のままです。
+
 ## 開発者の方へ
 
 本プロジェクトは非公式のファン制作物で、Gator Dragon Games とは無関係です。ゲームのアセットやコードをそのままの形では含まず（[docs/CONTENT_POLICY.ja.md](docs/CONTENT_POLICY.ja.md)）、ゲームのファイルを書き換えることもありません（BepInEx が実行時に読み込みます）。開発チームの方で懸念がある場合は、このリポジトリの Issue かメンテナーへの連絡でお知らせください。ご希望に応じて修正または公開停止します。

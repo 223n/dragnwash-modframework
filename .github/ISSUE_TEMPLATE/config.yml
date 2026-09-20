@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使い方・仕組み / How it works
+    url: https://github.com/TomXV/dragnwash-modframework/wiki
+    about: プレイヤー向けのページ、はじめての Mod の手順、ライブラリごとのリファレンスは Wiki にあります。The wiki has a page for players, a getting-started walkthrough and a reference page for each library.
+  - name: セキュリティの問題 / Security problem
+    url: https://github.com/TomXV/dragnwash-modframework/security/advisories/new
+    about: 脆弱性は公開の Issue ではなく、こちらの非公開のフォームへ。Please report vulnerabilities privately here, not in a public issue. See SECURITY.md.
+  - name: 翻訳 Mod のこと / About the localization mod
+    url: https://github.com/TomXV/dragnwash-localization/issues
+    about: 訳の誤りや言語パックの話は Drag'n Wash Localization のリポジトリへ。Wrong translations and language packs belong in the localization mod's repository.

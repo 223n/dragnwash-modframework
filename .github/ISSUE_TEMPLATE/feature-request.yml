@@ -1,0 +1,39 @@
+name: 機能・API の要望 / Feature or API request
+description: フレームワークに足りないもの / Something the framework should give mods
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        予定されているものは [docs/ROADMAP.md](https://github.com/TomXV/dragnwash-modframework/blob/main/docs/ROADMAP.md) にあります。
+        What is already planned is in [docs/ROADMAP.md](https://github.com/TomXV/dragnwash-modframework/blob/main/docs/ROADMAP.md).
+  - type: textarea
+    id: goal
+    attributes:
+      label: やりたいこと / What you are trying to do
+      description: API そのものより、作りたい Mod の話から書いてもらえると考えやすいです。Start from the mod you want to build, not from the API you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: 今はどうしているか / How you do it today
+      description: 自前で Harmony パッチを当てている、できないので諦めた、など。A Harmony patch of your own, a workaround, or "it cannot be done".
+    validations:
+      required: true
+  - type: textarea
+    id: sketch
+    attributes:
+      label: こんな API があれば / A sketch of the API
+      description: 呼び出す側のコードを数行書いてもらえると話が早いです。A few lines of calling code say more than a paragraph.
+      render: csharp
+  - type: dropdown
+    id: who
+    attributes:
+      label: 誰のためのものか / Who is it for
+      options:
+        - Mod を作る人 / Mod authors
+        - 遊ぶ人 / Players
+        - 両方 / Both
+    validations:
+      required: true
