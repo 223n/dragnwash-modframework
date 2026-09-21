@@ -102,12 +102,36 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 
 /* ---- the graphs editor ---------------------------------------------------- */
 .view-tab[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-#graphsView { display: grid; grid-template-columns: 240px 1fr 6px 320px; min-height: 0; }
+#graphsView { display: grid; grid-template-columns: 240px 1fr 6px 320px; grid-template-areas: "list stage split side"; min-height: 0; }
+#gList { grid-area: list; }
+#gStage { grid-area: stage; }
+#gSplit { grid-area: split; }
+#gSide { grid-area: side; }
+/* Narrow: the panels stack rather than squeezing the editor itself to nothing.
+   A window of 700 px used to leave the blocks 30 px wide, which is no editor at
+   all. Below 1000 the problems and the log go under the blocks; below 640 the
+   list of graphs goes on top and everything is one column, which is what the
+   Steam Deck's browser and a half-screen window get. */
+@media (max-width: 1000px) {
+  #graphsView { grid-template-columns: 200px 1fr; grid-template-rows: 1fr 230px; grid-template-areas: "list stage" "side side"; }
+  #gSplit { display: none; }
+  #gSide { border-left: 0; border-top: 1px solid var(--line); }
+  #gLog { height: 130px; }
+}
+@media (max-width: 640px) {
+  #graphsView { grid-template-columns: 1fr; grid-template-rows: auto 1fr 210px; grid-template-areas: "list" "stage" "side"; }
+  #gList { max-height: 150px; border-right: 0; border-bottom: 1px solid var(--line); }
+  #gBar input { width: 110px; }
+  .blk input[type="text"] { width: 120px; }
+  .blk .slot input[type="text"] { width: 90px; }
+}
 /* An id beats "main[hidden]", so the graphs view says it again for itself. */
 #graphsView[hidden] { display: none; }
 #gList, #gSide { background: var(--panel); border-right: 1px solid var(--line); padding: 10px 12px; overflow: auto; min-width: 0; }
 #gSide { border-right: 0; border-left: 1px solid var(--line); }
-#gList h2, #gSide h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0; }
+#gList h2, #gSide h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0; display: flex; align-items: center; gap: 8px; }
+#gSide h2 button { font-size: 10px; padding: 1px 6px; text-transform: none; letter-spacing: 0; }
+#gWhich { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--inset); color: var(--text); font: 12px var(--mono); max-width: 180px; }
 #gSplit { background: var(--line); cursor: col-resize; }
 #gStage { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
 #gBar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
@@ -122,12 +146,22 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 .blk .body { padding: 4px 8px 8px 20px; }
 .blk .id { color: var(--muted); font: 11px var(--mono); }
 .blk input, .blk select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--inset); color: var(--text); font: 12px var(--mono); max-width: 260px; }
+/* Left to itself a text field is about 175px and a row of them pushes the
+   block's own buttons onto a line of their own. */
+.blk input[type="text"] { width: 150px; }
+.blk input[type="number"] { width: 78px; }
+.blk .slot input[type="text"] { width: 110px; }
 .blk .slot { display: inline-flex; gap: 4px; align-items: center; margin: 2px 6px 2px 0; font-size: 12px; color: var(--muted); }
 .blk .tools { margin-left: auto; display: flex; gap: 4px; }
 .blk .tools button { padding: 1px 7px; font-size: 12px; }
 .add { margin: 6px 0 2px 0; display: flex; gap: 6px; align-items: center; }
 .add select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--inset); color: var(--text); font: inherit; }
-#gBar .gap { flex: 1; }
+/* The two views sit at the right end when there is room, and fold under the
+   buttons when there is not, instead of leaving one button alone on a line. */
+#gBar .gap { flex: 1 1 0; min-width: 0; }
+#gBar > * { flex: 0 0 auto; }
+.blk input[type="color"] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--inset); cursor: pointer; vertical-align: middle; }
+.blk .oftype { font: 11px var(--mono); color: var(--muted); margin-left: 4px; }
 #gNodes { overflow: auto; padding: 14px; background: var(--ground); }
 #gNodes svg { display: block; }
 .node rect { fill: var(--node); stroke: var(--line); rx: 7; }
@@ -150,6 +184,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 @keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: none; } }
 .log { font: 12px/1.5 var(--mono); background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px; height: 320px; overflow: auto; white-space: pre-wrap; }
 .log .error { color: var(--error); }
+#graphList .error { color: var(--error); }
 .log .warning { color: var(--warn); }
 .log .at { color: var(--muted); }
 </style>
@@ -189,9 +224,13 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     <div id="gBar">
       <label>Mod folder <input id="gFolder" type="text" spellcheck="false" placeholder="MyGraphs"></label>
       <label>Name <input id="gName" type="text" spellcheck="false" placeholder="scene-notes"></label>
-      <button id="gSave" type="button">Save</button>
-      <button id="gRun" type="button" title="Start the first handler now, without waiting for its event">Run</button>
+      <button id="gSave" type="button" title="Write this graph to its mod, under the name beside it">Save</button>
+      <button id="gRename" type="button" title="Give this graph another name; the file is moved, not copied">Rename</button>
+      <select id="gWhich" title="Which handler Run starts"></select>
+      <button id="gRun" type="button" title="Start this handler now, without waiting for its event">Run</button>
       <button id="gStop" type="button" title="Stop this graph for the session and put back what it changed">Stop</button>
+      <button id="gReload" type="button" title="Read the graph files again: what was added, changed or removed outside the editor">Reload</button>
+      <button id="gDelete" type="button" title="Take this graph out of its mod (the file is kept as .json.bak)">Delete</button>
       <span class="gap"></span>
       <button id="gAsBlocks" type="button" class="view-tab" aria-pressed="true" title="The graph as blocks, to edit">Blocks</button>
       <button id="gAsNodes" type="button" class="view-tab" aria-pressed="false" title="The graph as nodes, to see its shape">Nodes</button>
@@ -204,7 +243,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   <aside id="gSide">
     <h2>Problems</h2>
     <ul class="list" id="gProblems"><li class="muted" style="cursor:default">None.</li></ul>
-    <h2>Log</h2>
+    <h2>Log <button id="gClear" type="button" title="Empty this panel (the game's own log is not touched)">Clear</button></h2>
     <div id="gLog" class="log"></div>
   </aside>
 </main>
@@ -667,7 +706,30 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   $("toCode").onclick = () => show("code");
   $("toGraphs").onclick = () => show("graphs");
 
+  // ---- when something here goes wrong -------------------------------------
+  // A page that stops halfway through drawing, with nothing said, is the worst
+  // of the ways this can fail: the person sees an editor that no longer
+  // answers and has nowhere to look. Every failure lands in the status line
+  // and in the browser's console, and the editor carries on with what it has.
+  function wrong(what, e) {
+    const said = e && e.message ? e.message : String(e);
+    window.dnwStatus(what + ": " + said, true);
+    try { console.error("[graphs] " + what, e); } catch (ignored) { }
+  }
+
+  window.addEventListener("error", e => wrong("the editor hit an error", e.error || e));
+  window.addEventListener("unhandledrejection", e => wrong("a call did not finish", e.reason));
+
   // ---- what the game says -------------------------------------------------
+  // What the game says about the graph that is open, put in the bar. After a
+  // save, a run or a stop the list has just been read again, so this is what
+  // the game thinks now rather than what it thought when the graph was opened.
+  function saidState() {
+    if (!open || !open.file) return;
+    const g = graphs.find(x => x.file === open.file && (!open.modGuid || x.mod_guid === open.modGuid));
+    if (g) $("gState").textContent = g.state;
+  }
+
   async function refresh() {
     try {
       if (!catalog.operations.length) catalog = await call("graphs.catalog");
@@ -688,7 +750,8 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     for (const g of graphs) {
       const li = el("li", { tabindex: "0" });
       li.append(el("div", null, g.file));
-      li.append(el("div", { class: "muted", style: "font-size:12px" }, g.mod + " · " + g.state));
+      const gone = (g.state || "").startsWith("its file is gone");
+      li.append(el("div", { class: gone ? "error" : "muted", style: "font-size:12px" }, g.mod + " · " + g.state));
       li.onclick = () => openGraph(g);
       li.onkeydown = e => { if (e.key === "Enter") openGraph(g); };
       ul.append(li);
@@ -696,13 +759,18 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   }
 
   async function openGraph(g) {
+    // Work that has not been saved is not thrown away by a click in the list.
+    if (open && open.changed && !confirm("This graph has changes that are not saved. Open " + g.file + " and lose them?")) return;
     try {
       const r = await call("graphs.read", { mod_guid: g.mod_guid, file: g.file });
       const doc = JSON.parse(r.text);
       const name = g.file.replace(/^graphs\//, "").replace(/\.json$/, "");
-      open = { modGuid: g.mod_guid, file: g.file, folder: folderOf(g), name, doc };
+      open = { modGuid: g.mod_guid, file: g.file, folder: folderOf(g), name, doc, changed: false };
       $("gFolder").value = open.folder || "";
       $("gName").value = name;
+      // A saved graph is named by Rename, so Save always means "write this one
+      // where it already is" instead of quietly making a second copy.
+      naming(false);
       $("gState").textContent = g.state;
       draw();
       check();
@@ -724,12 +792,34 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     $("gFolder").value = open.folder;
     $("gName").value = open.name;
     $("gState").textContent = "not saved yet";
+    // Not the name of the graph that was open: Save would write over it.
+    $("gName").value = "";
+    $("gName").placeholder = "a name for this one";
+    naming(true);
     draw();
     check();
   };
 
   // ---- drawing the blocks -------------------------------------------------
   function draw() {
+    try { drawBlocks(); } catch (e) { wrong("the blocks could not be drawn", e); }
+    try { drawHandlerPick(); } catch (e) { wrong("the handler list could not be drawn", e); }
+  }
+
+  // Which handler Run starts. A graph with one handler says its name and
+  // nothing else; a graph with several is a choice, and used to be "the first".
+  function drawHandlerPick() {
+    const pick = $("gWhich");
+    const handlers = (open && open.doc.on) || [];
+    const had = pick.value;
+    pick.replaceChildren();
+    for (const h of handlers) pick.append(el("option", { value: h.id }, h.id + ": " + h.event));
+    pick.value = handlers.some(h => h.id === had) ? had : (handlers[0] ? handlers[0].id : "");
+    // An empty box beside Run says nothing; it comes back with the handlers.
+    pick.hidden = handlers.length === 0;
+  }
+
+  function drawBlocks() {
     const root = $("gBlocks");
     root.replaceChildren();
     if (!open) {
@@ -740,7 +830,39 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     const bar = el("div", { class: "head" });
     bar.append(el("span", { class: "kind" }, "graph"));
     bar.append(field("text", open.doc.name || "", v => { open.doc.name = v; changed(); }, "its name"));
+    bar.append(slot("says", field("text", open.doc.description || "", v => { open.doc.description = v || undefined; changed(); }, "what it does, for the Mods screen")));
     head.append(bar);
+    // Variables: a "set" statement may only use a name listed here, so without
+    // a way to list one the statement cannot be used at all.
+    const vars = el("div", { class: "body" });
+    open.doc.variables = open.doc.variables || {};
+    for (const name of Object.keys(open.doc.variables)) {
+      const row = el("div", { class: "add" });
+      row.append(el("span", { class: "slot" }, "variable "));
+      row.append(field("text", name, v => {
+        if (!v || v === name) return;
+        const kept = open.doc.variables[name];
+        delete open.doc.variables[name];
+        open.doc.variables[v] = kept;
+        changed(true);
+      }, "its name"));
+      row.append(slot("starts as", expr(open.doc.variables[name], v => { open.doc.variables[name] = v; changed(); })));
+      const drop = el("button", { type: "button", title: "Remove this variable" }, "✕");
+      drop.onclick = () => { delete open.doc.variables[name]; changed(true); };
+      row.append(drop);
+      vars.append(row);
+    }
+    const addVar = el("div", { class: "add" });
+    const varButton = el("button", { type: "button" }, "+ variable");
+    varButton.onclick = () => {
+      let n = 1;
+      while (("count" + n) in open.doc.variables) n++;
+      open.doc.variables["count" + n] = 0;
+      changed(true);
+    };
+    addVar.append(varButton);
+    vars.append(addVar);
+    head.append(vars);
     root.append(head);
 
     for (const h of open.doc.on || []) root.append(handlerBlock(h));
@@ -749,7 +871,11 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     add.append(el("button", { type: "button" }, "+ handler"));
     add.lastChild.onclick = () => {
       open.doc.on = open.doc.on || [];
-      open.doc.on.push({ id: nextId("h"), event: catalog.events.length ? catalog.events[0].name : "scene.loaded", do: [] });
+      const first = catalog.events.length ? catalog.events[0].name : "scene.loaded";
+      const handler = { id: nextId("h"), event: first, do: [] };
+      if (first === "timer.every") handler.seconds = 5;
+      if (first === "key.pressed") handler.key = "F8";
+      open.doc.on.push(handler);
       changed(true);
     };
     root.append(add);
@@ -763,9 +889,24 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     const bar = el("div", { class: "head" });
     bar.append(el("span", { class: "kind" }, "when"));
     const events = catalog.events.map(e => e.name);
-    bar.append(choice(events, h.event, v => { h.event = v; changed(true); }));
-    if (h.event === "timer.every") bar.append(slot("every", field("number", h.seconds != null ? h.seconds : 5, v => { h.seconds = Number(v); changed(); })));
-    if (h.event === "key.pressed") bar.append(slot("key", field("text", h.key || "F6", v => { h.key = v; changed(); })));
+    bar.append(choice(events, h.event, v => {
+      h.event = v;
+      // What the event needs comes with it. Shown-but-not-written defaults
+      // read as filled in and check as missing, which is the worst of both.
+      if (v === "timer.every" && h.seconds == null) h.seconds = 5;
+      if (v === "key.pressed" && !h.key) h.key = "F8";
+      if (v !== "timer.every") delete h.seconds;
+      if (v !== "key.pressed") delete h.key;
+      changed(true);
+    }));
+    if (h.event === "timer.every") bar.append(slot("every", field("number", h.seconds, v => { h.seconds = Number(v); changed(); })));
+    // F8 rather than F6: Drag'n Wash Localization dumps its lines on F6 and F7,
+    // and a key two mods answer is a puzzle nobody needs on their first graph.
+    if (h.event === "key.pressed") bar.append(slot("key", field("text", h.key, v => { h.key = v; changed(); })));
+    // Only when this is true, and what to do when the event comes again while
+    // a run of it is still going: both are in the file, so both are editable.
+    bar.append(slot("only if", expr(h.when, v => { h.when = v === "" ? undefined : v; changed(); })));
+    bar.append(slot("again while running", choice(["skip", "queue"], h.overlap || "skip", v => { h.overlap = v === "skip" ? undefined : v; changed(); })));
     bar.append(el("span", { class: "id" }, h.id));
     bar.append(tools(open.doc.on, h, () => changed(true)));
     b.append(bar);
@@ -845,15 +986,24 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
         st.args = st.args || {};
         const has = p.name in st.args;
         const row = el("div");
-        row.append(slot(p.name + (p.required ? " *" : ""), p.choices && p.choices.length
-          ? choice([""].concat(p.choices), has ? String(st.args[p.name]) : "", v => { setArg(st, p, v); })
+        row.append(p.choices && p.choices.length
+          ? slot(p.name + (p.required ? " *" : ""), choice([""].concat(p.choices), has ? String(st.args[p.name]) : "", v => { setArg(st, p, v); }))
           : p.type === "boolean"
-            ? choice(["", "true", "false"], has ? String(st.args[p.name]) : "", v => { setArg(st, p, v); })
-            : expr(has ? st.args[p.name] : "", v => { setArg(st, p, v); })));
+            ? slot(p.name + (p.required ? " *" : ""), choice(["", "true", "false"], has ? String(st.args[p.name]) : "", v => { setArg(st, p, v); }))
+            : p.name === "value"
+              ? valueSlot(st, p)
+              : slot(p.name + (p.required ? " *" : ""), expr(has ? st.args[p.name] : "", v => { setArg(st, p, v); })));
         if (p.description) row.append(el("span", { class: "muted", style: "font-size:11px" }, " " + p.description));
         body.append(row);
       }
-      if (st.onError) { body.append(el("div", { class: "slot" }, "on error")); statements(body, st.onError); }
+      if (st.onError) {
+        const head = el("div", { class: "slot" }, "on error ");
+        const drop = el("button", { type: "button", title: "Remove the on error part" }, "✕");
+        drop.onclick = () => { delete st.onError; changed(true); };
+        head.append(drop);
+        body.append(head);
+        statements(body, st.onError);
+      }
       else {
         const add = el("div", { class: "add" });
         const btn = el("button", { type: "button" }, "+ on error");
@@ -874,6 +1024,139 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     if (body.childNodes.length) b.append(body);
     carry(b, bar, list, st);
     return b;
+  }
+
+  // ---- what kind of value a parameter wants --------------------------------
+  // Two ways of knowing, because neither alone is enough:
+  //
+  //   A. The text itself. "#FF57A8" or "1, 0.2, 0.4" is a colour whatever the
+  //      operation says, and a colour deserves a colour picker.
+  //   B. The game. objects.member.set writes any member of any component, so
+  //      the operation cannot say what its "value" is; the Inspector can
+  //      (inspector.member.get returns the member's type). Asked once per
+  //      path + component + member, and only when all three are filled in.
+  //
+  // The text field stays the one that counts: an expression such as
+  // {"var":"tint"} is still typed there, and the picker only fills it in.
+  const memberTypes = new Map();
+  // Asked and not answered yet. A failure is not remembered: the object may
+  // simply not be in the scene that is loaded now, and the same question is
+  // worth asking again once the level it lives in is open.
+  const asking = new Set();
+  // When a question failed, when that was: the object may not be in the scene
+  // that is loaded, and a block redrawn while somebody types must not ask the
+  // game again on every keystroke.
+  const askedInVain = new Map();
+  const ASK_AGAIN_AFTER = 10000;
+
+  function typeKey(st) {
+    const a = st.args || {};
+    return [a.path, a.component, a.index || 0, a.member, a.private ? 1 : 0].join("|");
+  }
+
+  function askType(st, done) {
+    const a = st.args || {};
+    if (!a.path || !a.component || !a.member || typeof a.path !== "string" || typeof a.member !== "string") return;
+    const key = typeKey(st);
+    if (memberTypes.has(key)) return done(memberTypes.get(key));
+    if (asking.has(key)) return;
+    const failed = askedInVain.get(key);
+    if (failed && Date.now() - failed < ASK_AGAIN_AFTER) return;
+    if (!catalog.operations.some(o => o.name === "inspector.member.get")) return;
+    asking.add(key);
+    call("inspector.member.get", { path: a.path, component: a.component, index: a.index || 0, member: a.member, private: !!a.private })
+      .then(r => {
+        asking.delete(key);
+        const type = r && (r.type || (r.members && r.members[0] && r.members[0].type));
+        if (type) { memberTypes.set(key, type); askedInVain.delete(key); done(type); }
+        else askedInVain.set(key, Date.now());
+      })
+      .catch(() => { asking.delete(key); askedInVain.set(key, Date.now()); });
+  }
+
+  const COLOUR_TYPES = ["Color", "Color32"];
+
+  // While a colour is dragged, the game shows it: the same write the graph
+  // would make, sent as the picker moves. It goes through the page's own door
+  // like everything else here - there is no second channel to the game - so it
+  // is held to about eight a second, well inside what the Bridge allows, and
+  // only one is in the air at a time. A write from the page is put back like
+  // any other (the Inspector's History lists it, and its take-back is there),
+  // so a preview left behind is nobody's mystery.
+  const PREVIEW_EVERY = 120;
+  let previewAt = 0, previewBusy = false, previewNext = null, previewSaid = null;
+
+  function preview(st, value) {
+    if (!("call" in st) || st.call !== "objects.member.set") return;
+    const a = st.args || {};
+    if (!a.path || !a.component || !a.member) return;
+    previewNext = { path: a.path, component: a.component, index: a.index || 0, member: a.member, private: !!a.private, value, scene: a.scene };
+    sendPreview();
+  }
+
+  function sendPreview() {
+    if (previewBusy || !previewNext) return;
+    const wait = PREVIEW_EVERY - (Date.now() - previewAt);
+    if (wait > 0) { setTimeout(sendPreview, wait); return; }
+    const args = previewNext;
+    previewNext = null;
+    previewBusy = true;
+    previewAt = Date.now();
+    const send = { path: args.path, component: args.component, member: args.member, value: args.value };
+    if (args.index) send.index = args.index;
+    if (args.private) send.private = true;
+    if (args.scene) send.scene = args.scene;
+    call("graphs.preview", send)
+      .catch(e => {
+        // Said once per reason: the object may simply not be in the scene that
+        // is loaded, and a line a second would drown the editor.
+        const said = e && e.message ? e.message : String(e);
+        if (said !== previewSaid) { previewSaid = said; window.dnwStatus("The value could not be shown in the game: " + said, true); }
+      })
+      .then(() => { previewBusy = false; if (previewNext) sendPreview(); });
+  }
+
+  function asHex(text) {
+    if (typeof text !== "string") return null;
+    const t = text.trim();
+    let m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(t);
+    if (m) return "#" + m[1].toLowerCase();
+    m = /^([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(\s*,\s*[0-9.]+)?$/.exec(t);
+    if (!m) return null;
+    const part = n => {
+      const v = Number(n);
+      const byte = v <= 1 ? Math.round(v * 255) : Math.round(v);
+      return Math.max(0, Math.min(255, byte)).toString(16).padStart(2, "0");
+    };
+    return "#" + part(m[1]) + part(m[2]) + part(m[3]);
+  }
+
+  // The text field, with a colour picker beside it when the value is a colour -
+  // because it looks like one, or because the game says the member is one.
+  function valueSlot(st, p) {
+    const box = el("span", { class: "slot" }, (p.name + (p.required ? " *" : "")) + " ");
+    const text = expr(p.name in (st.args || {}) ? st.args[p.name] : "", v => { setArg(st, p, v); paint(); });
+    const picker = el("input", { type: "color", title: "Pick a colour" });
+    const oftype = el("span", { class: "oftype" });
+    picker.hidden = true;
+    picker.oninput = () => {
+      text.value = picker.value.toUpperCase();
+      setArg(st, p, text.value);
+      preview(st, text.value);
+    };
+    box.append(text, picker, oftype);
+
+    function paint(type) {
+      if (type) oftype.textContent = type;
+      const known = oftype.textContent;
+      const hex = asHex(text.value);
+      const colour = hex != null || COLOUR_TYPES.indexOf(known) >= 0;
+      picker.hidden = !colour;
+      if (colour && hex) picker.value = hex;
+    }
+    paint();
+    askType(st, type => paint(type));
+    return box;
   }
 
   function setArg(st, p, v) {
@@ -1059,6 +1342,10 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   let asNodes = false;
 
   function nodes() {
+    try { drawNodes(); } catch (e) { wrong("the nodes could not be drawn", e); }
+  }
+
+  function drawNodes() {
     const root = $("gNodes");
     root.replaceChildren();
     if (!open) { root.append(el("p", { class: "muted" }, "Pick a graph on the left, or make one.")); return; }
@@ -1114,15 +1401,25 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   }
 
   // A result named with "as" is read by whatever mentions {"var": name}.
+  // A wire per reader of a named result. Each statement is written out once,
+  // not once per pair: a big graph would otherwise stringify itself thousands
+  // of times over and stop the page while it drew.
+  const WIRE_LIMIT = 400;
+
   function wires(out) {
-    for (const from of out.nodes) {
-      const name = from.st && from.st.as;
-      if (!name || !("call" in from.st)) continue;
-      const looking = JSON.stringify({ var: name });
+    const named = out.nodes.filter(n => n.st && "call" in n.st && n.st.as);
+    if (!named.length || out.nodes.length > WIRE_LIMIT) return;
+    const own = new Map();
+    for (const n of out.nodes) {
+      if (!n.st) continue;
+      own.set(n, JSON.stringify(Object.assign({}, n.st, { do: 0, then: 0, else: 0, onError: 0 })));
+    }
+    for (const from of named) {
+      const looking = JSON.stringify({ var: from.st.as });
       for (const to of out.nodes) {
-        if (to === from || !to.st) continue;
-        const own = Object.assign({}, to.st, { do: 0, then: 0, else: 0, onError: 0 });
-        if (JSON.stringify(own).includes(looking)) out.edges.push({ from, to, label: name, value: true });
+        if (to === from) continue;
+        const text = own.get(to);
+        if (text && text.includes(looking)) out.edges.push({ from, to, label: from.st.as, value: true });
       }
     }
   }
@@ -1236,11 +1533,70 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
     if (asNodes) nodes();
   }
 
+  // Files come and go outside the editor. Reload asks the game to read them
+  // again, and the list stops showing graphs whose file is not there.
+  $("gReload").onclick = async () => {
+    try {
+      const r = await call("graphs.reload", {});
+      window.dnwStatus(r && r.said ? r.said : "Reloaded.");
+      await refresh();
+      saidState();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  };
+
+  // Whether the name and the mod folder can be typed into: for a graph that
+  // has never been saved, that is how it is named; after that they follow the
+  // file, and Rename is what moves it.
+  function naming(open_) {
+    $("gName").disabled = !open_;
+    $("gFolder").disabled = !open_;
+    $("gRename").disabled = open_;
+  }
+
+  $("gRename").onclick = async () => {
+    if (!open || !open.file) return window.dnwStatus("This graph has not been saved yet; type a name and press Save.", true);
+    const now = open.file.replace(/^graphs\//, "").replace(/\.json$/, "");
+    const name = prompt("A new name for this graph (letters, digits, - and _):", now);
+    if (!name || name === now) return;
+    try {
+      const r = await call("graphs.rename", { file: open.file, name, mod_guid: open.modGuid });
+      open.file = r.file;
+      $("gName").value = name;
+      window.dnwStatus("Renamed to " + r.file + ".");
+      await refresh();
+      saidState();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  };
+
+  $("gDelete").onclick = async () => {
+    if (!open || !open.file) return window.dnwStatus("This graph has not been saved, so there is nothing to remove.", true);
+    if (!confirm("Take " + open.file + " out of " + (open.folder || "its mod") + "? The file is kept beside it as .json.bak.")) return;
+    try {
+      const r = await call("graphs.delete", { file: open.file, mod_guid: open.modGuid });
+      window.dnwStatus("Removed " + open.file + "; the file is kept as " + r.kept + ".");
+      open = null;
+      $("gName").value = "";
+      $("gState").textContent = "";
+      naming(true);
+      draw();
+      await refresh();
+    } catch (e) {
+      window.dnwStatus(e.message, true);
+    }
+  };
+
+  $("gClear").onclick = () => { $("gLog").replaceChildren(); };
+
   $("gAsBlocks").onclick = () => { asNodes = false; paintView(); };
   $("gAsNodes").onclick = () => { asNodes = true; paintView(); };
 
   // ---- checking, saving, running ------------------------------------------
   function changed(redraw) {
+    if (open) open.changed = true;
     if (redraw) draw();
     clearTimeout(checkSoon);
     checkSoon = setTimeout(check, 350);
@@ -1274,8 +1630,12 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
       folders[r.mod_guid] = $("gFolder").value.trim();
       open.modGuid = r.mod_guid;
       open.file = r.file;
+      open.changed = false;
+      // It is a saved graph now: named by Rename, and Save means this file.
+      naming(false);
       window.dnwStatus("Saved " + r.path + (r.created ? " (a new mod)" : "") + ".");
       await refresh();
+      saidState();
     } catch (e) {
       window.dnwStatus(e.message, true);
     }
@@ -1283,11 +1643,15 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 
   $("gRun").onclick = async () => {
     if (!open || !open.file) return window.dnwStatus("Save it first.", true);
-    const first = (open.doc.on || [])[0];
-    if (!first) return;
+    const handlers = open.doc.on || [];
+    const which = $("gWhich").value;
+    const chosen = handlers.find(h => h.id === which) || handlers[0];
+    if (!chosen) return window.dnwStatus("This graph has no handler to start.", true);
     try {
-      const r = await call("graphs.run", { file: open.file, handler: first.id });
-      window.dnwStatus("Started " + first.id + (r && r.started_again ? " (the graph was stopped; it runs again)" : "") + ".");
+      const r = await call("graphs.run", { file: open.file, handler: chosen.id, mod_guid: open.modGuid });
+      window.dnwStatus("Started " + chosen.id + (r && r.started_again ? " (the graph was stopped; it runs again)" : "") + ".");
+      await refresh();
+      saidState();
     } catch (e) {
       window.dnwStatus(e.message, true);
     }
@@ -1296,21 +1660,30 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
   $("gStop").onclick = async () => {
     if (!open || !open.file) return;
     try {
-      const r = await call("graphs.stop", { file: open.file });
+      const r = await call("graphs.stop", { file: open.file, mod_guid: open.modGuid });
       window.dnwStatus(r.said);
       await refresh();
+      saidState();
     } catch (e) {
       window.dnwStatus(e.message, true);
     }
   };
 
   // ---- the live log -------------------------------------------------------
+  // Every second while the editor is on screen. When the game does not answer -
+  // it was closed, or the Bridge was turned off - the wait doubles up to half a
+  // minute instead of a failed call a second for as long as the page is open.
+  let quiet = 0, wasQuiet = false;
+
   function poll() {
     if (polling) return;
     polling = setInterval(async () => {
-      if ($("graphsView").hidden) return;
+      if ($("graphsView").hidden || document.hidden) return;
+      if (quiet && Date.now() < quiet) return;
       try {
         const r = await call("graphs.log", { after: logAfter });
+        if (wasQuiet) { wasQuiet = false; window.dnwStatus("The game is answering again."); }
+        quiet = 0;
         logAfter = r.next;
         if (!r.lines.length) return;
         const box = $("gLog");
@@ -1323,9 +1696,29 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
         }
         while (box.childNodes.length > 400) box.removeChild(box.firstChild);
         if (stick) box.scrollTop = box.scrollHeight;
-      } catch (e) { /* the game may be away; the next tick tries again */ }
+      } catch (e) {
+        // The game may be away; back off rather than asking every second, and
+        // say so once so the empty log is not a mystery.
+        const wait = Math.min(30000, quiet ? (quiet - Date.now()) * 2 : 2000);
+        quiet = Date.now() + Math.max(2000, wait);
+        if (!wasQuiet) {
+          wasQuiet = true;
+          window.dnwStatus("The game is not answering; the log waits for it.", true);
+        }
+      }
     }, 1000);
   }
+
+  // A width dragged while the window was wide would otherwise beat the layout
+  // the narrow window asks for, and squeeze the editor again.
+  window.addEventListener("resize", () => {
+    if (window.innerWidth <= 1000) $("graphsView").style.gridTemplateColumns = "";
+  });
+
+  // Closing the tab with work that was never saved asks as well.
+  window.addEventListener("beforeunload", e => {
+    if (open && open.changed) { e.preventDefault(); e.returnValue = ""; }
+  });
 
   // The side panel's width, dragged as the code graph's is.
   (function () {
@@ -1335,6 +1728,7 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
       from = e.clientX; width = $("gSide").getBoundingClientRect().width;
       split.setPointerCapture(e.pointerId);
       const move = ev => {
+        if (window.innerWidth <= 1000) return;   // stacked: there is nothing to drag
         const w = Math.min(640, Math.max(220, width + (from - ev.clientX)));
         view.style.gridTemplateColumns = `240px 1fr 6px ${w}px`;
       };

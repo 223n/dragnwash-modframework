@@ -298,7 +298,24 @@ namespace DragNWash.ModFramework.Graphs
                     {
                         if (result.TakenBackBy != null)
                         {
-                            run.Graph.TakeBacks.Add(result.TakenBackBy);
+                            // One per thing changed, the first one: it holds the
+                            // value the game had before this graph touched it, and
+                            // a graph writing in a loop would otherwise keep a
+                            // take-back per round for as long as it runs.
+                            bool held = false;
+                            for (int i = 0; i < run.Graph.TakeBacks.Count; i++)
+                            {
+                                GraphTakeBack kept = run.Graph.TakeBacks[i];
+                                if (kept.Operation == result.TakenBackBy.Operation && kept.Label == result.TakenBackBy.Label)
+                                {
+                                    held = true;
+                                    break;
+                                }
+                            }
+                            if (!held)
+                            {
+                                run.Graph.TakeBacks.Add(result.TakenBackBy);
+                            }
                         }
                         if (c.As != null)
                         {

@@ -518,8 +518,18 @@ namespace DragNWash.ModFramework.ToolWindow
             else if (_current.Failure != null)
             {
                 ToolWindow.Fill(body, ToolWindow.InsetColor);
-                GUI.Label(new Rect(body.x + 12, body.y + 12, body.width - 24, body.height - 24),
-                    $"This tab stopped working and was turned off for this session. See BepInEx/LogOutput.log.\n\n{_current.Owner}: {_current.Failure}", styles.WrappedLabel);
+                float row = ToolWindow.RowHeight;
+                GUI.Label(new Rect(body.x + 12, body.y + 12, body.width - 24, body.height - 24 - row - 8),
+                    $"This tab stopped working and was turned off. See BepInEx/LogOutput.log.\n\n{_current.Owner}: {_current.Failure}", styles.WrappedLabel);
+                // Some of what a tab draws is gone by the time it is drawn - an
+                // object destroyed, a scene changed - and the next frame would
+                // have been fine. One press to find out, rather than a restart.
+                if (GUI.Button(new Rect(body.x + 12, body.yMax - row - 10, 120, row), "Try again", styles.Button))
+                {
+                    Log.LogInfo($"The tool window tab \"{_current.Title}\" of {_current.Owner} was turned on again by hand.");
+                    _current.Failure = null;
+                    Notice = null;
+                }
             }
             else
             {

@@ -54,6 +54,7 @@ namespace DragNWash.ModFramework.Overrides
         internal static Note Record(string key, string target, string by, object wrote, Func<object> get, UnityEngine.Object owner, out string other)
         {
             other = null;
+            Sweep();
             if (!Notes.TryGetValue(key, out Note note))
             {
                 note = new Note { Key = key };
@@ -80,23 +81,23 @@ namespace DragNWash.ModFramework.Overrides
         }
 
         /// <summary>
-        /// True when the member still holds what this write put there: the
-        /// object is still alive, the last writer is still <paramref name="by"/>,
-        /// and the value is still <paramref name="wrote"/>.
+        /// True when this caller is still the last one to have written the
+        /// member, and the value is still the one it wrote: the object lives,
+        /// nobody else has written over it, and nothing outside this library
+        /// (the game's own script, a hand edit) has changed it since.
         /// </summary>
         /// <remarks>
-        /// One note is kept per member, and a later writer overwrites its
-        /// fields, so the question cannot be asked of the note alone: a write
-        /// asks with the name and the value it used itself. Two writes of one
-        /// caller share a note happily - they put back the same first value.
+        /// The question is asked of the note, not of one write: a caller that
+        /// wrote the same member several times restores the value it found the
+        /// first time, and it is the note that knows what it last put there.
         /// </remarks>
-        internal static bool StillOurs(Note note, string by, object wrote)
+        internal static bool StillOurs(Note note, string by)
         {
             if (note == null || note.Owner == null) return false;
             if (note.By != by) return false;
             try
             {
-                return Equals(note.Get(), wrote);
+                return Equals(note.Get(), note.Wrote);
             }
             catch
             {
@@ -113,6 +114,24 @@ namespace DragNWash.ModFramework.Overrides
             if (note != null && Notes.TryGetValue(note.Key, out Note held) && ReferenceEquals(held, note))
             {
                 Notes.Remove(note.Key);
+            }
+        }
+
+        // Objects come and go with the levels, and a note for one that is gone
+        // says nothing to anybody. They are cleared out when there are enough to
+        // be worth the walk, so a session that runs for hours does not carry
+        // every dragon it ever washed.
+        private const int SweepAbove = 512;
+
+        private static void Sweep()
+        {
+            if (Notes.Count < SweepAbove)
+            {
+                return;
+            }
+            foreach (string key in Notes.Where(n => n.Value.Owner == null).Select(n => n.Key).ToList())
+            {
+                Notes.Remove(key);
             }
         }
 

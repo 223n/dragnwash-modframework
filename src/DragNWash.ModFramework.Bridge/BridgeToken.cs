@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace DragNWash.ModFramework.Bridge
@@ -45,12 +46,40 @@ namespace DragNWash.ModFramework.Bridge
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
                 File.WriteAllText(FilePath, _token);
+                OwnerOnly(FilePath);
             }
             catch (Exception ex)
             {
                 BridgePlugin.Log.LogWarning($"[bridge] Could not write the token file: {ex.Message}; the token lasts this session only.");
             }
             return _token;
+        }
+
+        [DllImport("libc", SetLastError = true)]
+        private static extern int chmod(string path, uint mode);
+
+        // On Windows the file is in the user's profile, which no other account
+        // can read. On Linux and the Steam Deck the profile is not private by
+        // itself - a file lands at 644 - so the token is set to the owner's own
+        // read and write (600), and nobody else on the machine can pick it up.
+        private static void OwnerOnly(string path)
+        {
+            PlatformID kind = Environment.OSVersion.Platform;
+            if (kind != PlatformID.Unix && kind != PlatformID.MacOSX)
+            {
+                return;
+            }
+            try
+            {
+                if (chmod(path, 0x180) != 0)   // 0600
+                {
+                    BridgePlugin.Log.LogDebug("[bridge] Could not set the token file to the owner's own; it is readable by this computer's other users.");
+                }
+            }
+            catch (Exception ex)
+            {
+                BridgePlugin.Log.LogDebug($"[bridge] Could not set the token file's permissions: {ex.Message}");
+            }
         }
 
         // Compares in constant time, so the time taken says nothing about the token.

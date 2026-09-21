@@ -12,6 +12,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 The core and the preloader patcher go to 1.4.3, the Bridge to 0.1.2.
 
+### Inspector 1.1.2
+
+- `inspector.level.get` (read), and `inspector.scene.load` and `inspector.level.start` (writes, for the console and the page alone): what the game is playing, and opening the scene or level a graph is about without going back to the game to click through a menu. Neither write is offered to graphs or to an AI client.
+
 ### Bridge 0.1.2
 
 - **Open page** and **Graphs** on the Bridge tab of the F1 window. The page could only be opened from a method in the Inspector's Code view, which is no help to somebody who wants to write a graph: **Graphs** opens the same page with the editor already in front (`bridge.page.open` takes `focus=v:graphs`), and **Open page** opens it at the code graph as before. Both views still switch inside the page.
@@ -20,6 +24,9 @@ The core and the preloader patcher go to 1.4.3, the Bridge to 0.1.2.
 
 ### Graphs 0.1.2
 
+- The editor is what somebody writing a graph needs, and not a corner of it: a graph's **variables** (a `set` statement could not be used at all without them), its **description**, a handler's **only if** and **again while running**, which **handler Run starts**, **Rename**, **Delete** (the file is kept as `.json.bak`), **Reload** for files that changed outside the editor, and **Clear** for the log panel. `graphs.rename`, `graphs.delete` and `graphs.reload` are page-only writes like the rest.
+- The page lays itself out for the window it is in: below 1000 px the problems and the log go under the blocks, below 640 px everything is one column. A window of 700 px used to leave the blocks 30 px wide.
+- Fixed in the editor: **New graph** kept the last graph's name, so Save wrote over it; a `key.pressed` handler showed `F6` and checked as having no key (the default was drawn and never written, and F6 is Drag'n Wash Localization's dump key - it is F8 now); a block's own buttons dropped onto a line of their own; after a save the bar still said *not saved yet* and Rename stayed off; a graph whose file was removed outside the editor stayed in the list and failed when opened.
 - Fixed: **Run** starts a graph that was stopped. Stopping is for the session, but pressing Run is somebody asking by hand, so the graph comes back (its failure count with it) instead of refusing with *switched off for this session*; the page says when a run did that. `graphs.run` returns `started_again`.
 
 ### Core 1.4.3

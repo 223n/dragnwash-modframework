@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -24,7 +25,20 @@ namespace DragNWash.ModFramework.Graphs
         internal static void Build(RectTransform panel, string guid)
         {
             RectTransform content = ScrollArea(panel);
-            List<GameGraphs.GraphReport> graphs = GameGraphs.Loaded.Where(r => r.ModGuid == guid).ToList();
+            List<GameGraphs.GraphReport> graphs;
+            try
+            {
+                graphs = GameGraphs.Loaded.Where(r => r.ModGuid == guid).ToList();
+            }
+            catch (Exception ex)
+            {
+                // The Mods screen belongs to the player and to every other mod
+                // on it: this page saying nothing is better than the screen
+                // failing to draw.
+                GraphsPlugin.Log.LogError($"[graphs] The Mods screen's page could not be built: {ex}");
+                Line(content, "The graphs could not be read: " + ex.Message, Size, FontStyles.Italic, Bad, 0f);
+                return;
+            }
 
             if (graphs.Count == 0)
             {
@@ -85,7 +99,7 @@ namespace DragNWash.ModFramework.Graphs
                 if (graph.Problems.Count == 0)
                 {
                     string file = graph.File;
-                    StopButton(content, file);
+                    StopButton(content, guid, file);
                 }
                 Spacer(content, Size * 0.8f);
             }
@@ -94,7 +108,7 @@ namespace DragNWash.ModFramework.Graphs
                 Size * 0.85f, FontStyles.Italic, Dim, 0f);
         }
 
-        private static void StopButton(RectTransform content, string file)
+        private static void StopButton(RectTransform content, string guid, string file)
         {
             var row = new GameObject("StopRow", typeof(RectTransform));
             var rowRect = (RectTransform)row.transform;
@@ -131,7 +145,7 @@ namespace DragNWash.ModFramework.Graphs
             Button press = button.GetComponent<Button>();
             press.onClick.AddListener(() =>
             {
-                string said = GameGraphs.Stop(file);
+                string said = GameGraphs.Stop(guid, file);
                 label.text = said.Contains("stopped") ? "Stopped" : "Could not stop it";
                 press.interactable = false;
             });

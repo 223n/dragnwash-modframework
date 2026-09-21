@@ -11,10 +11,55 @@ namespace DragNWash.ModFramework.Inspector
     // and components, and member values as the rows show them.
     internal static class InspectorOperations
     {
+        // Scenes and levels, for whoever is holding the editor: opening the place
+        // a graph is about, without going back to the game to click through a
+        // menu. Writes, so an AI client never sees them, and not for graphs
+        // either - a mod that could restart the level while somebody plays is
+        // not something to hand out - which leaves the console and the page,
+        // where a person asked for it.
+        private static void RegisterScenes(string g)
+        {
+            Only(Operations.Register(g, "inspector.level.get",
+                "What the game is playing: the level running, its dragon and its weather, and whether this is a trial play that is not saved.",
+                OperationKind.Read, "{ says, in_level, level, levels, scene, trial }",
+                args => new Dictionary<string, object>
+                {
+                    ["says"] = InspectorScenes.Describe(),
+                    ["in_level"] = InspectorScenes.InLevel,
+                    ["level"] = InspectorScenes.InLevel ? InspectorScenes.CurrentLevel + 1 : 0,
+                    ["levels"] = InspectorScenes.LevelCount,
+                    ["scene"] = InspectorScenes.ActiveScene,
+                    ["trial"] = InspectorScenes.Trial,
+                }));
+
+            Only(Operations.Register(g, "inspector.scene.load",
+                "Loads one of the game's scenes, as the Inspector's Scenes view does. The game's save is not written while this is on; going back to the title screen ends it.",
+                OperationKind.Write, "what it says in the Inspector",
+                args => new Dictionary<string, object> { ["said"] = InspectorScenes.LoadScene(args.String("name")) },
+                Operations.Parameter("name", OperationType.String, "The scene's name, as scene.list gives it.", true)),
+                OperationAudience.Console | OperationAudience.Page);
+
+            Only(Operations.Register(g, "inspector.level.start",
+                "Starts one of the game's levels, as the Inspector's Levels view does. A level must be running already (the game plays its levels inside PlayGame).",
+                OperationKind.Write, "what it says in the Inspector",
+                args => new Dictionary<string, object> { ["said"] = InspectorScenes.StartLevel(Math.Max(1, args.Int("level", 1)) - 1) },
+                Operations.Parameter("level", OperationType.Number, "Which level, counting from 1.", true)),
+                OperationAudience.Console | OperationAudience.Page);
+        }
+
+        private static void Only(Operation op, OperationAudience audience = OperationAudience.Anyone)
+        {
+            if (op != null)
+            {
+                op.Audience = audience;
+            }
+        }
+
         internal static void Register()
         {
             RegisterObjects();
             string g = Inspector.Guid;
+            RegisterScenes(g);
             Operations.Register(g, "inspector.objects.find", "Objects in the loaded scenes whose name contains the text.", OperationKind.Read,
                 "a list of { path, scene, active }", args =>
                 {

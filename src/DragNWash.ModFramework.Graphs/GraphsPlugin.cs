@@ -364,15 +364,31 @@ namespace DragNWash.ModFramework.Graphs
             {
                 return "Which graph? graphs stop <file or name>";
             }
-            Graph graph = Graphs.FirstOrDefault(g =>
+            List<Graph> found = Graphs.Where(g =>
                 string.Equals(g.File, which, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(System.IO.Path.GetFileName(g.File), which, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(g.Name, which, StringComparison.OrdinalIgnoreCase));
-            if (graph == null)
+                string.Equals(g.Name, which, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (found.Count == 0)
             {
                 return $"No graph called \"{which}\". The names are: " +
                        string.Join(", ", Graphs.Select(g => g.File).ToArray());
             }
+            if (found.Count > 1)
+            {
+                // Two mods can have a graph of the same name; stopping the first
+                // one found would be a coin toss nobody asked for.
+                return $"{found.Count} mods have a graph called \"{which}\": " +
+                       string.Join(", ", found.Select(g => g.Where).ToArray()) +
+                       ". Say which one, by its mod's name.";
+            }
+            Graph graph = found[0];
+            return Stop(graph);
+        }
+
+        // One graph, already found: the page knows which mod's it means, and
+        // says so; the console has to work it out from a name.
+        internal string Stop(Graph graph)
+        {
             // StopByHand writes the same thing to the log already; saying it
             // twice only makes the log harder to read.
             int back = _runner.StopByHand(graph);

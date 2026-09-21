@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -67,8 +68,28 @@ namespace DragNWash.ModFramework.Graphs
         }
 
         /// <summary>Every graph found at startup, or at the last <see cref="Reload"/>.</summary>
-        public static IReadOnlyList<GraphReport> Loaded =>
-            (GraphsPlugin.Instance != null ? GraphsPlugin.Instance.Graphs : new List<Graph>()).Select(Report).ToList();
+        public static IReadOnlyList<GraphReport> Loaded
+        {
+            get
+            {
+                List<Graph> graphs = GraphsPlugin.Instance != null ? GraphsPlugin.Instance.Graphs : new List<Graph>();
+                // What the Overrides library has written, read once for the whole
+                // list rather than once per graph: the registry writes every
+                // result out to measure it, and the list is drawn on a screen.
+                List<object> writes = AllWrites();
+                return graphs.Select(g => Report(g, writes)).ToList();
+            }
+        }
+
+        private static List<object> AllWrites()
+        {
+            if (Operations.Find("objects.writes") == null)
+            {
+                return null;
+            }
+            OperationResult result = Operations.CallNow("objects.writes", null, Guid, OperationAudience.None, false);
+            return result.Ok ? result.Value as List<object> : null;
+        }
 
         /// <summary>
         /// Stops every graph, puts back what they changed, reads the files again
@@ -85,7 +106,23 @@ namespace DragNWash.ModFramework.Graphs
         /// </summary>
         public static string Stop(string which) => GraphsPlugin.Instance != null ? GraphsPlugin.Instance.StopOne(which) : "The Graphs library is not running.";
 
-        internal static GraphReport Report(Graph graph)
+        /// <summary>
+        /// Stops one mod's graph, for a caller that knows which mod it means -
+        /// the Mods screen, the editor. Two mods may have a graph of the same
+        /// name, and then the name alone says nothing. Since 1.4.3.
+        /// </summary>
+        public static string Stop(string modGuid, string file)
+        {
+            if (GraphsPlugin.Instance == null) return "The Graphs library is not running.";
+            Graph graph = GraphsPlugin.Instance.Graphs.FirstOrDefault(g =>
+                string.Equals(g.ModGuid, modGuid, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(g.File, file, StringComparison.OrdinalIgnoreCase));
+            return graph != null ? GraphsPlugin.Instance.Stop(graph) : $"No graph {file} in {modGuid}.";
+        }
+
+        internal static GraphReport Report(Graph graph) => Report(graph, AllWrites());
+
+        private static GraphReport Report(Graph graph, List<object> writes)
         {
             return new GraphReport
             {
@@ -102,7 +139,7 @@ namespace DragNWash.ModFramework.Graphs
                 Started = graph.RunsStarted,
                 Failures = graph.Failures,
                 State = State(graph),
-                Clashes = Clashes(graph),
+                Clashes = Clashes(graph, writes),
                 Shares = graph.Shares.ToList(),
             };
         }
@@ -111,20 +148,15 @@ namespace DragNWash.ModFramework.Graphs
         // the library that owns the writes, through the registry and by name:
         // the Graphs library knows no operation, and when the Overrides library
         // is not installed there is simply nothing to say.
-        private static IReadOnlyList<string> Clashes(Graph graph)
+        private static IReadOnlyList<string> Clashes(Graph graph, List<object> writes)
         {
             var found = new List<string>();
-            if (Operations.Find("objects.writes") == null)
+            if (writes == null)
             {
                 return found;
             }
             string me = $"graph:{graph.ModGuid}/{graph.File}";
-            OperationResult result = Operations.CallNow("objects.writes", null, GameGraphs.Guid);
-            if (!result.Ok || !(result.Value is System.Collections.IList rows))
-            {
-                return found;
-            }
-            foreach (object row in rows)
+            foreach (object row in writes)
             {
                 if (!(row is IDictionary<string, object> write)) continue;
                 var also = write.TryGetValue("also", out object a) ? a as System.Collections.IList : null;
@@ -160,6 +192,11 @@ namespace DragNWash.ModFramework.Graphs
 
         internal static string State(Graph graph)
         {
+            // Files are removed, renamed and moved while the game runs - by
+            // hand, or by another editor. The library keeps what it read until
+            // it reads again, so a graph whose file has gone would otherwise
+            // sit in the list as though it were fine and fail when opened.
+            if (graph.Path != null && !System.IO.File.Exists(graph.Path)) return "its file is gone: reload to clear it";
             if (!graph.Ok) return $"{graph.Problems.Count} problem(s): it does not run";
             if (graph.Stopped) return "switched off for this session" + (graph.StoppedWhy != null ? " because " + graph.StoppedWhy : "");
             if (graph.Waiting != null) return $"waiting for {graph.Waiting}";

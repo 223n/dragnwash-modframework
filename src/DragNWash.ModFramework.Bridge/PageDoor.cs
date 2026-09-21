@@ -26,11 +26,14 @@ namespace DragNWash.ModFramework.Bridge
         private const string Cookie = "dnw_page";
         private static readonly TimeSpan CodeLife = TimeSpan.FromSeconds(60);
         private const int MaxSessions = 8;
+        // A tab left open all day keeps its sign-in; one left behind does not
+        // keep it for the rest of the game's life.
+        private static readonly TimeSpan SessionLife = TimeSpan.FromHours(6);
         private const int CallsPerSecond = 40;
         private const int CallTimeoutMs = 10000;
 
         private static readonly Dictionary<string, DateTime> Codes = new Dictionary<string, DateTime>(StringComparer.Ordinal);
-        private static readonly List<string> Sessions = new List<string>();
+        private static readonly Dictionary<string, DateTime> Sessions = new Dictionary<string, DateTime>(StringComparer.Ordinal);
         private static readonly Queue<DateTime> Recent = new Queue<DateTime>();
         private static string _html;
 
@@ -120,8 +123,13 @@ namespace DragNWash.ModFramework.Bridge
             string session = Random(32);
             lock (Sessions)
             {
-                Sessions.Add(session);
-                while (Sessions.Count > MaxSessions) Sessions.RemoveAt(0);
+                Forget();
+                Sessions[session] = DateTime.Now + SessionLife;
+                while (Sessions.Count > MaxSessions)
+                {
+                    string oldest = Sessions.OrderBy(kv => kv.Value).First().Key;
+                    Sessions.Remove(oldest);
+                }
             }
             BridgePlugin.Log.LogInfo("[bridge] The page signed in.");
             PageAnswer answer = JsonAnswer(200, new Dictionary<string, object> { ["ok"] = true });
@@ -139,10 +147,26 @@ namespace DragNWash.ModFramework.Bridge
                 string value = p.Substring(Cookie.Length + 1);
                 lock (Sessions)
                 {
-                    if (Sessions.Any(s => Same(s, value))) return true;
+                    Forget();
+                    string match = Sessions.Keys.FirstOrDefault(s => Same(s, value));
+                    if (match != null)
+                    {
+                        Sessions[match] = DateTime.Now + SessionLife;   // in use: it stays
+                        return true;
+                    }
                 }
             }
             return false;
+        }
+
+        // Sign-ins that have gone quiet for their whole life. Called with the
+        // lock held.
+        private static void Forget()
+        {
+            foreach (string old in Sessions.Where(kv => kv.Value < DateTime.Now).Select(kv => kv.Key).ToList())
+            {
+                Sessions.Remove(old);
+            }
         }
 
         private static PageAnswer Call(string body)

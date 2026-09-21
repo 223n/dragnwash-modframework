@@ -18,6 +18,7 @@ namespace DragNWash.ModFramework.Bridge
         private const int MaxConnections = 8;
         private const int MaxBody = 1024 * 1024;
         private const int MaxHeaderLines = 100;
+        private const int MaxHeaderLength = 8192;
 
         private readonly int _port;
         private TcpListener _listener;
@@ -105,6 +106,7 @@ namespace DragNWash.ModFramework.Bridge
                     var reader = new StreamReader(stream, new UTF8Encoding(false), false, 8192, true);
                     string requestLine = reader.ReadLine();
                     if (string.IsNullOrEmpty(requestLine)) return;
+                    if (requestLine.Length > MaxHeaderLength) { Respond(stream, 414, "text/plain", "The request line is too long.", null); return; }
                     string[] parts = requestLine.Split(' ');
                     if (parts.Length < 3) { Respond(stream, 400, "text/plain", "Bad request line.", null); return; }
                     string method = parts[0];
@@ -118,6 +120,7 @@ namespace DragNWash.ModFramework.Bridge
                     while (!string.IsNullOrEmpty(line = reader.ReadLine()))
                     {
                         if (++count > MaxHeaderLines) { Respond(stream, 431, "text/plain", "Too many headers.", null); return; }
+                        if (line.Length > MaxHeaderLength) { Respond(stream, 431, "text/plain", "A header is too long.", null); return; }
                         int colon = line.IndexOf(':');
                         if (colon > 0) headers[line.Substring(0, colon).Trim()] = line.Substring(colon + 1).Trim();
                     }

@@ -204,7 +204,7 @@ namespace DragNWash.ModFramework.Overrides
                     WriteLedger.Forget(note);
                     return false;
                 }
-                if (!WriteLedger.StillOurs(note, caller, after))
+                if (!WriteLedger.StillOurs(note, caller))
                 {
                     string since = WriteLedger.LastWriter(note);
                     if (since == null || since == caller)

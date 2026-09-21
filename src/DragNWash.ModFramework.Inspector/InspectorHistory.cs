@@ -37,6 +37,8 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         private static readonly List<Entry> Entries = new List<Entry>();
+        // How long one change goes on being the same change, in seconds.
+        private const double Gather = 3;
         private static readonly Dictionary<string, object> Originals = new Dictionary<string, object>(StringComparer.Ordinal);
 
         internal static IReadOnlyList<Entry> All => Entries;
@@ -74,9 +76,23 @@ namespace DragNWash.ModFramework.Inspector
             {
                 return;
             }
+            string key = "op|" + w.Operation + "|" + w.Label;
+            // A colour dragged in the editor, or a graph writing in a loop, is
+            // one change being made over and over. Rows for each step would
+            // push this session's own edits out of the list and say nothing
+            // more than the last one does, so they are gathered into one: the
+            // value it started from stays, and with it the way back.
+            Entry last = Entries.Count > 0 ? Entries[Entries.Count - 1] : null;
+            if (last != null && last.Key == key && last.By == w.Caller && !last.Reverted
+                && (DateTime.Now - last.Time).TotalSeconds < Gather)
+            {
+                last.After = w.After;
+                last.Time = DateTime.Now;
+                return;
+            }
             Entries.Add(new Entry
             {
-                Key = "op|" + w.Operation + "|" + w.Label,
+                Key = key,
                 Label = w.Label ?? "",
                 Member = w.Operation,
                 Before = w.Before,

@@ -64,12 +64,42 @@ namespace DragNWash.ModFramework.Graphs
                 "Starts one handler of a graph now, with the values the editor gives, instead of waiting for its event.",
                 OperationKind.Write, "{ started, graph, handler }", Run,
                 Operations.Parameter("file", OperationType.String, "The graph, as graphs.list gives it.", true),
-                Operations.Parameter("handler", OperationType.String, "The handler's id (h1).", true)), forThePage);
+                Operations.Parameter("handler", OperationType.String, "The handler's id (h1).", true),
+                Operations.Parameter("mod_guid", OperationType.String, "Which mod's graph, when two mods have one of that name.")), forThePage);
+
+            Only(Operations.Register(g, "graphs.rename",
+                "Gives a graph another name, in the mod it is already in. The file is moved, not copied, so there is one graph afterwards and not two.",
+                OperationKind.Write, "{ file }", Rename,
+                Operations.Parameter("file", OperationType.String, "The graph, as graphs.list gives it.", true),
+                Operations.Parameter("name", OperationType.String, "The new name: letters, digits, - and _ (the file becomes name.json).", true),
+                Operations.Parameter("mod_guid", OperationType.String, "Which mod's graph, when two mods have one of that name.")), forThePage);
+
+            Only(Operations.Register(g, "graphs.delete",
+                "Takes a graph out of its mod. The file is kept beside it as <name>.json.bak, so a delete by mistake is not the end of the work.",
+                OperationKind.Write, "{ kept }", Delete,
+                Operations.Parameter("file", OperationType.String, "The graph, as graphs.list gives it.", true),
+                Operations.Parameter("mod_guid", OperationType.String, "Which mod's graph, when two mods have one of that name.")), forThePage);
+
+            Only(Operations.Register(g, "graphs.reload",
+                "Reads the graph files again: what was added, changed or removed outside the editor. Every graph's changes are put back first, and nothing carries over.",
+                OperationKind.Write, "what it says in the console", args => new Dictionary<string, object> { ["said"] = GameGraphs.Reload() }), forThePage);
+
+            Only(Operations.Register(g, "graphs.preview",
+                "Shows a value in the game while the editor is being used: the same write a graph would make, put back like any other. The editor sends it while a colour is dragged.",
+                OperationKind.Write, "what the write returned", Preview,
+                Operations.Parameter("path", OperationType.String, "The object's path in the scene.", true),
+                Operations.Parameter("component", OperationType.String, "The component's type name.", true),
+                Operations.Parameter("member", OperationType.String, "The field or property to set.", true),
+                Operations.Parameter("value", OperationType.String, "The value, as the Inspector's rows show it.", true),
+                Operations.Parameter("index", OperationType.Number, "Which component, when the object has more than one of that type."),
+                Operations.Parameter("private", OperationType.Boolean, "Set a private field or property."),
+                Operations.Parameter("scene", OperationType.String, "Only an object in this scene.")), forThePage);
 
             Only(Operations.Register(g, "graphs.stop",
                 "Stops a graph for this session and puts back what it changed.",
                 OperationKind.Write, "{ stopped, put_back }", Stop,
-                Operations.Parameter("file", OperationType.String, "The graph, as graphs.list gives it.", true)), forThePage);
+                Operations.Parameter("file", OperationType.String, "The graph, as graphs.list gives it.", true),
+                Operations.Parameter("mod_guid", OperationType.String, "Which mod's graph, when two mods have one of that name.")), forThePage);
         }
 
         private static void Only(Operation op, OperationAudience audience)
@@ -145,6 +175,10 @@ namespace DragNWash.ModFramework.Graphs
         private static object Read(OperationArgs args)
         {
             Graph graph = Graph(args.String("file"), args.String("mod_guid"));
+            if (!File.Exists(graph.Path))
+            {
+                throw new InvalidOperationException($"{graph.Where} is not there any more; \"graphs reload\", or Reload on the page, clears it from the list.");
+            }
             string text;
             try
             {
@@ -287,7 +321,16 @@ namespace DragNWash.ModFramework.Graphs
 
         private static string Manifest(string modName)
         {
-            string escaped = modName.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            // Quotes, backslashes and anything below a space: a name typed into
+            // the page must not be able to write a mod.json the reader refuses.
+            var clean = new System.Text.StringBuilder();
+            foreach (char c in modName)
+            {
+                if (c < ' ') { clean.Append(' '); continue; }
+                if (c == '\\' || c == '"') { clean.Append('\\'); }
+                clean.Append(c);
+            }
+            string escaped = clean.ToString();
             return "{\n" +
                    "  \"name\": \"" + escaped + "\",\n" +
                    "  \"version\": \"1.0.0\",\n" +
@@ -295,9 +338,98 @@ namespace DragNWash.ModFramework.Graphs
                    "}\n";
         }
 
+        // The editor showing a value in the game, through the operation that
+        // knows how to make and put back that change. The page's door takes a
+        // write that is offered to the page alone, and objects.member.set is
+        // offered to everybody, so the editor asks for it by this name instead
+        // of the door being opened wider.
+        private static object Preview(OperationArgs args)
+        {
+            if (Operations.Find("objects.member.set") == null)
+            {
+                throw new InvalidOperationException("The Overrides library is not installed, so there is nothing to show it with.");
+            }
+            var send = new Dictionary<string, object>
+            {
+                ["path"] = args.String("path"),
+                ["component"] = args.String("component"),
+                ["member"] = args.String("member"),
+                ["value"] = args.String("value"),
+            };
+            if (args.Has("index")) send["index"] = args.Number("index");
+            if (args.Has("private")) send["private"] = args.Bool("private");
+            if (!string.IsNullOrEmpty(args.String("scene"))) send["scene"] = args.String("scene");
+            OperationResult result = Operations.CallNow("objects.member.set", send, "page preview", OperationAudience.None, false);
+            if (!result.Ok)
+            {
+                throw new InvalidOperationException(result.Error);
+            }
+            return result.Value;
+        }
+
+        private static object Rename(OperationArgs args)
+        {
+            Graph graph = Graph(args.String("file"), args.String("mod_guid"));
+            string name = (args.String("name") ?? "").Trim();
+            if (!SafeName.IsMatch(name))
+            {
+                throw new InvalidOperationException("A graph's name is letters, digits, - and _ only.");
+            }
+            if (!File.Exists(graph.Path))
+            {
+                throw new InvalidOperationException($"{graph.Where} is not there any more.");
+            }
+            string folder = Path.GetDirectoryName(graph.Path);
+            string to = Path.Combine(folder, name + ".json");
+            if (string.Equals(to, graph.Path, StringComparison.OrdinalIgnoreCase))
+            {
+                return new Dictionary<string, object> { ["file"] = graph.File };
+            }
+            if (File.Exists(to))
+            {
+                throw new InvalidOperationException($"{name}.json is already in that mod; pick another name.");
+            }
+            try
+            {
+                File.Move(graph.Path, to);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"{graph.Where} could not be renamed: {ex.Message}");
+            }
+            GraphsPlugin.Log.LogInfo($"[graphs] {graph.Where} is now graphs/{name}.json.");
+            GraphsPlugin.Instance.Reload();
+            return new Dictionary<string, object> { ["file"] = "graphs/" + name + ".json" };
+        }
+
+        // Out of the mod, but not off the disk: the file becomes its own .bak,
+        // which is what a save does with the file it replaces.
+        private static object Delete(OperationArgs args)
+        {
+            Graph graph = Graph(args.String("file"), args.String("mod_guid"));
+            string path = graph.Path;
+            if (!File.Exists(path))
+            {
+                throw new InvalidOperationException($"{graph.Where} is not there any more.");
+            }
+            string kept = path + ".bak";
+            try
+            {
+                File.Copy(path, kept, true);
+                File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"{graph.Where} could not be removed: {ex.Message}");
+            }
+            GraphsPlugin.Log.LogInfo($"[graphs] {graph.Where} was removed from the page; the file is kept as {Path.GetFileName(kept)}.");
+            GraphsPlugin.Instance.Reload();
+            return new Dictionary<string, object> { ["kept"] = Path.GetFileName(kept) };
+        }
+
         private static object Run(OperationArgs args)
         {
-            Graph graph = Graph(args.String("file"), null);
+            Graph graph = Graph(args.String("file"), args.String("mod_guid"));
             string id = args.String("handler");
             GraphHandler handler = graph.Handlers.FirstOrDefault(h => string.Equals(h.Id, id, StringComparison.Ordinal));
             if (handler == null)
@@ -336,7 +468,10 @@ namespace DragNWash.ModFramework.Graphs
 
         private static object Stop(OperationArgs args)
         {
-            string said = GameGraphs.Stop(args.String("file"));
+            // Through the same lookup as the rest, so mod_guid is honoured: the
+            // console's by-name stop is a different road with a different sign.
+            Graph graph = Graph(args.String("file"), args.String("mod_guid"));
+            string said = GraphsPlugin.Instance.Stop(graph);
             return new Dictionary<string, object>
             {
                 ["stopped"] = said.Contains("stopped"),
@@ -363,7 +498,10 @@ namespace DragNWash.ModFramework.Graphs
             }
             if (graphs.Count > 1 && modGuid == null)
             {
-                throw new InvalidOperationException($"{graphs.Count} graphs are called {file}; say which mod with mod_guid.");
+                throw new InvalidOperationException(
+                    $"{graphs.Count} mods have a graph called {file}: " +
+                    string.Join(", ", graphs.Select(x => $"{x.ModName ?? x.ModGuid} ({x.ModGuid})").ToArray()) +
+                    ". Say which with mod_guid.");
             }
             return graphs[0];
         }
