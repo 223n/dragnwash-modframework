@@ -22,3 +22,6 @@ Thumbs.db
 
 # Python bytecode from tools/
 __pycache__/
+
+# Local environment settings (tokens, paths); never committed
+.env
