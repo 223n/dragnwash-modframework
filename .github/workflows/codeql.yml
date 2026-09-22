@@ -17,9 +17,9 @@ name: CodeQL
 # repository itself, not code that ships to players.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     # Mondays, so a new query added to CodeQL finds old code too.
     - cron: "41 5 * * 1"

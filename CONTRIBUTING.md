@@ -154,7 +154,8 @@ means a wiki page is now wrong, say which one in the pull request.
 
 ## The pull request itself
 
-- Branch off `main`, one topic per pull request.
+- Branch off `dev` and open the pull request against `dev`, one topic per pull
+  request. Work collects on `dev` and goes to `main` together before a release.
 - Write the title and body so someone reading the history in a year knows what
   changed and why. The template asks the questions.
 - Both languages in the body are welcome but not expected; either is fine.
