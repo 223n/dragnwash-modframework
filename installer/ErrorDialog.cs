@@ -101,7 +101,7 @@ namespace DragNWash.Installer
             switch (error)
             {
                 case InstallerException known:
-                    return (Strings.Get(known.Key), null);
+                    return (known.Text(), null);
                 case HttpRequestException _:
                 case WebException _:
                     return (Strings.Get(Strings.Key.DownloadFailed), Strings.Get(Strings.Key.DownloadFailedHelp));
@@ -121,7 +121,7 @@ namespace DragNWash.Installer
         {
             if (error is InstallerException known)
             {
-                return Strings.English(known.Key) + (known.Detail == null ? "" : Environment.NewLine + known.Detail);
+                return known.Text(english: true) + (known.Detail == null ? "" : Environment.NewLine + known.Detail);
             }
             return error.ToString();
         }

@@ -32,6 +32,14 @@ namespace DragNWash.Installer
         internal const string Marker = ".bepinex-installed-by-dragnwash-installer";
         internal const string OldMarker = ".bepinex-installed-by-dragnwash-localization";
 
+        // What Doorstop (winhttp.dll) starts for BepInEx 5, relative to the game folder.
+        internal const string BepInExPreloader = @"BepInEx\core\BepInEx.Preloader.dll";
+
+        // The other Drag'n Wash loader, KrazenLabs/dnw-modloader: Doorstop too, with its
+        // own files in this folder next to the game.
+        internal const string DnwModLoaderFolder = "DnWModLoader";
+        internal const string DnwModLoaderName = "dnw-modloader";
+
         // Files of the framework's Mods screen that name plugins by path.
         internal static readonly string[] FrameworkLists =
         {
@@ -164,6 +172,79 @@ namespace DragNWash.Installer
             return File.Exists(Path.Combine(game, "BepInEx", "core", "BepInEx.dll"));
         }
 
+        // Another mod loader in the game folder, which unpacking BepInEx would break by
+        // replacing its winhttp.dll and doorstop_config.ini. Found says what gave it
+        // away (English, for the log) and is null when there is none; Name is the
+        // loader's name when it is one this installer knows.
+        internal static (string Name, string Found) OtherLoader(string game)
+        {
+            string folder = Path.Combine(game, Paths.DnwModLoaderFolder);
+            if (Directory.Exists(folder))
+            {
+                return (Paths.DnwModLoaderName, $"{Paths.DnwModLoaderFolder}\\ is in the game folder");
+            }
+            bool config = File.Exists(Path.Combine(game, "doorstop_config.ini"));
+            if (config && !DoorstopStartsBepInEx(game, out string target))
+            {
+                string name = target != null && target.IndexOf(Paths.DnwModLoaderFolder, StringComparison.OrdinalIgnoreCase) >= 0 ? Paths.DnwModLoaderName : null;
+                return (name, $"doorstop_config.ini starts {target ?? "nothing it names"}, not {Paths.BepInExPreloader}");
+            }
+            // A winhttp.dll whose config starts BepInEx is what is left of BepInEx, and
+            // unpacking BepInEx again mends it.
+            if (!config && File.Exists(Path.Combine(game, "winhttp.dll")) && !HasBepInEx(game))
+            {
+                return (null, "winhttp.dll is in the game folder without BepInEx\\core\\BepInEx.dll or a doorstop_config.ini");
+            }
+            return (null, null);
+        }
+
+        // Whether doorstop_config.ini names BepInEx's preloader as the assembly to start.
+        // Doorstop 4 (BepInEx 5.4.22 on) calls the key target_assembly, Doorstop 3
+        // targetAssembly; the path may be relative to the game folder or absolute.
+        private static bool DoorstopStartsBepInEx(string game, out string target)
+        {
+            target = null;
+            foreach (string raw in File.ReadAllLines(Path.Combine(game, "doorstop_config.ini")))
+            {
+                string line = raw.Trim();
+                int eq = line.IndexOf('=');
+                if (line.StartsWith("#", StringComparison.Ordinal) || line.StartsWith(";", StringComparison.Ordinal) || eq <= 0)
+                {
+                    continue;
+                }
+                string key = line.Substring(0, eq).Trim();
+                if (string.Equals(key, "target_assembly", StringComparison.OrdinalIgnoreCase) || string.Equals(key, "targetAssembly", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = line.Substring(eq + 1).Trim().Trim('"');
+                    break;
+                }
+            }
+            if (string.IsNullOrEmpty(target))
+            {
+                target = null;
+                return false;
+            }
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(Path.Combine(game, target.Replace('/', '\\'))),
+                    Path.GetFullPath(Path.Combine(game, Paths.BepInExPreloader)),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception)
+            {
+                // Not a path at all.
+                return false;
+            }
+        }
+
+        private static InstallerException OtherLoaderError(string name, string found)
+        {
+            return name == null
+                ? new InstallerException(Strings.Key.OtherLoader, found)
+                : new InstallerException(Strings.Key.OtherLoaderNamed, found, name);
+        }
+
         // The installed version of the mod: its manifest copy, or its first DLL.
         internal string InstalledVersion(string game)
         {
@@ -222,6 +303,16 @@ namespace DragNWash.Installer
                 }
             }
             _log($"Game: {game}");
+            // Before anything is downloaded or changed: one loader per game folder.
+            var (loader, found) = OtherLoader(game);
+            if (found != null)
+            {
+                _log($"Loader: another mod loader{(loader == null ? "" : " (" + loader + ")")}: {found}; nothing was changed");
+                throw OtherLoaderError(loader, found);
+            }
+            _log(HasBepInEx(game)
+                ? $"Loader: BepInEx {DllVersion(Path.Combine(game, "BepInEx", "core", "BepInEx.dll"))}, no other loader found"
+                : "Loader: none yet, no other loader found");
 
             string zip = HasBepInEx(game) ? null : bepInExZip ?? DownloadBepInEx(progress, cancel);
             try
@@ -574,9 +665,20 @@ namespace DragNWash.Installer
         private void RemoveBepInEx(string game, bool keepData)
         {
             bool ours = File.Exists(Path.Combine(game, "BepInEx", Paths.Marker)) || File.Exists(Path.Combine(game, "BepInEx", Paths.OldMarker));
-            foreach (string file in new[] { "winhttp.dll", "doorstop_config.ini", ".doorstop_version" })
+            // Doorstop's files at the top of the game folder go only when they start
+            // BepInEx: with another loader there, they are that loader's.
+            bool config = File.Exists(Path.Combine(game, "doorstop_config.ini"));
+            if (config ? DoorstopStartsBepInEx(game, out _) : !Directory.Exists(Path.Combine(game, Paths.DnwModLoaderFolder)))
             {
-                TryDelete(Path.Combine(game, file));
+                foreach (string file in new[] { "winhttp.dll", "doorstop_config.ini", ".doorstop_version" })
+                {
+                    TryDelete(Path.Combine(game, file));
+                }
+            }
+            else
+            {
+                var (loader, found) = OtherLoader(game);
+                _log($"winhttp.dll, doorstop_config.ini: kept, they belong to another mod loader{(loader == null ? "" : " (" + loader + ")")}: {found}");
             }
             string changelog = Path.Combine(game, "changelog.txt");
             if (File.Exists(changelog) && Regex.IsMatch(File.ReadAllText(changelog), "BepInEx|Doorstop|commits since v5"))
@@ -649,6 +751,12 @@ namespace DragNWash.Installer
         // installer's language, for the window to show before anything runs.
         internal List<string> InstallPlan(string game, IDictionary<string, string> choices)
         {
+            var (loader, found) = OtherLoader(game);
+            if (found != null)
+            {
+                // Install stops before it changes anything; that is the whole plan.
+                return new List<string> { loader == null ? Strings.Get(Strings.Key.PlanOtherLoader) : Strings.Get(Strings.Key.PlanOtherLoaderNamed, loader) };
+            }
             var steps = new List<string>
             {
                 HasBepInEx(game)
@@ -915,10 +1023,20 @@ namespace DragNWash.Installer
         internal readonly Strings.Key Key;
         internal readonly string Detail;
 
-        internal InstallerException(Strings.Key key, string detail = null) : base(key + (detail == null ? "" : ": " + detail))
+        // Fill the key's {0}, {1}...
+        internal readonly object[] Args;
+
+        internal InstallerException(Strings.Key key, string detail = null, params object[] args) : base(key + (detail == null ? "" : ": " + detail))
         {
             Key = key;
             Detail = detail;
+            Args = args;
+        }
+
+        // In the installer's language, or in English for the log and bug reports.
+        internal string Text(bool english = false)
+        {
+            return english ? Strings.English(Key, Args) : Strings.Get(Key, Args);
         }
     }
 }

@@ -30,7 +30,7 @@ namespace DragNWash.Installer
                 }
                 catch (InstallerException ex)
                 {
-                    MessageBox.Show(Strings.Get(ex.Key) + (ex.Detail == null ? "" : Environment.NewLine + Environment.NewLine + ex.Detail),
+                    MessageBox.Show(ex.Text() + (ex.Detail == null ? "" : Environment.NewLine + Environment.NewLine + ex.Detail),
                         "Drag'n Wash Mod Installer", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 1;
                 }
@@ -130,7 +130,7 @@ namespace DragNWash.Installer
             catch (InstallerException ex)
             {
                 Strings.Current = "en";
-                Log("ERROR: " + Strings.Get(ex.Key) + (ex.Detail == null ? "" : " (" + ex.Detail + ")"));
+                Log("ERROR: " + ex.Text() + (ex.Detail == null ? "" : " (" + ex.Detail + ")"));
                 return 1;
             }
             catch (Exception ex)

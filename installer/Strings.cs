@@ -19,6 +19,8 @@ namespace DragNWash.Installer
             NoPayload,
             BadManifest,
             BepInExHash,
+            OtherLoader,
+            OtherLoaderNamed,
             Install,
             Update,
             Uninstall,
@@ -52,6 +54,8 @@ namespace DragNWash.Installer
             PlanKeepNewerFramework,
             PlanSet,
             PlanNothingElse,
+            PlanOtherLoader,
+            PlanOtherLoaderNamed,
             PlanRemovePlugin,
             PlanRemovePluginKeep,
             PlanRemoveConfig,
@@ -92,6 +96,8 @@ namespace DragNWash.Installer
                 [Key.NoPayload] = "The mod's files are missing next to the installer. Extract the whole zip first, then run Install.exe from the extracted folder.",
                 [Key.BadManifest] = "mod-install.json next to the installer could not be read.",
                 [Key.BepInExHash] = "The BepInEx download is corrupt or has been tampered with (SHA-256 mismatch). Nothing was installed.",
+                [Key.OtherLoader] = "Another mod loader is in this game folder. Only one loader can be installed per game folder, so nothing was changed.",
+                [Key.OtherLoaderNamed] = "Another mod loader ({0}) is in this game folder. Only one loader can be installed per game folder, so nothing was changed.",
                 [Key.Install] = "Install",
                 [Key.Update] = "Update",
                 [Key.Uninstall] = "Uninstall",
@@ -125,6 +131,8 @@ namespace DragNWash.Installer
                 [Key.PlanKeepNewerFramework] = "Keep Drag'n Wash ModFramework {0}, which is newer than the one in this zip",
                 [Key.PlanSet] = "Set {0} = {1} in BepInEx\\config\\{2}",
                 [Key.PlanNothingElse] = "Nothing else is downloaded or changed.",
+                [Key.PlanOtherLoader] = "Stop without changing anything: another mod loader is in this game folder, and a game folder can have only one loader",
+                [Key.PlanOtherLoaderNamed] = "Stop without changing anything: another mod loader ({0}) is in this game folder, and a game folder can have only one loader",
                 [Key.PlanRemovePlugin] = "Remove BepInEx\\plugins\\{0}",
                 [Key.PlanRemovePluginKeep] = "Remove BepInEx\\plugins\\{0}, keeping {1}",
                 [Key.PlanRemoveConfig] = "Remove BepInEx\\config\\{0}",
@@ -162,6 +170,8 @@ namespace DragNWash.Installer
                 [Key.NoPayload] = "インストーラーの隣に Mod のファイルがありません。zip を丸ごと展開してから、展開したフォルダーの Install.exe を実行してください。",
                 [Key.BadManifest] = "インストーラーの隣にある mod-install.json を読めませんでした。",
                 [Key.BepInExHash] = "ダウンロードした BepInEx が壊れているか、改ざんされています（SHA-256 が一致しません）。何もインストールしていません。",
+                [Key.OtherLoader] = "別の Mod ローダーが入っています。1 つのゲームフォルダーに入れられるローダーは 1 つだけなので、何も変更していません。",
+                [Key.OtherLoaderNamed] = "別の Mod ローダー（{0}）が入っています。1 つのゲームフォルダーに入れられるローダーは 1 つだけなので、何も変更していません。",
                 [Key.Install] = "インストール",
                 [Key.Update] = "更新",
                 [Key.Uninstall] = "アンインストール",
@@ -195,6 +205,8 @@ namespace DragNWash.Installer
                 [Key.PlanKeepNewerFramework] = "Drag'n Wash ModFramework {0} はこの zip のものより新しいので、そのまま残す",
                 [Key.PlanSet] = "「{0}」を「{1}」に設定する（BepInEx\\config\\{2}）",
                 [Key.PlanNothingElse] = "これ以外のダウンロードや変更は行いません。",
+                [Key.PlanOtherLoader] = "別の Mod ローダーが入っているので、何も変更せずに止める（1 つのゲームフォルダーに入れられるローダーは 1 つだけ）",
+                [Key.PlanOtherLoaderNamed] = "別の Mod ローダー（{0}）が入っているので、何も変更せずに止める（1 つのゲームフォルダーに入れられるローダーは 1 つだけ）",
                 [Key.PlanRemovePlugin] = "BepInEx\\plugins\\{0} を削除する",
                 [Key.PlanRemovePluginKeep] = "BepInEx\\plugins\\{0} を削除する（{1} は残す）",
                 [Key.PlanRemoveConfig] = "BepInEx\\config\\{0} を削除する",
@@ -232,6 +244,8 @@ namespace DragNWash.Installer
                 [Key.NoPayload] = "安装器旁边缺少模组文件。请先完整解压 zip，再运行解压后文件夹中的 Install.exe。",
                 [Key.BadManifest] = "无法读取安装器旁边的 mod-install.json。",
                 [Key.BepInExHash] = "下载的 BepInEx 已损坏或被篡改（SHA-256 不一致）。未安装任何内容。",
+                [Key.OtherLoader] = "此游戏文件夹中已有另一个模组加载器。一个游戏文件夹只能安装一个加载器，因此没有做任何更改。",
+                [Key.OtherLoaderNamed] = "此游戏文件夹中已有另一个模组加载器（{0}）。一个游戏文件夹只能安装一个加载器，因此没有做任何更改。",
                 [Key.Install] = "安装",
                 [Key.Update] = "更新",
                 [Key.Uninstall] = "卸载",
@@ -265,6 +279,8 @@ namespace DragNWash.Installer
                 [Key.PlanKeepNewerFramework] = "保留 Drag'n Wash ModFramework {0}（其版本比此 zip 中的新）",
                 [Key.PlanSet] = "将“{0}”设为“{1}”（BepInEx\\config\\{2}）",
                 [Key.PlanNothingElse] = "不会下载或更改其他任何内容。",
+                [Key.PlanOtherLoader] = "此游戏文件夹中已有另一个模组加载器，因此不做任何更改并停止（一个游戏文件夹只能安装一个加载器）",
+                [Key.PlanOtherLoaderNamed] = "此游戏文件夹中已有另一个模组加载器（{0}），因此不做任何更改并停止（一个游戏文件夹只能安装一个加载器）",
                 [Key.PlanRemovePlugin] = "删除 BepInEx\\plugins\\{0}",
                 [Key.PlanRemovePluginKeep] = "删除 BepInEx\\plugins\\{0}，保留 {1}",
                 [Key.PlanRemoveConfig] = "删除 BepInEx\\config\\{0}",
@@ -313,9 +329,9 @@ namespace DragNWash.Installer
         }
 
         // For bug reports and the log, which stay English whatever the window shows.
-        internal static string English(Key key)
+        internal static string English(Key key, params object[] args)
         {
-            return All["en"][key];
+            return args.Length == 0 ? All["en"][key] : string.Format(All["en"][key], args);
         }
 
         // The windows' font for the installer language. Windows' own font for another
