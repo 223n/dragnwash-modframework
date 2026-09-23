@@ -331,7 +331,23 @@ namespace DragNWash.ModFramework.Inspector
         // The "..." button at the end of every row, which opens the row's menu
         // as a right click does: a gamepad's click is a left click only.
         private const float RowMenuWidth = 26f;
-        private static GUIStyle _rowMenuStyle;
+        private static readonly Vector2 RowMenuChip = new Vector2(24f, 20f);
+
+        // The chip: Inset face, a 1px edge (accent when hot) and three dots in
+        // the label colour, drawn as squares so they don't depend on the font.
+        private static void PaintRowMenuChip(Rect chip, bool hot, ToolWindowStyles s)
+        {
+            TW.Fill(chip, hot ? TW.AccentColor : new Color(TW.MutedColor.r, TW.MutedColor.g, TW.MutedColor.b, 0.55f));
+            TW.Fill(new Rect(chip.x + 1, chip.y + 1, chip.width - 2, chip.height - 2), TW.InsetColor);
+            Color dot = s.Label.normal.textColor;
+            const float size = 3f, gap = 3f;
+            float dx = chip.x + Mathf.Round((chip.width - (3 * size + 2 * gap)) / 2);
+            float dy = chip.y + Mathf.Round((chip.height - size) / 2);
+            for (int i = 0; i < 3; i++)
+            {
+                TW.Fill(new Rect(dx + i * (size + gap), dy, size, size), dot);
+            }
+        }
 
         // Fields narrower than this are unreadable; the composite then goes on
         // a second line across the whole width.
@@ -617,17 +633,17 @@ namespace DragNWash.ModFramework.Inspector
                 float errorY = rect.y + (Stacked(r, rect.width, nameWidth) ? row * 2 : row);
                 GUI.Label(new Rect(rect.x + nameWidth, errorY, rect.width - nameWidth, row), Drawable(error), _errorCell);
             }
-            // "..." at the row's end, faint until the pointer is on the row.
+            // "..." at the row's end: a small chip with a thin edge, the accent
+            // edge while the pointer is on it or its menu is open.
             float rowHeight = Stacked(r, rect.width, nameWidth) ? row * 2 : row;
             var rowRect = new Rect(rect.x, rect.y, rect.width, rowHeight);
-            var dots = new Rect(rect.xMax - RowMenuWidth + 4, rect.y + 2, RowMenuWidth - 4, row - 4);
-            if (_rowMenuStyle == null)
+            var dots = new Rect(rect.xMax - RowMenuChip.x, rect.y + Mathf.Round((row - RowMenuChip.y) / 2), RowMenuChip.x, RowMenuChip.y);
+            if (ev.type == EventType.Repaint)
             {
-                _rowMenuStyle = new GUIStyle(_mutedCell) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
+                bool hot = dots.Contains(ev.mousePosition) || (_menuRow != null && !_menuValues && _menuRow.Key == r.Key);
+                PaintRowMenuChip(dots, hot, s);
             }
-            bool onRow = rowRect.Contains(ev.mousePosition) || (_menuRow != null && !_menuValues && _menuRow.Key == r.Key);
-            string ellipsis = TW.CanDraw("\u2026") ? "\u2026" : "...";
-            if (GUI.Button(dots, new GUIContent(ellipsis, "Copy, undo, reset and more for this row (a right click opens it too)"), onRow ? s.Button : _rowMenuStyle))
+            if (GUI.Button(dots, new GUIContent("", "Copy, undo, reset and more for this row (a right click opens it too)"), GUIStyle.none))
             {
                 OpenRowMenu(r, -1, false, new Vector2(dots.x, dots.yMax));
             }

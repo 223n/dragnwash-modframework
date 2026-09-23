@@ -184,7 +184,12 @@ namespace DragNWash.ModFramework.Inspector
                         // A search result's path, cut from the front when it is too
                         // wide, so the object's own name stays in view.
                         string text = _results != null ? FitPath(n.Path, label.width, cellStyle) : n.Name;
-                        if (GUI.Button(label, Drawable(text), cellStyle))
+                        // A name still too wide ends in "..."; whatever was cut
+                        // shows whole on the hint line while the pointer is on it.
+                        string whole = Drawable(_results != null ? n.Path : n.Name);
+                        string shown = TW.Elide(Drawable(text), cellStyle, label.width);
+                        string tip = shown != whole && label.Contains(Event.current.mousePosition) ? whole : null;
+                        if (GUI.Button(label, new GUIContent(shown, tip), cellStyle))
                         {
                             SelectObject(n.Transform.gameObject);
                             _page = 1;
