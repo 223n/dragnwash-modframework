@@ -325,7 +325,7 @@ namespace DragNWash.ModFramework.Bridge
             var names = new List<string>();
             foreach (McpProtocol.Session c in sessions)
             {
-                string name = string.IsNullOrEmpty(c.Client) ? "a client" : c.Client;
+                string name = string.IsNullOrEmpty(c.Client) ? "a client" : TW.Drawable(c.Client);
                 if (!names.Contains(name)) names.Add(name);
             }
             if (names.Count > 3)
@@ -685,11 +685,102 @@ namespace DragNWash.ModFramework.Bridge
             return y;
         }
 
+        // Who is connected, each with a Disconnect of its own, and the last
+        // calls. A client's name is its own (clientInfo), so it goes through
+        // Drawable, is cut to its column, and shows whole on the hint line.
+        private float DrawClients(float x, float y, float width, List<McpProtocol.Session> sessions, List<McpProtocol.CallRecord> calls, string who)
+        {
+            var s = TW.Styles;
+            float row = TW.RowHeight;
+            float allWidth = ButtonRow.Width("Disconnect all");
+            string heading = $"CLIENTS ({sessions.Count})" + (PageDoor.SignedIn > 0 ? $"   PAGE: {PageDoor.SignedIn} signed in" : "");
+            GUI.Label(new Rect(x, y, width - allWidth - 8, row), TW.Elide(heading, s.Label, width - allWidth - 8), s.Label);
+            // It cuts off everyone, so it asks first - and only then: with
+            // nobody connected there is nothing to lose.
+            if (GUI.Button(new Rect(x + width - allWidth, y, allWidth, row), "Disconnect all", TW.IsConfirming(DisconnectId) ? s.SelectedButton : s.Button))
+            {
+                if (who == null) TW.ShowNotice("No client is connected.", NoticeKind.Info, 6f);
+                else TW.AskConfirm(DisconnectId);
+            }
+            y += row + 6;
+            if (TW.IsConfirming(DisconnectId))
+            {
+                if (TW.Confirm(new Rect(x, y, width, row), DisconnectId, who != null ? $"Disconnect {who}?" : "Disconnect every client?", "Yes, disconnect",
+                    "Yes disconnects them; they can connect again with the same token. Cancel or 5 s keeps them. Esc = Cancel."))
+                {
+                    McpProtocol.EndAll();
+                    PageDoor.EndAll();
+                    TW.ShowNotice(who != null ? $"Disconnected {who}." : "Disconnected every client.", NoticeKind.Info, 8f);
+                }
+                y += row + 6;
+            }
+            if (sessions.Count == 0)
+            {
+                GUI.Label(new Rect(x, y, width, 26), "None connected.", s.MutedLabel);
+                y += 26;
+            }
+            float nameWidth = Mathf.Min(320f, width * 0.45f);
+            float oneWidth = ButtonRow.Width("Disconnect");
+            foreach (McpProtocol.Session c in sessions)
+            {
+                string name = TW.Drawable(string.IsNullOrEmpty(c.Client) ? "a client" : c.Client);
+                GUI.Label(new Rect(x, y, nameWidth, row), TW.Elide(name, s.Label, nameWidth - 8), s.Label);
+                string counts = $"{c.Calls} call{(c.Calls == 1 ? "" : "s")}, last {c.LastUsed:HH:mm:ss}";
+                float countsWidth = Mathf.Max(0, width - nameWidth - oneWidth - 8);
+                GUI.Label(new Rect(x + nameWidth, y, countsWidth, row), TW.Elide(counts, s.MutedLabel, countsWidth), s.MutedLabel);
+                TW.Hint(new Rect(x, y, width - oneWidth - 8, row), $"{name} (MCP {c.Version}), since {c.Started:HH:mm:ss}, {counts}");
+                // No question: the same token lets it straight back in.
+                if (GUI.Button(new Rect(x + width - oneWidth, y + 2, oneWidth, row - 4), "Disconnect", s.Button))
+                {
+                    McpProtocol.EndSession(c.Id);
+                    TW.ShowNotice($"Disconnected {name}. It can connect again with the same token.", NoticeKind.Info, 6f);
+                }
+                y += row;
+            }
+
+            y += 8;
+            GUI.Label(new Rect(x, y, width, 26), "LAST CALLS", s.Label);
+            y += 28;
+            if (calls.Count == 0)
+            {
+                GUI.Label(new Rect(x, y, width, 26), "None yet.", s.MutedLabel);
+                y += 26;
+            }
+            float timeWidth = s.MutedLabel.CalcSize(new GUIContent("00:00:00")).x + 12;
+            float clientWidth = Mathf.Min(240f, width * 0.3f);
+            float tagWidth = s.Tag.CalcSize(new GUIContent("failed")).x + 4;
+            for (int i = calls.Count - 1; i >= 0; i--)
+            {
+                McpProtocol.CallRecord c = calls[i];
+                string client = TW.Drawable(c.Client ?? "");
+                GUI.Label(new Rect(x, y, timeWidth, 26), $"{c.Time:HH:mm:ss}", s.MutedLabel);
+                var clientRect = new Rect(x + timeWidth, y, clientWidth, 26);
+                string clientShown = TW.Elide(client, s.MutedLabel, clientWidth - 8);
+                GUI.Label(clientRect, clientShown, s.MutedLabel);
+                if (clientShown != client) TW.Hint(clientRect, client);
+                float toolX = x + timeWidth + clientWidth;
+                float toolRoom = Mathf.Max(0, width - (toolX - x) - (c.Ok ? 0 : tagWidth + 8));
+                string tool = TW.Elide(c.Tool ?? "", s.Label, toolRoom);
+                GUI.Label(new Rect(toolX, y, toolRoom, 26), tool, s.Label);
+                if (!c.Ok)
+                {
+                    // A failed call stands out: a red tag after the tool's name.
+                    float tagX = toolX + Mathf.Min(toolRoom, s.Label.CalcSize(new GUIContent(tool)).x) + 8;
+                    Color was = GUI.contentColor;
+                    GUI.contentColor = TW.ErrorColor;
+                    GUI.Label(new Rect(tagX, y, tagWidth, 26), "failed", s.Tag);
+                    GUI.contentColor = was;
+                }
+                y += 26;
+            }
+            return y;
+        }
+
         private void DrawTab(Rect area)
         {
             var s = TW.Styles;
             TW.Fill(area, TW.InsetColor);
-            float x = 12, w = area.width - 24, row = TW.RowHeight;
+            float x = 12, w = area.width - 24;
             float inner = w - 20;
             List<McpProtocol.Session> sessions = McpProtocol.AllSessions();
             List<McpProtocol.CallRecord> calls = McpProtocol.RecentCalls();
@@ -705,67 +796,7 @@ namespace DragNWash.ModFramework.Bridge
             if (_portChangedFrom != 0 && sessions.Any(c => c.Started >= _portChangedAt)) _portChangedFrom = 0;
             y = DrawConnection(x, y, inner, who) + 16;
             y = DrawCodeGraph(x, y, inner) + 16;
-            // The row wraps: six buttons do not fit a narrow window, and the
-            // last of them was walking off the edge.
-            float bx = x, by = y;
-            bool Button(string label, float width, bool lit = false)
-            {
-                if (bx > x && bx + width > x + inner)
-                {
-                    bx = x;
-                    by += row + 6;
-                }
-                bool pressed = GUI.Button(new Rect(bx, by, width, row), label, lit ? s.SelectedButton : s.Button);
-                bx += width + 8;
-                return pressed;
-            }
-
-            // It cuts off whoever is connected, so it asks first - and only
-            // then: with nobody connected there is nothing to lose.
-            if (Button("Disconnect all", 150, TW.IsConfirming(DisconnectId)))
-            {
-                if (who == null) TW.ShowNotice("No client is connected.", NoticeKind.Info, 6f);
-                else TW.AskConfirm(DisconnectId);
-            }
-            y = by;
-            y += row + 10;
-            if (TW.IsConfirming(DisconnectId))
-            {
-                if (TW.Confirm(new Rect(x, y, inner, row), DisconnectId, who != null ? $"Disconnect {who}?" : "Disconnect every client?", "Yes, disconnect",
-                    "Yes disconnects them; they can connect again with the same token. Cancel or 5 s keeps them. Esc = Cancel."))
-                {
-                    McpProtocol.EndAll();
-                    PageDoor.EndAll();
-                    TW.ShowNotice(who != null ? $"Disconnected {who}." : "Disconnected every client.", NoticeKind.Info, 8f);
-                }
-                y += row + 6;
-            }
-            GUI.Label(new Rect(x, y, inner, 26), $"CLIENTS ({sessions.Count})" + (PageDoor.SignedIn > 0 ? $"   PAGE: {PageDoor.SignedIn} signed in" : ""), s.Label);
-            y += 28;
-            if (sessions.Count == 0)
-            {
-                GUI.Label(new Rect(x, y, inner, 26), "None connected.", s.MutedLabel);
-                y += 26;
-            }
-            foreach (McpProtocol.Session c in sessions)
-            {
-                GUI.Label(new Rect(x, y, inner, 26), $"{c.Client}  (MCP {c.Version}), {c.Calls} call(s), since {c.Started:HH:mm:ss}, last {c.LastUsed:HH:mm:ss}", s.MutedLabel);
-                y += 26;
-            }
-            y += 8;
-            GUI.Label(new Rect(x, y, inner, 26), "LAST CALLS", s.Label);
-            y += 28;
-            if (calls.Count == 0)
-            {
-                GUI.Label(new Rect(x, y, inner, 26), "None yet.", s.MutedLabel);
-                y += 26;
-            }
-            for (int i = calls.Count - 1; i >= 0; i--)
-            {
-                McpProtocol.CallRecord c = calls[i];
-                GUI.Label(new Rect(x, y, inner, 26), $"{c.Time:HH:mm:ss}  {c.Client}: {c.Tool}{(c.Ok ? "" : "  (failed)")}", s.MutedLabel);
-                y += 26;
-            }
+            y = DrawClients(x, y, inner, sessions, calls, who);
             _contentHeight = y + 12;
             GUI.EndScrollView();
         }
