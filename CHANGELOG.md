@@ -87,6 +87,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ### Mods screen: fixes
 
+- The keyboard works on the Mods screen: the arrow keys move between the list and the details, the right arrow goes from Back into the list, and Enter presses the selected button. Before, the arrow keys only moved between the game's own buttons on the left, so the list could not be reached without the mouse or the pad.
 - Pressing a tab in the details no longer flashes white. Every button the screen builds (the tabs, a tab's buttons, the rows' faces) came in white and faded to its colour over about five frames, since setting a button's colours starts a fade from what is drawn, and a new button is drawn white. The colours now land at once, and the short fade stays for hover and press.
 
 ### Mods screen: frosted glass

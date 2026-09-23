@@ -591,8 +591,8 @@ namespace DragNWash.ModFramework.Mods
             button.onClick.AddListener(() =>
             {
                 Select(entry);
-                // With the pad, pressing a mod moves on to its buttons.
-                if (PadSupport.PadPressedThisFrame())
+                // With the pad or the keyboard, pressing a mod moves on to its buttons.
+                if (PadSupport.SubmitPressedThisFrame())
                 {
                     FlushDetails();
                     Focus("Switch", "Tab" + _tab);

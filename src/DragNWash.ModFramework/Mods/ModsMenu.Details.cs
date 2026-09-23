@@ -784,6 +784,14 @@ namespace DragNWash.ModFramework.Mods
             return true;
         }
 
+        // From the game's buttons on the left (Back) into the list: the mod's
+        // row, else the first row, else the search field. The game's own
+        // navigation only knows its buttons, so it never leads here.
+        internal bool FocusList()
+        {
+            return FocusRow(_selected) || FocusFirstRow() || SelectSearch();
+        }
+
         private bool FocusFirstRow()
         {
             ModRowSelect row = _listRows.FirstOrDefault(r => r != null && r.isActiveAndEnabled);

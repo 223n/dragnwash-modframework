@@ -20,6 +20,9 @@ namespace DragNWash.ModFramework.Mods
     //
     // LB and RB go to the tab on the left or right, Y to the search field, and
     // whatever gets selected is scrolled into view in the list or the tab.
+    //
+    // The keyboard too: the arrow keys move between the list and the details
+    // (and from Back into the list), and Enter presses the selected button.
     internal sealed class PadSupport : MonoBehaviour
     {
         internal ModsMenu Menu;
@@ -33,6 +36,7 @@ namespace DragNWash.ModFramework.Mods
         private int _clickedFrame = -1;
         private Button _listening;
         private GameObject _selected;
+        private GameObject _lastSelected;
         private int _selectedFrame = -1;
         private bool _reported;
 
@@ -47,8 +51,16 @@ namespace DragNWash.ModFramework.Mods
             try
             {
                 GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+                // Whether the game's UI input already moved the selection this frame.
+                bool movedByGame = !ReferenceEquals(selected, _lastSelected);
+                _lastSelected = selected;
                 if (Shortcuts(selected))
                 {
+                    return;
+                }
+                if (!movedByGame && Arrows(selected))
+                {
+                    _lastSelected = EventSystem.current.currentSelectedGameObject;
                     return;
                 }
                 if (selected == null || !selected.activeInHierarchy || !selected.transform.IsChildOf(Menu.transform))
@@ -101,7 +113,8 @@ namespace DragNWash.ModFramework.Mods
                     button.onClick.AddListener(NoteClick);
                     _listening = button;
                 }
-                if (!PadPressedThisFrame() || button == null || !button.IsInteractable())
+                if (!SubmitPressedThisFrame() || button == null || !button.IsInteractable() ||
+                    selected.GetComponent<ShortcutCapture>() != null)
                 {
                     return;
                 }
@@ -116,7 +129,7 @@ namespace DragNWash.ModFramework.Mods
                 if (!_reported)
                 {
                     _reported = true;
-                    ModFramework.Log.LogInfo($"Mods screen: a gamepad press on \"{selected.name}\" was not handled by the game's UI input; clicking it.");
+                    ModFramework.Log.LogInfo($"Mods screen: a pad or Enter press on \"{selected.name}\" was not handled by the game's UI input; clicking it.");
                 }
                 button.onClick.Invoke();
             }
@@ -158,6 +171,60 @@ namespace DragNWash.ModFramework.Mods
                 return true;
             }
             return false;
+        }
+
+        // The arrow keys, and the d-pad's right on the game's buttons. The game's
+        // menu input moves only between its own buttons (Back and the others on
+        // the left), so from there nothing led into the list, and on some setups
+        // the arrow keys did not move between the list's rows either. Only when
+        // the game's input left the selection where it was this frame, and never
+        // while a field is typing or a key is being taken.
+        private bool Arrows(GameObject selected)
+        {
+            if (selected == null || Menu == null || Menu.Details == null || !Menu.Details.gameObject.activeInHierarchy ||
+                !selected.activeInHierarchy || !selected.transform.IsChildOf(Menu.transform) ||
+                selected.GetComponent<ShortcutCapture>() != null)
+            {
+                return false;
+            }
+            TMP_InputField field = selected.GetComponent<TMP_InputField>();
+            if (field != null && field.isFocused)
+            {
+                return false;
+            }
+            Keyboard keys = Keyboard.current;
+            Gamepad pad = Gamepad.current;
+            bool up = keys != null && keys.upArrowKey.wasPressedThisFrame;
+            bool down = keys != null && keys.downArrowKey.wasPressedThisFrame;
+            bool left = keys != null && keys.leftArrowKey.wasPressedThisFrame;
+            bool right = keys != null && keys.rightArrowKey.wasPressedThisFrame;
+            if (!up && !down && !left && !right && !(pad != null && pad.dpad.right.wasPressedThisFrame))
+            {
+                return false;
+            }
+
+            Transform split = Menu.Details.parent;
+            if (split == null || !selected.transform.IsChildOf(split))
+            {
+                // On the game's buttons: right goes into the list.
+                return (right || pad != null && pad.dpad.right.wasPressedThisFrame) && Menu.FocusList();
+            }
+            Selectable current = selected.GetComponent<Selectable>();
+            if (current == null)
+            {
+                return false;
+            }
+            Selectable next = up ? current.FindSelectableOnUp()
+                : down ? current.FindSelectableOnDown()
+                : left ? current.FindSelectableOnLeft()
+                : right ? current.FindSelectableOnRight()
+                : null;
+            if (next == null || !next.gameObject.activeInHierarchy || !next.transform.IsChildOf(Menu.transform))
+            {
+                return false;
+            }
+            EventSystem.current.SetSelectedGameObject(next.gameObject);
+            return true;
         }
 
         // Scrolls the list or the tab so the selected thing shows, with a
@@ -202,6 +269,15 @@ namespace DragNWash.ModFramework.Mods
         private void NoteClick()
         {
             _clickedFrame = Time.frameCount;
+        }
+
+        // A, or Enter on the keyboard: pressing the selected button. Not for
+        // text fields, where Enter is what ends the typing.
+        internal static bool SubmitPressedThisFrame()
+        {
+            Keyboard keys = Keyboard.current;
+            return PadPressedThisFrame() ||
+                   keys != null && (keys.enterKey.wasPressedThisFrame || keys.numpadEnterKey.wasPressedThisFrame);
         }
 
         internal static bool PadPressedThisFrame()
