@@ -9,9 +9,9 @@ namespace DragNWash.ModFramework.Mods
 {
     // Gamepad and Steam Deck help for the Mods screen.
     //
-    // A thin white frame around whatever is selected, so a player using the pad or
-    // the Deck can see where they are: the game's own hover tint is too faint on
-    // the dark bands.
+    // A rounded frame in the accent colour around whatever is selected, so a
+    // player using the pad or the Deck can see where they are: the hover tint
+    // alone is too faint on the dark panel.
     //
     // Presses of A, R2 and the stick buttons (Steam Input reports a trackpad click
     // as a stick press) click the selected button when the game's UI input did
@@ -22,6 +22,7 @@ namespace DragNWash.ModFramework.Mods
         internal ModsMenu Menu;
 
         private const float Thickness = 2f;
+        private const float Gap = 4f;
         private static readonly Color FrameColor = Color.white;
 
         private GameObject _frame;
@@ -134,8 +135,9 @@ namespace DragNWash.ModFramework.Mods
             rect.SetParent(target.transform, false);
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(-Thickness, -Thickness);
-            rect.offsetMax = new Vector2(Thickness, Thickness);
+            float margin = ModsLook.Outline != null ? Gap : Thickness;
+            rect.offsetMin = new Vector2(-margin, -margin);
+            rect.offsetMax = new Vector2(margin, margin);
             rect.SetAsLastSibling();
             _frame.SetActive(true);
             _framed = target;
@@ -153,6 +155,13 @@ namespace DragNWash.ModFramework.Mods
         private static GameObject BuildFrame()
         {
             var frame = new GameObject("SelectionFrame", typeof(RectTransform));
+            if (ModsLook.Outline != null)
+            {
+                Image outline = ModsLook.Shape(frame, ModsLook.Outline, ModsLook.Accent, 14f);
+                outline.raycastTarget = false;
+                return frame;
+            }
+            // Without the shapes: a thin white line on each edge.
             // Left, right, bottom, top edges.
             Edge(frame, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(Thickness, 0f));
             Edge(frame, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-Thickness, 0f), new Vector2(0f, 0f));

@@ -52,9 +52,9 @@ namespace DragNWash.ModFramework.Mods
         // The Back button's pointing hand is drawn just right of the button,
         // over the start of the list; keep the text clear of it.
         private const float ListLeftMargin = 110f;
+        internal const float ListPanelLeft = ListLeftMargin - 34f;
         private const float RowHeight = 96f;
 
-        private static readonly Color BandColor = new Color(0f, 0f, 0f, 0.45f);
         private static readonly Color OnColor = new Color(0.36f, 0.62f, 0.36f, 1f);
         private static readonly Color OffColor = new Color(0.62f, 0.3f, 0.27f, 1f);
 
@@ -185,17 +185,11 @@ namespace DragNWash.ModFramework.Mods
             bandRect.anchorMax = Vector2.one;
             bandRect.offsetMin = new Vector2(ListLeftMargin - 20f, 6f);
             bandRect.offsetMax = new Vector2(0f, -6f);
-            Image bandImage = band.AddComponent<Image>();
-            bandImage.color = BandColor;
+            Image bandImage = ModsLook.Shape(band, ModsLook.Rounded, Color.white);
 
             Button button = band.AddComponent<Button>();
             button.targetGraphic = bandImage;
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(1f, 1f, 1f, 0.7f);
-            colors.highlightedColor = new Color(0.55f, 0.75f, 1f, 1f);
-            colors.selectedColor = new Color(0.55f, 0.75f, 1f, 1f);
-            colors.pressedColor = new Color(0.45f, 0.6f, 0.9f, 1f);
-            button.colors = colors;
+            button.colors = ListColors(button.colors);
             ModRowSelect select = band.AddComponent<ModRowSelect>();
             select.Menu = this;
             select.Entry = entry;
@@ -306,11 +300,6 @@ namespace DragNWash.ModFramework.Mods
             {
                 return;
             }
-
-            GameObject band = Part("Band", 0f, 1f, 0f, 1f);
-            Image bandImage = band.AddComponent<Image>();
-            bandImage.color = BandColor;
-            bandImage.raycastTarget = false;
 
             TMP_Text nameLabel = Label("Name", Escape(entry.DisplayName), UiText.TitleSize * 0.6f, 0.86f, 0.98f, false);
             Texture2D icon = entry.Info?.Icon;

@@ -33,11 +33,6 @@ namespace DragNWash.ModFramework.Mods
 
         private void BuildPage()
         {
-            GameObject band = Part("Band", 0f, 1f, 0f, 1f);
-            Image bandImage = band.AddComponent<Image>();
-            bandImage.color = BandColor;
-            bandImage.raycastTarget = false;
-
             Label("Mod", Escape(_pageFor?.DisplayName), UiText.BodySize, 0.91f, 0.98f, false);
             Label("Title", _page.Title, UiText.TitleSize * 0.55f, 0.81f, 0.91f, false);
 

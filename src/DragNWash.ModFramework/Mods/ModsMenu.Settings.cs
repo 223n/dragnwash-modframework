@@ -156,8 +156,7 @@ namespace DragNWash.ModFramework.Mods
             bandRect.anchorMax = Vector2.one;
             bandRect.offsetMin = new Vector2(90f, 4f);
             bandRect.offsetMax = new Vector2(0f, -4f);
-            Image image = band.AddComponent<Image>();
-            image.color = BandColor;
+            Image image = ModsLook.Shape(band, ModsLook.Rounded, Color.white);
             Button button = band.AddComponent<Button>();
             button.targetGraphic = image;
             button.colors = ListColors(button.colors);
@@ -206,8 +205,7 @@ namespace DragNWash.ModFramework.Mods
             bandRect.anchorMax = Vector2.one;
             bandRect.offsetMin = new Vector2(90f, 4f);
             bandRect.offsetMax = new Vector2(0f, -4f);
-            Image image = band.AddComponent<Image>();
-            image.color = BandColor;
+            Image image = ModsLook.Shape(band, ModsLook.Rounded, Color.white);
             Button button = band.AddComponent<Button>();
             button.targetGraphic = image;
             button.colors = ListColors(button.colors);
@@ -248,11 +246,6 @@ namespace DragNWash.ModFramework.Mods
             {
                 return;
             }
-
-            GameObject band = Part("Band", 0f, 1f, 0f, 1f);
-            Image bandImage = band.AddComponent<Image>();
-            bandImage.color = BandColor;
-            bandImage.raycastTarget = false;
 
             Label("Mod", Escape(_settingsFor.DisplayName), UiText.BodySize, 0.91f, 0.98f, false);
             Label("Key", Escape(item.Title), UiText.TitleSize * 0.55f, 0.81f, 0.91f, false);
@@ -579,12 +572,15 @@ namespace DragNWash.ModFramework.Mods
             return go;
         }
 
+        // A row of a list on the Mods screen's panel: a darker band, lighter
+        // under the pointer or the pad.
         private static ColorBlock ListColors(ColorBlock colors)
         {
-            colors.normalColor = new Color(1f, 1f, 1f, 0.7f);
-            colors.highlightedColor = new Color(0.55f, 0.75f, 1f, 1f);
-            colors.selectedColor = new Color(0.55f, 0.75f, 1f, 1f);
-            colors.pressedColor = new Color(0.45f, 0.6f, 0.9f, 1f);
+            colors.normalColor = ModsLook.Inset;
+            colors.highlightedColor = ModsLook.Hover;
+            colors.selectedColor = ModsLook.Hover;
+            colors.pressedColor = ModsLook.Raised;
+            colors.colorMultiplier = 1f;
             return colors;
         }
     }

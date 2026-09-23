@@ -56,6 +56,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 - With nothing to export, the Export button is greyed out like any other button that can't be used, with the reason next to it. Before, it looked selected, as if you could press it.
 - Typing in Export's Name, Author and Description fields, or in the Clips and Rigidbodies filters, no longer sets off the Inspector's keys. Before, a letter that is a shortcut, ?, Home, End or an arrow did its shortcut instead of going into the field.
 
+### Mods screen: a settings-app look
+
+- The list and the details sit on solid panels in the Tool window's colours, with rounded corners. Before, they were drawn on the game's see-through panel, so how easy the text was to read depended on the picture behind the menu. The rounded corners are small shapes the framework draws in code when the game starts; there are no image files.
+- The frame that shows where the gamepad is has rounded corners and the accent colour.
+
 ### Mods screen: fixes
 
 - A library with a conflict or an update now shows the Conflict and Update tags in the list next to Library. Before, only one tag was shown and Library won, so a library's conflict couldn't be seen from the list.

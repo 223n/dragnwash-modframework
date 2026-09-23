@@ -45,9 +45,10 @@ namespace DragNWash.ModFramework.Mods
 
         internal static void Install(Harmony harmony)
         {
-            // Loaded here, from the plugin's Awake: a texture made later can
-            // crash Direct3D 12.
+            // Loaded and made here, from the plugin's Awake: a texture made
+            // later can crash Direct3D 12.
             LoadButtonArt();
+            ModsLook.MakeSprites();
             try
             {
                 MethodInfo onShow = AccessTools.Method(typeof(MenuOptions), "OnShow");
@@ -261,6 +262,10 @@ namespace DragNWash.ModFramework.Mods
         // Both go into a holder that takes the scroll view's place, and are
         // anchored by fractions of it, so they keep their shares when the window
         // is resized (fixed offsets measured at build time did not).
+        //
+        // Each side sits on a solid panel in the Tool window's colours: over
+        // the game's see-through panel, how readable the text was depended on
+        // the picture behind the menu.
         private static RectTransform SplitForDetails(Transform panel)
         {
             var scroll = (RectTransform)panel.Find("Scroll View");
@@ -279,8 +284,19 @@ namespace DragNWash.ModFramework.Mods
             split.anchoredPosition = scroll.anchoredPosition;
             split.sizeDelta = scroll.sizeDelta;
 
+            // The list's panel starts right of the Back button's pointing hand,
+            // as the rows do.
+            RectTransform listCard = ModsLook.Rect(split, "ListPanel");
+            Fill(listCard, 0f, 0.45f);
+            listCard.offsetMin = new Vector2(ModsMenu.ListPanelLeft, 0f);
+            ModsLook.Shape(listCard.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
+
             scroll.SetParent(split, false);
             Fill(scroll, 0f, 0.45f);
+
+            RectTransform detailsCard = ModsLook.Rect(split, "DetailsPanel");
+            Fill(detailsCard, 0.47f, 1f);
+            ModsLook.Shape(detailsCard.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
 
             var details = (RectTransform)new GameObject("Details", typeof(RectTransform)).transform;
             details.SetParent(split, false);
