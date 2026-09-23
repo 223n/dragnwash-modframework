@@ -109,7 +109,7 @@ namespace DragNWash.ModFramework.Graphs
         /// <summary>
         /// Stops one mod's graph, for a caller that knows which mod it means -
         /// the Mods screen, the editor. Two mods may have a graph of the same
-        /// name, and then the name alone says nothing. Since 1.4.3.
+        /// name, and then the name alone says nothing. Since 0.1.2.
         /// </summary>
         public static string Stop(string modGuid, string file)
         {
