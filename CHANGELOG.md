@@ -4,6 +4,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Bridge tab: what's wrong, and the fix, in one place
+
+- The top of the tab is a panel with a 3 px bar: accent while it listens ("Listening on 127.0.0.1:47821"), dim when it's off, red when it can't listen. The red one says why in words a player can follow ("Windows won't let the game use port 47821", "port 47821 is in use"), with the port in the title so a screenshot carries it. Turn on and Turn off sit in that panel. Before, a port Windows had taken showed "On, but the developer tools are off", which was never the reason (the F1 window doesn't open without them), and the real reason under the buttons was cut off by a fixed 44 px height. Turning the Bridge off now clears an old failure instead of leaving it under "Off", and the Inspector's Graph buttons and the console get the real reason too.
+
 ### Assets tab: a toolbar that fits, and replacements that say why they don't show
 
 - `ToolWindow.FlowButton` (ToolWindow library), new: a button in a row of buttons that wraps onto the next row when the window is too narrow, sized to its label (or to a width you give, so a button whose label changes doesn't make the row jump). A selected one has the accent line under it, the way a view switch shows what's showing. It takes a string or a `GUIContent`, whose tooltip goes on the hint line.

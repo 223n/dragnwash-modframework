@@ -27,8 +27,13 @@ namespace DragNWash.ModFramework.Bridge
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<int> _port;
         private ConfigEntry<string> _openIn;
-        private string _note = "";
+        private string _note = "";              // why the last Listen failed, whole, for the log and the console
+        private ListenProblem _problem;         // the same, for the band at the top of the tab
+        private int _problemPort;
+        private string _problemText = "";
         private Vector2 _scroll;
+
+        private enum ListenProblem { None, Reserved, InUse, Other }
 
         private void Awake()
         {
@@ -82,8 +87,23 @@ namespace DragNWash.ModFramework.Bridge
 
         private void Apply()
         {
-            if (Wanted && Server == null) Listen();
-            else if (!Wanted && Server != null) Stop(_enabled.Value ? "the developer tools were turned off" : "it was switched off");
+            if (Wanted && Server == null)
+            {
+                Listen();
+            }
+            else if (!Wanted)
+            {
+                Stop(_enabled.Value ? "the developer tools were turned off" : "it was switched off");
+                // Off is off: an old failure no longer shows under it.
+                ClearProblem();
+            }
+        }
+
+        private void ClearProblem()
+        {
+            _note = "";
+            _problem = ListenProblem.None;
+            _problemText = "";
         }
 
         // Not named Start: Unity calls a MonoBehaviour's Start() by itself after Awake.
@@ -99,13 +119,19 @@ namespace DragNWash.ModFramework.Bridge
                 // browser, above all) takes the front: keep answering while listening.
                 if (_runInBackground == null) _runInBackground = Application.runInBackground;
                 Application.runInBackground = true;
-                _note = "";
+                ClearProblem();
                 Log.LogInfo($"[bridge] Listening on http://127.0.0.1:{_port.Value}/mcp (read-only, this computer only).");
             }
             catch (Exception ex)
             {
                 Server = null;
-                _note = $"Could not listen on port {_port.Value}: {ex.Message.Trim().TrimEnd('.', '。')}. " + ListenAdvice(ex);
+                var socket = ex as System.Net.Sockets.SocketException ?? ex.InnerException as System.Net.Sockets.SocketException;
+                _problem = socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied ? ListenProblem.Reserved
+                    : socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse ? ListenProblem.InUse
+                    : ListenProblem.Other;
+                _problemPort = _port.Value;
+                _problemText = ex.Message.Trim().TrimEnd('.', '。');
+                _note = $"Could not listen on port {_port.Value}: {_problemText}. " + ListenAdvice(_problem);
                 Log.LogWarning("[bridge] " + _note);
             }
         }
@@ -115,10 +141,9 @@ namespace DragNWash.ModFramework.Bridge
         // Hyper-V, WSL or Docker (see "netsh interface ipv4 show
         // excludedportrange protocol=tcp"); those ranges can move at every
         // restart, so the port may work again later or stop working one day.
-        private static string ListenAdvice(Exception ex)
+        private static string ListenAdvice(ListenProblem problem)
         {
-            var socket = ex as System.Net.Sockets.SocketException ?? ex.InnerException as System.Net.Sockets.SocketException;
-            if (socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied)
+            if (problem == ListenProblem.Reserved)
             {
                 return "Windows has probably set this port aside (Hyper-V, WSL and Docker do that, and the ranges can change when the PC restarts). " +
                        "Choose another [Bridge] Port, and register the new address with your client.";
@@ -126,8 +151,9 @@ namespace DragNWash.ModFramework.Bridge
             return "Another program may use it; change [Bridge] Port.";
         }
 
-        private static void Stop(string why)
+        private void Stop(string why)
         {
+            ClearProblem();
             if (Server == null) return;
             Server.Stop();
             Server = null;
@@ -151,7 +177,8 @@ namespace DragNWash.ModFramework.Bridge
                 "a line saying it opened",
                 args =>
                 {
-                    if (Server == null) throw new InvalidOperationException(_enabled.Value ? "The Bridge is not listening (the developer tools are off, or the port is taken)." : "The Bridge is off: turn it on in the Bridge tab of the F1 window.");
+                    if (Server == null) throw new InvalidOperationException(!_enabled.Value ? "The Bridge is off: turn it on in the Bridge tab of the F1 window."
+                        : _note.Length > 0 ? _note : "The Bridge is not listening: the developer tools are off.");
                     string focus = args.String("focus");
                     if (OpenInApp(focus)) return "Opened the code graph in its window.";
                     string url = $"http://127.0.0.1:{_port.Value}/page#code={PageDoor.NewCode()}";
@@ -270,6 +297,130 @@ namespace DragNWash.ModFramework.Bridge
             return sb.ToString();
         }
 
+        // The state at the top of the tab: a panel with a 3 px bar in its
+        // colour (accent listening, muted off, error when it cannot listen),
+        // one line saying it, the reason under it, and the buttons that change
+        // it. Returns the bottom.
+        private float DrawStatus(float x, float y, float width)
+        {
+            var s = TW.Styles;
+            bool failed = Server == null && _enabled.Value && _problem != ListenProblem.None;
+            Color bar;
+            string title, detail;
+            if (Server != null)
+            {
+                bar = TW.AccentColor;
+                title = $"Listening on 127.0.0.1:{Server.Port}";
+                detail = "AI clients on this computer can read the game. Nothing can be changed from outside.";
+            }
+            else if (!_enabled.Value)
+            {
+                bar = TW.MutedColor;
+                title = "Off";
+                detail = "AI clients on this computer can't reach the game.";
+            }
+            else if (failed)
+            {
+                bar = TW.ErrorColor;
+                ProblemLines(out title, out detail);
+            }
+            else
+            {
+                // Hardly seen: the F1 window is the developer tools' screen.
+                bar = TW.MutedColor;
+                title = "On, but the developer tools are off";
+                detail = "The Bridge only listens while the developer tools are on.";
+            }
+
+            string[] buttons = { _enabled.Value ? "Turn off" : "Turn on" };
+            const float pad = 10, titleHeight = 26;
+            float textX = x + 3 + pad, textWidth = width - 3 - pad * 2;
+            float detailHeight = s.WrappedLabel.CalcHeight(new GUIContent(detail), textWidth);
+            float height = pad + titleHeight + detailHeight + 8 + ButtonRow.Height(textWidth, buttons) + pad;
+            TW.Fill(new Rect(x, y, width, height), TW.PanelColor);
+            TW.Fill(new Rect(x, y, 3, height), bar);
+            var titleRect = new Rect(textX, y + pad, textWidth, titleHeight);
+            string shown = TW.Elide(title, s.Label, textWidth);
+            GUI.Label(titleRect, shown, s.Label);
+            if (shown != title) TW.Hint(titleRect, title);
+            GUI.Label(new Rect(textX, y + pad + titleHeight, textWidth, detailHeight), detail, s.WrappedLabel);
+
+            var row = new ButtonRow(textX, y + pad + titleHeight + detailHeight + 8, textWidth);
+            if (row.Button(buttons[0]))
+            {
+                _enabled.Value = !_enabled.Value;
+            }
+            return y + height;
+        }
+
+        // What went wrong, said for the player: the port is in the title so a
+        // screenshot carries it, and the system's own words only when the
+        // cause is not one of the two usual ones.
+        private void ProblemLines(out string title, out string detail)
+        {
+            switch (_problem)
+            {
+                case ListenProblem.Reserved:
+                    title = $"Not listening: Windows won't let the game use port {_problemPort}";
+                    detail = "Windows keeps some ports for Hyper-V, WSL or Docker, and which ones can change when the PC restarts. Change the port and set your client up again, or try this one later.";
+                    break;
+                case ListenProblem.InUse:
+                    title = $"Not listening: port {_problemPort} is in use";
+                    detail = "Another program probably has it. Change the port, or close that program and try again.";
+                    break;
+                default:
+                    title = $"Not listening on port {_problemPort}";
+                    // Mono's message can come in the system's language.
+                    detail = TW.Drawable(_problemText) + ".";
+                    break;
+            }
+        }
+
+        // Buttons in a row that wraps: each as wide as its text, on the next
+        // line when it does not fit. Height measures without drawing, for a
+        // panel that is filled before its buttons are drawn on it.
+        private sealed class ButtonRow
+        {
+            private const float Gap = 8;
+            private readonly float _left, _right;
+            private float _x, _y;
+
+            internal ButtonRow(float left, float top, float width)
+            {
+                _left = _x = left;
+                _right = left + width;
+                _y = top;
+            }
+
+            internal float Bottom => _y + TW.RowHeight;
+
+            internal static float Width(string label) => Mathf.Max(90f, TW.Styles.Button.CalcSize(new GUIContent(label)).x + 20f);
+
+            internal static float Height(float width, params string[] labels)
+            {
+                var row = new ButtonRow(0, 0, width);
+                foreach (string label in labels) row.Place(Width(label));
+                return row.Bottom;
+            }
+
+            internal Rect Place(float width)
+            {
+                if (_x > _left && _x + width > _right)
+                {
+                    _x = _left;
+                    _y += TW.RowHeight + 6;
+                }
+                var rect = new Rect(_x, _y, width, TW.RowHeight);
+                _x += width + Gap;
+                return rect;
+            }
+
+            internal bool Button(string label, bool lit = false)
+            {
+                return GUI.Button(Place(Width(label)), label, lit ? TW.Styles.SelectedButton : TW.Styles.Button);
+            }
+        }
+
         private void DrawTab(Rect area)
         {
             var s = TW.Styles;
@@ -284,11 +435,7 @@ namespace DragNWash.ModFramework.Bridge
             float y = 8;
             GUI.Label(new Rect(x, y, inner, 26), "BRIDGE: AI CLIENTS OVER MCP (READ-ONLY)", s.Label);
             y += 32;
-            string status = Server != null ? $"Listening on http://127.0.0.1:{_port.Value}/mcp. Clients can read the game; nothing can be changed."
-                : !_enabled.Value ? "Off. AI clients on this computer cannot reach the game."
-                : "On, but the developer tools are off, so it is not listening.";
-            GUI.Label(new Rect(x, y, inner, 44), status, s.WrappedLabel);
-            y += 48;
+            y = DrawStatus(x, y, inner) + 12;
             // The row wraps: six buttons do not fit a narrow window, and the
             // last of them was walking off the edge.
             float bx = x, by = y;
@@ -304,10 +451,6 @@ namespace DragNWash.ModFramework.Bridge
                 return pressed;
             }
 
-            if (Button(Server != null || _enabled.Value ? "Turn off" : "Turn on", 120, _enabled.Value))
-            {
-                _enabled.Value = !_enabled.Value;
-            }
             // The page is where graphs are made, so it needs a way in that does
             // not go through the game's code: the Inspector's Graph buttons open
             // it at a method, which is no help to somebody writing a graph.
@@ -360,11 +503,6 @@ namespace DragNWash.ModFramework.Bridge
                     TW.ShowNotice(who != null ? $"Disconnected {who}." : "Disconnected every client.", NoticeKind.Info, 8f);
                 }
                 y += row + 6;
-            }
-            if (_note.Length > 0)
-            {
-                GUI.Label(new Rect(x, y, inner, 44), _note, s.WrappedLabel);
-                y += 48;
             }
             GUI.Label(new Rect(x, y, inner, 60), "Setup for Claude Code (Copy setup puts it on the clipboard with the token): claude mcp add --transport http dragnwash http://127.0.0.1:" + _port.Value + "/mcp --header \"Authorization: Bearer <token>\". VS Code and Cursor take the same URL and header. The token is kept in your user profile, not in the game folder.", s.WrappedLabel);
             y += 72;
