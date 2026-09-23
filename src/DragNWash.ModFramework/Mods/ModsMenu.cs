@@ -221,13 +221,26 @@ namespace DragNWash.ModFramework.Mods
                 used += FitRight(state, used) + 16f;
             }
 
+            // Every tag that applies: a library can have a conflict or an update
+            // too, and one tag must not hide another.
             bool conflict = ConflictsOf(entry).Count > 0;
             bool update = entry.Loaded && Updates.UpdateCheck.NewerRelease(entry.Guid, entry.Version) != null;
-            string tagText = entry.IsLibrary ? TextLibrary : conflict ? TextConflictTag : update ? TextUpdateTag : null;
-            if (tagText != null)
+            if (update)
             {
-                TMP_Text tag = UiText.Create(band.transform, entry.IsLibrary ? "Library" : conflict ? "Conflict" : "Update", tagText, UiText.BodySize * 0.8f);
-                tag.color = entry.IsLibrary ? new Color(0.7f, 0.8f, 1f, 1f) : conflict ? WarnColor : UpdateColor;
+                TMP_Text tag = UiText.Create(band.transform, "Update", TextUpdateTag, UiText.BodySize * 0.8f);
+                tag.color = UpdateColor;
+                used += FitRight(tag, used) + 16f;
+            }
+            if (conflict)
+            {
+                TMP_Text tag = UiText.Create(band.transform, "Conflict", TextConflictTag, UiText.BodySize * 0.8f);
+                tag.color = WarnColor;
+                used += FitRight(tag, used) + 16f;
+            }
+            if (entry.IsLibrary)
+            {
+                TMP_Text tag = UiText.Create(band.transform, "Library", TextLibrary, UiText.BodySize * 0.8f);
+                tag.color = new Color(0.7f, 0.8f, 1f, 1f);
                 used += FitRight(tag, used) + 16f;
             }
             if (IsOnline(entry, out bool undeclaredOnline))

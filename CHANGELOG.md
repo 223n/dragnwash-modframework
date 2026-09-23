@@ -56,6 +56,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 - With nothing to export, the Export button is greyed out like any other button that can't be used, with the reason next to it. Before, it looked selected, as if you could press it.
 - Typing in Export's Name, Author and Description fields, or in the Clips and Rigidbodies filters, no longer sets off the Inspector's keys. Before, a letter that is a shortcut, ?, Home, End or an arrow did its shortcut instead of going into the field.
 
+### Mods screen: fixes
+
+- A library with a conflict or an update now shows the Conflict and Update tags in the list next to Library. Before, only one tag was shown and Library won, so a library's conflict couldn't be seen from the list.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.
