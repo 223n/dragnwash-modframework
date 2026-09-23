@@ -349,7 +349,7 @@ namespace DragNWash.ModFramework.ToolWindow
         /// </summary>
         /// <param name="row">One row of controls, as wide as the tab allows.</param>
         /// <param name="id">As given to <see cref="AskConfirm"/>.</param>
-        /// <param name="question">One line saying how much and what happens, e.g. "Clear 12 edits? They stay applied, Revert is gone."</param>
+        /// <param name="question">One line saying how much and what happens, e.g. "Clear 12 edits? They stay applied, and you can't undo them after."</param>
         /// <param name="yes">The Yes button's text, e.g. "Yes, clear".</param>
         /// <param name="hint">For the hint line, e.g. "Yes clears the history; Cancel or 5 s keeps it. Esc = Cancel."; a general one when null.</param>
         public static bool Confirm(Rect row, string id, string question, string yes = "Yes", string hint = null)
@@ -481,7 +481,7 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <c>y</c> down by <see cref="RowHeight"/> yourself. A selected button
         /// is drawn with <see cref="ToolWindowStyles.SelectedButton"/> and the
         /// accent line under it, the way a view switch shows the view that is
-        /// showing. Returns true on the event it is pressed. Since 1.5.0.
+        /// showing. Returns true on the event it is pressed. Since 1.3.0.
         /// </summary>
         /// <param name="bx">Where the button goes; moved past it (and 6 px on).</param>
         /// <param name="y">Top of the current row; moved down when the button wraps.</param>
@@ -501,7 +501,7 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <summary>
         /// As <see cref="FlowButton(ref float, ref float, float, float, string, bool, float)"/>,
         /// with a <c>GUIContent</c> whose tooltip shows on the hint line while
-        /// the pointer is on the button. Since 1.5.0.
+        /// the pointer is on the button. Since 1.3.0.
         /// </summary>
         public static bool FlowButton(ref float bx, ref float y, float x, float width, GUIContent content, bool selected = false, float minWidth = 0f)
         {

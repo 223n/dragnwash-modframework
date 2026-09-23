@@ -87,7 +87,7 @@ namespace DragNWash.ModFramework.Saves
         /// <c>[History] Keep</c> setting. Once a slot has this many, each new
         /// snapshot deletes the oldest one. A new snapshot is only taken when the
         /// save differs from the newest one, so an edit or a restore while the
-        /// newest snapshot matches the save deletes nothing. Since 1.5.0.
+        /// newest snapshot matches the save deletes nothing. Since 1.2.0.
         /// </summary>
         public static int Keep => _keep;
 
