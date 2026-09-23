@@ -18,7 +18,7 @@ namespace DragNWash.ModFramework.Overrides
         public const string Guid = "com.tomxv.dragnwash.modframework.overrides";
 
         /// <summary>The library's version.</summary>
-        public const string Version = "0.1.1";
+        public const string Version = "1.5.0";
 
         /// <summary>What was read from one overrides mod, and how it went.</summary>
         public sealed class ModReport

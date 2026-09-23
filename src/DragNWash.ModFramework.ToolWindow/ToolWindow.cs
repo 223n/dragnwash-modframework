@@ -36,7 +36,7 @@ namespace DragNWash.ModFramework.ToolWindow
         public const string Guid = "com.tomxv.dragnwash.modframework.toolwindow";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.2.0";
+        public const string Version = "1.5.0";
 
         /// <summary>Height of one row of controls, in pixels.</summary>
         public const float RowHeight = 30f;
@@ -481,7 +481,7 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <c>y</c> down by <see cref="RowHeight"/> yourself. A selected button
         /// is drawn with <see cref="ToolWindowStyles.SelectedButton"/> and the
         /// accent line under it, the way a view switch shows the view that is
-        /// showing. Returns true on the event it is pressed. Since 1.3.0.
+        /// showing. Returns true on the event it is pressed. Since 1.5.0.
         /// </summary>
         /// <param name="bx">Where the button goes; moved past it (and 6 px on).</param>
         /// <param name="y">Top of the current row; moved down when the button wraps.</param>
@@ -501,7 +501,7 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <summary>
         /// As <see cref="FlowButton(ref float, ref float, float, float, string, bool, float)"/>,
         /// with a <c>GUIContent</c> whose tooltip shows on the hint line while
-        /// the pointer is on the button. Since 1.3.0.
+        /// the pointer is on the button. Since 1.5.0.
         /// </summary>
         public static bool FlowButton(ref float bx, ref float y, float x, float width, GUIContent content, bool selected = false, float minWidth = 0f)
         {

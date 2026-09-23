@@ -2,61 +2,13 @@
 
 Versions of the core and of each library are separate, and follow semantic versioning: from 1.0.0 on, a change that breaks the public API comes only with a new major version.
 
-## Unreleased
+## 2026-09-23: a whole new look
 
-### Bridge tab: what's wrong, and the fix, in one place
+The core, the preloader patcher and every library go to 1.5.0, so from here on one number says which release you have. For mods, everything is additive, as before: a mod built for 1.4.x keeps working.
 
-- The top of the tab is a panel with a 3 px bar: accent while it listens ("Listening on 127.0.0.1:47821"), dim when it's off, red when it can't listen. The red one says why in words a player can follow ("Windows won't let the game use port 47821", "port 47821 is in use"), with the port in the title so a screenshot carries it. Turn on and Turn off sit in that panel. Before, a port Windows had taken showed "On, but the developer tools are off", which was never the reason (the F1 window doesn't open without them), and the real reason under the buttons was cut off by a fixed 44 px height. Turning the Bridge off now clears an old failure instead of leaving it under "Off", and the Inspector's Graph buttons and the console get the real reason too.
-- When it can't listen, the red panel has **Use a free port** and **Try again**. Use a free port looks at the ports after the current one, skips every range in Windows' excluded port list (`netsh interface ipv4 show excludedportrange`, read only, no administrator needed) and every port it can't listen on for a moment on 127.0.0.1, then saves the first good one as `[Bridge] Port` and listens there. It looks on a worker thread, so the game doesn't stop (about 70 ms on a Windows 11 PC, most of it netsh). Only asking is involved: nothing about Windows' settings is changed, the Bridge still listens on 127.0.0.1 only and still needs the token. The notice says "Listening on port 47822 now. Clients set up for 47821 need the new setup (Copy setup).", and a yellow "Port changed from 47821" line stays under the address until something is copied or a client connects. Try again tries the same port, for when the PC has restarted and Windows let it go. Before, the only way was the Mods screen's port stepper, which moves by 3,226 at a time.
-- CODE GRAPH: **Open page** and **Graphs** are now **Code graph** and **Graphs editor**, with "Opens in: App / Browser" beside them, the same setting as the Mods screen's "Open the code graph in". When App is picked but CodeGraph.exe isn't there, a dim line says it opens in the browser (it used to switch without a word), and off Windows it just says it opens in the browser. While the Bridge isn't listening both buttons are greyed out with "Opens once the Bridge is listening." instead of failing after the press.
-- CLIENTS: Disconnect all moved up beside the heading, and each client has a small **Disconnect** of its own, with no question, since the same token lets it straight back in. A long client name is cut with "..." and shows whole, with its MCP version and when it connected, on the hint line; names a client gives go through the window's safe text path. A failed call in LAST CALLS has a red "failed" tag instead of a dim "(failed)".
-- CONNECTION: the address, the token and the setup are a row each, each with its own Copy. The token is still never drawn ("kept in your user profile, never shown here"), and copying it alone gives away no more than Copy setup always did. Setup switches between Claude Code (the `claude mcp add` command, with a note to run `claude mcp remove dragnwash` first when it's already set up, since adding the same name twice fails), VS Code (a `.vscode/mcp.json` with a `servers` entry of type `http`) and Cursor (an `mcp.json` with an `mcpServers` entry), each in the form its own documentation gives, with the token filled in. Copying while the Bridge isn't listening says it won't answer until it is. New token moved to the token's row. The long setup paragraph, which a fixed 60 px height cut off, is gone, and the tab measures how tall it came out instead of guessing, so nothing at the bottom is out of reach in a narrow window.
+### Core 1.5.0
 
-### Assets tab: a toolbar that fits, and replacements that say why they don't show
-
-- `ToolWindow.FlowButton` (ToolWindow library), new: a button in a row of buttons that wraps onto the next row when the window is too narrow, sized to its label (or to a width you give, so a button whose label changes doesn't make the row jump). A selected one has the accent line under it, the way a view switch shows what's showing. It takes a string or a `GUIContent`, whose tooltip goes on the hint line.
-- Assets tab: the top row switches between **Textures (1,234)** and **Replacements (4)** like tabs, with the one showing marked, and the name filter takes the rest of that row. Before, one button said the name of the list that wasn't showing, so you couldn't tell which one you were looking at. **List again**, **Apply replacements** and **Reload files** sit on the row under it. Both rows wrap in a narrow window, so the filter and Reload files no longer end up off the edge. The status gets a line of its own instead of sharing one with the replacement count, where it was cut off. The buttons explain themselves on the hint line.
-- Assets tab, Replacements: the right column says how each file is doing. **In 12 places** is fine. **Not used yet** (yellow) means it hasn't gone in anywhere, and the hint line says whether a texture of that name is loaded at all, so a typo in the file name shows. **Not used: CleanSponges wins** (yellow) means another mod's file of the same name is used; the mod that lost now has a row of its own too, where before it was only named at the end of the winner's row. **Off** (dim) is a language picture its mod switched off, which used to look as if it applied. **Not reloaded: ...** (red) is a file that couldn't be read. The switch above the list says how many rows are yellow or red ("2 to check"). When a language's pictures wait for a restart on Direct3D 12, a band above the list says so; before, only the `assets replacements` command did. The filter works on this list too, by texture name or mod. A narrow window leaves the mod column out, and a row's hint shows what was cut off.
-- Assets tab: the replacements list is only worked out again when the replacements change, and only the rows in sight are drawn.
-- Assets tab, Textures: the tab lists the textures by itself the first time it opens (after a frame of "Listing textures..."), and again after Apply replacements or Reload files, instead of leaving "Nothing listed yet." behind. When a scene loads after the list was made, a yellow band says "The scene changed since this list was made." with a **List again** button. With a filter, the status line says how many of how many show.
-- Assets tab, Textures: the mark column has room now (it was about 34 px wide at the default size, and less than nothing in a narrow window). A mod's replacement says **from SignPack**, and the game's texture it stands in for says **original, replaced** and is dimmed, so the two rows of the same name can be told apart. A narrow list leaves the material and sprite counts out, and the size too when the name would get too little room. Only the rows in sight are drawn, and the filter is only worked out again when it changes.
-- Assets tab: Reload files and Apply replacements say what happened in plain words. "Nothing changed on disk." instead of "Reloaded 0 file(s).", and "Everything was already in place." or "Put replacements into 5 more places." instead of "applied in 0 place(s)". A PNG added after the game started isn't read by Reload files, and nothing used to say so; now a notice names the new files and says they're read when the game starts, so restart to use them. When a watched file reloads by itself (`[Reload] WatchFiles`, Direct3D 11), a notice says so ("shop_sign.png changed on disk and was reloaded.") and the list is made again; before, only the log said it.
-- Assets tab: the two lines explaining the buttons are gone (the buttons explain themselves on the hint line), which gives the list more room. What stays in sight is a warning: on Direct3D 12 that Reload files can crash the game, and when Reload files is off, why and how to have it back (for example "Turn AllowReload back on in Options > Mods > Drag'n Wash ModFramework: Assets to try again."). On Direct3D 11 with reloading on, there's no line at all.
-- Assets tab: both lists scroll with the gamepad stick and d-pad, as the other tabs' lists do, so they no longer need the Steam Deck's trackpad or the touch screen. The preview's Close button is 64 px wide and the rows' Inspect buttons 80 px, easier to hit.
-
-### Inspector: keys you can change
-
-- The Inspector's shortcut keys can be changed now: the gizmo's move, rotate, scale and off (W, E, R, Q), pick (P), highlight (H), tree (T), free camera (C), bones (B), wireframe (N) and edit mesh (M). They stay as they were until you change one.
-- In the F1 window, open the Inspector tab's "?" panel and click a key. It says "Press a key…", and the next key you press becomes the new one, with Ctrl, Shift or Alt if you hold them. Esc stops without changing anything, and Backspace leaves the action with no key ("none"). "Reset all keys" at the bottom of the panel puts all eleven back.
-- The same keys are on the Mods screen too (Options → Mods, open Libraries, then Inspector → Settings → Keys), each with a **Change** button. Both places change the same setting.
-- When another setting has the same key, in another mod or in the Inspector itself, the key gets a yellow bar in the panel and the line the Mods screen shows under it, like "C is also used by Screenshot key (Photo Mode). Both will answer it." One key for two things is allowed, and both answer it.
-- The arrows, Home, End, Page Up and Page Down, Ctrl+Z, Ctrl+Up, Esc and ? can't be changed, and neither can the free camera's W A S D, Q E and Shift while you fly.
-- The Edit and View menus, the Tree and Pick tooltips and the free camera's notice name the key you set, and leave it out when there's none.
-- `ModFramework.SharedKeyNote(ConfigEntryBase)` (core), new: the line the Mods screen shows under a shortcut setting whose key another setting also has, for a mod that lets people change keys in a window of its own. It gives one English line; the Mods screen shows the same thing in parts a language pack can translate.
-
-### Inspector: easier to read and reach
-
-- What happens after you press something now shows in the notice strip at the bottom of the window, where you can't miss it: Undo last and Ctrl+Z, Undo and Redo on History's rows, Show private's warning, a Go in Used by whose object is gone, a texture's Assets button without the Assets library, and Export as overrides. A failure is red and a warning yellow. Before, most of these went to the status line, which is hidden behind the breadcrumb while an object is selected in Scene, so a Revert that failed looked like nothing happened. An export that fails is red in the form too, and a folder that can't be written now says so instead of stopping the tab.
-- Used by and the first Graph button of a session show "Looking where ... is used" or "Reading the game's code..." in the middle of the tab before they start, instead of freezing the window without a word.
-- The members pane has its own "Filter members" field over the rows, with "14 of 62" beside it. It keeps what you typed while you select other objects of the same type, and on a Transform it looks through all the members, not only position, rotation and scale.
-- A member name that doesn't fit ends in "..." instead of being cut off. With the pointer on a name, the hint line shows all of it with its type, like "maxAngularVelocity : float  (property).", and for a number it adds that you can drag up or down on the value to change it.
-- Show private, Hold values, Enabled and Code wrap onto a second line in a narrow window instead of running off the edge. Freeze is now called Hold values, and its hint says what it does: it stops reading the values, and the game keeps changing them.
-- Every member row ends in a small "..." button that opens the same menu as a right click (copy the value or the name, reset, go back one edit, show it in History). A gamepad or the Steam Deck only clicks with the left button, so this is the way to that menu there. The right click still works.
-- An enum's button shows its value with a small arrow and opens a list of all its values, the current one marked, so you pick the one you want, and a long list opens at the value that's set. It used to step to the next value on each press, and going back meant going all the way round.
-- Scene's search says what it found in a line over the results: "3 objects match "wheel"", "Nothing matches "whel".", or "The first 500 are shown; type more to narrow it." Before, no match just left the tree empty, and the cut at 500 was silent.
-- Scene's search takes `t:Rigidbody` (or any component type) like Objects does, for the objects that have that component, with a name after it to narrow it down. It runs once you stop typing, since each one looks through every object of the type. A name no component type has says so.
-- In a narrow window, typing in the search goes to the results page, so it no longer looks like nothing happened.
-- The selected row in Scene's tree and in Objects' list has a 2 px accent line on its left, so it stands out by more than its text colour.
-- A name too long for Scene's tree, in a narrow window say, ends in "..." instead of being cut off at the edge, and the whole name shows on the hint line while the pointer is on it.
-- The same goes for the names, types and folder titles in Objects' list, which used to run into each other, and for method signatures in Code. Code no longer leaves an empty gap before the signatures where no method has a Graph button, and an enum's list of values is never narrower than its button. The grey hint in the search and filter fields stays on one line and ends in "..." in a narrow window, instead of wrapping and being cut in half.
-- The View menu is split under headings: OVER THE GAME, DEBUG VIEW (PICK ONE), IT SHOWS, HOW IT DRAWS and IN THE PANE. The five settings that were indented under Rigidbodies, and looked like they belonged to it, are under HOW IT DRAWS now, since they're for the whole debug view. The debug view's three scopes, where only one can be on, have round marks, and the rest a tick when they're on (x and * where the window font has no such marks). The keys are the same. Where the window is too short for the whole menu, it scrolls with the wheel or a gamepad's stick.
-- History, Rigidbodies, Scenes and levels, Layers, Clips, Used by and Code, the views that take the members' place, all have the same band on top: "< Members" on the left, then the view's name and a few words about it. "< Members" used to sit at the end of each view's buttons, somewhere else in each one, and on a second line when they wrapped.
-- Going back has two words now. Undo and Redo go one edit back or forward, and Reset goes back to the value before the first edit. History's Revert button is called Undo, an undone edit says "(undone)" instead of "(put back)", and the row menu's "Back to previous" reads "Undo: back to ...". The results read "Undid drag: back to 0.05." and "Redid drag: 2 again.", and the log's `[inspector] Reverted ...` and `Reapplied ...` lines say `Undid ...` and `Redid ...` now.
-- History's buttons wrap in a narrow window, so Export as overrides no longer gets cut off, and an edit's long lines end in "..." with the whole text on the hint line.
-- With nothing to export, the Export button is greyed out like any other button that can't be used, with the reason next to it. Before, it looked selected, as if you could press it.
-- Typing in Export's Name, Author and Description fields, or in the Clips and Rigidbodies filters, no longer sets off the Inspector's keys. Before, a letter that is a shortcut, ?, Home, End or an arrow did its shortcut instead of going into the field.
-
-### Mods screen: a settings-app look
+#### Mods screen: a settings-app look
 
 - The list and the details sit on solid panels in the Tool window's colours, with rounded corners. Before, they were drawn on the game's see-through panel, so how easy the text was to read depended on the picture behind the menu. The rounded corners are small shapes the framework draws in code when the game starts; there are no image files.
 - The frame that shows where the gamepad is has rounded corners and the accent colour.
@@ -85,13 +37,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 - The details' title takes two lines at most and ends in ... when longer. A library's title is its short name (Inspector (experimental)), with the whole name on a small grey line under it.
 - A mod's initials pass over what is in brackets and words like "experimental", so Inspector (experimental) is I, not IE.
 
-### Mods screen: fixes
-
-- The keyboard works on the Mods screen: the arrow keys move between the list and the details, the right arrow goes from Back into the list, and Enter presses the selected button. Before, the arrow keys only moved between the game's own buttons on the left, so the list could not be reached without the mouse or the pad.
-- Notes built from pieces can be translated now: **Same key as** with the other settings' names and then "Both will answer it.", **Not accepted** with the reason, and **Times reloaded this session** with the number and then "What runs now is not the file BepInEx loaded." Each fixed sentence is a text of its own, so a language pack matches it whole. Before, the names and numbers sat inside the sentences, so they stayed in English.
-- Pressing a tab in the details no longer flashes white. Every button the screen builds (the tabs, a tab's buttons, the rows' faces) came in white and faded to its colour over about five frames, since setting a button's colours starts a fade from what is drawn, and a new button is drawn white. The colours now land at once, and the short fade stays for hover and press.
-
-### Mods screen: frosted glass
+#### Mods screen: frosted glass
 
 - The list and the details sit on see-through dark panels now, with a faint light line around each, instead of solid ones, so the game shows behind them a little. Rows, notes, settings, the chosen filter and chips are darker see-through cards on top, and the search and value fields have a thin edge.
 - Small grey text, and the accent and red colours where they're text (a website, "New version available:", "Saved", the Not loaded tag, a band's red heading), are a little lighter, so they stay easy to read over the brightest picture behind the menu, the white title logo. The switches, bars and lines keep their colours as they were.
@@ -101,38 +47,21 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Nothing runs while the Mods screen is closed. Its small textures (about 2.8 MB at 1920x1080, 1.4 MB on the Steam Deck) are made when it opens, made again when the window changes size or the graphics driver drops them, and let go when it closes. Taking a picture reads the screen once and is most of the cost, roughly 0.1 ms of graphics card time at 1920x1080 on a desktop card and 0.2 to 0.3 ms on the Steam Deck (estimates): with Snapshot that's five times a second, with Every frame every frame.
 - If the picture can't be made (HDR output, a game update that changed URP, anything else), the log gets one warning and the screen uses the tint alone until the game restarts. If no picture comes for about a second (a scene with no camera the glass can use), it uses the tint alone until the screen is closed. The copy only comes from the game's main camera (or a camera stacked on it), not from another camera that draws something of its own.
 
-### Tool window: its font is made when you first open it
+#### Mods screen: fixes
 
-- The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.
-- In exchange, the first F1 shows the window one frame later. A character the window hasn't drawn before shows as "?" for one frame, the way the Console already does it.
-- `ToolWindow.PrepareCharacters` now only notes the characters instead of drawing all of them into the font (the Localization mod passes it about 5800). In Unity 6 the window draws its text from an atlas of its own, and on Direct3D 12 the core already uploads that atlas once per frame. With `[Direct3D12] BatchFontAtlasUploads` off, everything happens at startup as before.
-- `ToolWindow.Font` and `ToolWindow.CanDraw`, called from Awake or Update before the window was opened, make the font right then, so they answer as they did before.
+- The keyboard works on the Mods screen: the arrow keys move between the list and the details, the right arrow goes from Back into the list, and Enter presses the selected button. Before, the arrow keys only moved between the game's own buttons on the left, so the list could not be reached without the mouse or the pad.
+- Notes built from pieces can be translated now: **Same key as** with the other settings' names and then "Both will answer it.", **Not accepted** with the reason, and **Times reloaded this session** with the number and then "What runs now is not the file BepInEx loaded." Each fixed sentence is a text of its own, so a language pack matches it whole. Before, the names and numbers sat inside the sentences, so they stayed in English.
+- Pressing a tab in the details no longer flashes white. Every button the screen builds (the tabs, a tab's buttons, the rows' faces) came in white and faded to its colour over about five frames, since setting a button's colours starts a fade from what is drawn, and a new button is drawn white. The colours now land at once, and the short fade stays for hover and press.
 
-### Saves: restoring the oldest snapshot
+#### Mods screen
 
-- Restoring a snapshot when the history was full could fail with "Restore failed" and lose that snapshot. Before a restore, the save being replaced is kept as a snapshot, and with the history full that pushed out the oldest one, which could be the very snapshot being restored. Now the snapshot is read first, so the restore goes through. The current save was never at risk.
+- The screen opens straight away and lists the loaded mods at once. Reading every plugin DLL and looking for patch conflicts happen off the frame. Until they're in, a "Checking mods..." row ends the list and a band in the details says it's still checking, and On/Off and Uninstall wait for it (Settings doesn't).
+- When a page another mod adds throws while it's being built, it shows a short message and **Try again** instead of half a page.
+- A shortcut setting tells you when another setting uses the same key: "F1 is also used by Open / close key (Drag'n Wash ModFramework: Tool window). Both will answer it." It sits right under the shortcut's row, whether the clash came from a key you just set or was there already. It only reports; the key stays as you set it.
+- Changing a setting shows **Saved** on its row for two seconds, and changes are still saved right away. If a mod turned off BepInEx's saving on every change, the page saves that mod's config file too.
+- A native (non-.NET) DLL in the plugins folder is skipped quietly, at Debug level, instead of an Info line saying it couldn't be read. Other read failures are logged as before.
 
-### Saves: how many snapshots are kept, and a restored old snapshot counts as the save
-
-- `GameSaves.Keep` (Flags and saves library), new: how many snapshots a slot keeps, the library's `[History] Keep` setting. A tab can show "30 of 30 kept" and say when the next snapshot will push the oldest one out. It's right even while `[History] Enabled` is off.
-- `GameSaves.SnapshotMatchesSave` now says true for a snapshot from before the game update of 2026-09-14 once it has been restored. The restore adds the `{"version":1}` entry the game needs, so the save and the snapshot were never byte for byte the same, and a tab couldn't mark that snapshot as the current save.
-
-### Saves: no snapshot is lost to another one taken in the same second
-
-- Snapshots are named by the second they're taken, and a second one in the same second was copied over the first. A mod's edit followed by the game saving within that second lost the save from before the edit. Now the second one is named with "-2" (then "-3", and so on) and both are kept.
-- An edit that changes nothing (a level the save already has, flags already set that way) no longer takes a snapshot first. With the history full, that snapshot pushed the oldest one out for nothing.
-
-### Bridge: a clearer message when Windows holds the port
-
-- When the Bridge can't listen because Windows refused the port ("access denied"), the F1 Bridge tab and the log now say the port has probably been set aside by Windows. Hyper-V, WSL and Docker reserve ranges of ports, and the ranges can change when the PC restarts. The message says to choose another `[Bridge] Port` and register the new address with the client. Before, it said another program might be using the port, which isn't what happens in that case. The system's own error text also no longer leaves a line break in the middle of the message.
-
-### Bridge page and Graphs page: the Tool window's look
-
-- Bridge page: the view switches (Code and Graphs, Blocks and Nodes) look like the F1 window's tabs. The one showing sits on the page's ground with a 2 px accent line on top, and the others are plain dim words. The open graph in the list is marked the same way, with the line on its left. The status line is a band under the header with a 3 px bar on its left, in the accent colour, or in the error colour when something went wrong, and a long line wraps instead of making the page scroll sideways.
-- Graphs page on the Mods screen: it sits on the screen's frosted panel like the other tabs, with no dark block of its own. Each graph is a card like a setting's row on the Settings tab (the same see-through fill, corners and padding), the headings, grey and red lines use the screen's colours, which stay readable over the brightest picture behind, and **Stop for this session** is one of the screen's buttons (raised, rounded, bold, lighter under the pointer or the gamepad). The note under the cards lines up with the text in them. With a core older than 1.5.0 the page looks as it did in Graphs 0.1.2.
-- `ModsScreenLook` (core), new: the Mods screen's text colours (`Text`, `Muted`, `Accent`, `Error`, `Warning`), a `Card` like a setting's row and a `Button` like the screen's own, for a `ModsScreenPage` that should look like the rest of the screen. The colours follow the look in use (frosted glass or the tint alone), and an open page is built again when it changes.
-
-### Installer: ModFramework from its own release
+#### Installer: ModFramework from its own release
 
 - `mod-install.json` schema 2 adds a `framework` block. It holds the ModFramework release the mod pins (`version`), the SHA-256 and size of its zip, and `needs`, the lowest version of each plugin folder the mod uses (`DragNWash.ModFramework`, `DragNWash.ModFramework.Text`, ...). Every field is checked: the version has to be digits and dots, the hash 64 lowercase hex digits, the size above 0 and at most 20 MB, and the folder names have to start with `DragNWash.ModFramework`. Schema 1 (the framework inside the mod's zip) installs as it did before, and a zip that brings the framework is used even with schema 2. A schema newer than 2 is refused with "Use the installer from the mod's release". `installer/mod-install.example.json` is schema 2.
 - Install.exe: when the mod's zip has no framework, it installs the core, the preloader and only the libraries in `needs` from the pinned release (never Inspector, Overrides, Bridge or Graphs). It fetches a part that's missing, below the mod's minimum, or (for the core and the preloader) older than the pinned release. After that, each part is only updated when the release's copy is newer, so a newer one that another mod brought stays. Inside a framework folder, only the files in the zip get written. When everything is already there, nothing is downloaded and no connection is made.
@@ -144,30 +73,41 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Steam Deck script (`install-steamdeck.sh`): the same flow, in the terminal or in kdialog. It asks first (where, why, what is sent), fetches the pinned release from the same address with the same User-Agent, checks the size and SHA-256, installs only what `needs` names, never puts an older part over a newer one, and puts the game folder back if a copy fails part way. `--framework-zip` and `--no-download` work the same as in Install.exe. A choice prompt in the terminal now reads what you type instead of always taking the default.
 - Build workflow: every release carries `SHA256SUMS` (`<sha256>  DragNWash.ModFramework-<version>.zip`) next to the zip, both in the draft release and in the workflow artifact.
 
-### Installer: one loader per game folder, and an install that can be undone
+#### Installer: one loader per game folder, and an install that can be undone
 
 - Install.exe: when another mod loader is in the game folder (KrazenLabs' dnw-modloader, or any Doorstop setup that doesn't start BepInEx), the install stops before anything is downloaded or changed, with "Another mod loader (dnw-modloader) is in this game folder. Only one loader can be installed per game folder, so nothing was changed." It used to get overwritten by BepInEx's `winhttp.dll` and `doorstop_config.ini`. The list of what Install will do says so before it runs. It counts as another loader when there's a `DnWModLoader` folder, a `doorstop_config.ini` whose `target_assembly` (Doorstop 4) or `targetAssembly` (Doorstop 3) isn't `BepInEx\core\BepInEx.Preloader.dll`, or a `winhttp.dll` with neither BepInEx nor a `doorstop_config.ini`. BepInEx's own leftovers (its `winhttp.dll` and config without `BepInEx\core`) are mended as before.
 - Uninstall leaves `winhttp.dll`, `doorstop_config.ini` and `.doorstop_version` alone when they start another loader.
 - Install.exe: every file an install replaces or deletes is copied to `BepInEx\DragNWash.Installer\backup\<date_time>` first, and BepInEx is unpacked into `BepInEx\DragNWash.Installer\staging` before it's copied into place. If a step fails halfway (a file in use, a folder that can't be written to), everything goes back the way it was: replaced files are restored, new files and new empty folders are removed, and the message says "Something went wrong while copying, so everything was put back as it was (N files)." After a successful install the staging folder goes and only that install's backup is kept (none if nothing was replaced), and the log ends with `Backup: N files -> BepInEx\DragNWash.Installer\backup\<date_time>`. Files the player added are still never deleted, and a newer framework DLL is still kept.
 - Uninstalling any mod removes `BepInEx\DragNWash.Installer`, and its list says so.
 
-### Console: level toggles that show on and off
+#### Installer
 
-- The Error, Warning, Message, Info and Debug toggles are drawn on the tab strip's dark panel instead of Unity's grey button. A toggle that's on has a 3 px bar along the top in its level's colour (the colour its log lines have), a filled square in that colour and bright words. One that's off has an empty square and dimmer words, which brighten under the pointer. Before, on and off only differed in the colour of the word. The bar and the square are painted rather than drawn from the font.
+- Install.exe: you choose **Install** or **Uninstall** first, and only that action's controls are shown, along with a list of what it will do. The list is built from `mod-install.json` and the game folder as it is: whether BepInEx gets downloaded, the framework version, each choice and the config file it's written to, and what's removed and what's kept. It replaces the "Uninstall …?" question. Enter runs the action, Esc closes, the buttons have Alt keys, and a line explains why SmartScreen or Defender may warn about Install.exe. The window is 640 high (at least 560).
+- Install.exe: the BepInEx download shows a progress bar with its percentage, and Close turns into **Cancel** while it runs. The zip goes to the temp folder, so cancelling leaves the game folder as it was.
+- Install.exe: a failure says what went wrong in plain words (download failed, game folder not writable, not a valid zip, anything else), with **Show details**, **Copy details** for a bug report, and **Retry**. The log and the details stay in English.
+- install-steamdeck.sh: in a terminal, the BepInEx download shows curl's progress bar. A `mod-install.json` that's there but broken now says to download the zip again, instead of saying the mod's files are missing.
 
-### Fonts: rasterized characters kept between starts
+#### Crash report window
 
-- Assets: what the fallback fonts rasterized (atlas pixels, glyph and character tables, free space on the last atlas) is kept in `BepInEx/cache/FontAtlases`, one file per face. A face created again from the same font file takes it all back at once and only rasterizes characters that are new. With the localization mod's 17 languages on Direct3D 12, its load goes from about 1230 ms to about 365 ms after the first start (on Direct3D 11, from 315 to 205 ms). A restored glyph is the same, pixel for pixel, as a freshly rasterized one.
-- The cache is written about two seconds after the last change, one face a frame. Each file is written on a worker thread and then moved into place, so a start never reads half a file. A file for another font file or version, other atlas settings, another Unity or TextMeshPro or another library version, or a damaged one, is ignored and written again. Nothing gets uploaded while the game runs that wasn't uploaded before.
-- `[Fonts] CacheAtlases` turns it off (it's on by default and takes effect at the next start).
+- The memory dump warning and the "nothing was sent" line stay in view above the buttons, in darker text, however small the window gets. The headline stays playful ("Oops! The kobold slipped!"), and the line under it says plainly that Drag'n Wash closed unexpectedly.
+- "Copy report (text only)": Enter copies, Esc closes, Alt+O / Alt+C work, and the tab order follows what's on screen. If copying or opening the folder fails, the window now says so instead of doing nothing.
+- When the window can't open, or the report can't be written, a message box says where the report or the session record is. Before, nothing happened.
+- The window speaks the language the game is shown in, even without the localization mod. The core keeps `BepInEx/CrashReports/locale.txt` from the language a mod set, or from the game's own choice when it offers more than one. Windows' language is the fallback.
 
-### Startup timing in the log
+#### Startup timing in the log
 
 - The core writes two `[startup]` blocks to the log once per launch, timed to the millisecond. The first comes when BepInEx has loaded the plugins: process start to the core, the core to the end of loading, each plugin's load time, and the longest gaps between log lines with the line that ended each one. The second comes 10 seconds after the first scene: how long that scene took to come, frames slower than 100 ms with the lines written in them, and the longest gaps. Then it stops listening, so it costs nothing afterwards. Because it costs a few tens of milliseconds, it only runs when developer tools are on at launch (Options → Mods → Drag'n Wash ModFramework → Developer tools). With them off, it lets go of the log in the core's Awake and none of it runs.
 - The block after the first scene also breaks down the first frame after it: each plugin's Start (for a coroutine, up to its first yield), Update, LateUpdate and OnGUI, and each `sceneLoaded` handler a mod added, in milliseconds, then the timing's own share and the rest (the game's own and Unity's). These are timed by Harmony patches that go on once that scene has loaded and come off after the frame, and what putting them on and taking them off cost is in the block too.
 - Connection watching only looks for `HttpClient` in System.Net.Http now, so when the game hasn't loaded that assembly, the core's start no longer spends about 100 ms and three HarmonyX "Could not find type" warnings on it. Once it's loaded, `HttpClient` is watched as before.
 
-### Tool window: notices, questions in place, a remembered window, one row of tabs
+#### Public CSV reading, and a safe write for any library
+
+- `CsvReader` (`DragNWash.ModFramework.Saves`) is public now, no longer internal to the flags catalog. `ReadRows` reads a CSV file the same shared way the catalog does, and `Escape` writes one field back, and now also quotes a value that starts with `#` so it isn't read back as a comment line. It comes from the localization mod.
+- `SafeFile` (`DragNWash.ModFramework`), new: `Write(path, encoding, Action<StreamWriter>)` fills a temporary file next to the target and then moves it into place, so a crash or a sharing violation partway through never leaves the target truncated. It comes from the localization mod, where it protects a translator's saved work. The Flags and saves library writes a save it restores or edits through it, and the Inspector's Export as overrides writes `mod.json` and the override files with it.
+
+### Tool window 1.5.0
+
+#### Tool window: notices, questions in place, a remembered window, one row of tabs
 
 - `ToolWindow.ShowNotice(string, NoticeKind, float)` (ToolWindow library), new: a notice in its own strip above the footer's hint line, with a colour bar for its kind (`NoticeKind.Info`, `Warning`, `Error`), on one line cut off with an ellipsis. The whole text shows while the pointer is on it, and a click dismisses it. A timed notice clears itself and the next one waits its turn; an Error goes first and stays until the tab changes. `ShowNotice(string)` is unchanged. The hint line no longer gives way to a notice.
 - `ToolWindow.Busy(string, string)`, new: call it from a tab's draw while the tab works over several frames. It dims the body, shows what's running and how far along it is with a spinner, and keeps input away from the tab.
@@ -179,27 +119,107 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Assets: Reload files reads one file a frame under the busy overlay. A file that fails no longer stops the rest, and it's shown in red.
 - Flags and saves: `GameSaves.Restore`'s message says the save it replaced is kept as a snapshot.
 
-### Crash report window
+#### Tool window: its font is made when you first open it
 
-- The memory dump warning and the "nothing was sent" line stay in view above the buttons, in darker text, however small the window gets. The headline stays playful ("Oops! The kobold slipped!"), and the line under it says plainly that Drag'n Wash closed unexpectedly.
-- "Copy report (text only)": Enter copies, Esc closes, Alt+O / Alt+C work, and the tab order follows what's on screen. If copying or opening the folder fails, the window now says so instead of doing nothing.
-- When the window can't open, or the report can't be written, a message box says where the report or the session record is. Before, nothing happened.
-- The window speaks the language the game is shown in, even without the localization mod. The core keeps `BepInEx/CrashReports/locale.txt` from the language a mod set, or from the game's own choice when it offers more than one. Windows' language is the fallback.
+- The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.
+- In exchange, the first F1 shows the window one frame later. A character the window hasn't drawn before shows as "?" for one frame, the way the Console already does it.
+- `ToolWindow.PrepareCharacters` now only notes the characters instead of drawing all of them into the font (the Localization mod passes it about 5800). In Unity 6 the window draws its text from an atlas of its own, and on Direct3D 12 the core already uploads that atlas once per frame. With `[Direct3D12] BatchFontAtlasUploads` off, everything happens at startup as before.
+- `ToolWindow.Font` and `ToolWindow.CanDraw`, called from Awake or Update before the window was opened, make the font right then, so they answer as they did before.
 
-### Installer
+#### Console: level toggles that show on and off
 
-- Install.exe: you choose **Install** or **Uninstall** first, and only that action's controls are shown, along with a list of what it will do. The list is built from `mod-install.json` and the game folder as it is: whether BepInEx gets downloaded, the framework version, each choice and the config file it's written to, and what's removed and what's kept. It replaces the "Uninstall …?" question. Enter runs the action, Esc closes, the buttons have Alt keys, and a line explains why SmartScreen or Defender may warn about Install.exe. The window is 640 high (at least 560).
-- Install.exe: the BepInEx download shows a progress bar with its percentage, and Close turns into **Cancel** while it runs. The zip goes to the temp folder, so cancelling leaves the game folder as it was.
-- Install.exe: a failure says what went wrong in plain words (download failed, game folder not writable, not a valid zip, anything else), with **Show details**, **Copy details** for a bug report, and **Retry**. The log and the details stay in English.
-- install-steamdeck.sh: in a terminal, the BepInEx download shows curl's progress bar. A `mod-install.json` that's there but broken now says to download the zip again, instead of saying the mod's files are missing.
+- The Error, Warning, Message, Info and Debug toggles are drawn on the tab strip's dark panel instead of Unity's grey button. A toggle that's on has a 3 px bar along the top in its level's colour (the colour its log lines have), a filled square in that colour and bright words. One that's off has an empty square and dimmer words, which brighten under the pointer. Before, on and off only differed in the colour of the word. The bar and the square are painted rather than drawn from the font.
 
-### Code Graph app
+#### Text-field underline and filter field for tool-window tabs
 
-- The waiting page says why it's waiting (the game or the Bridge isn't there, there's no token yet, or the token was refused), has a Retry now button, and shows how many tries have been made and when the next one is. A refused token waits for Retry instead of retrying every 2 seconds.
-- When a start hands over to the open window and gets no answer, it opens a window of its own and says so once, instead of quitting without a word.
-- Its own text comes in English, Japanese and Chinese and follows Windows' language, window title included.
+- `ToolWindow.Underline(Rect)` (ToolWindow library), new: the accent underline the built-in tabs draw under a text field.
+- `ToolWindow.FilterField(Rect, string, string, ToolWindowStyles)`, new: a text field with that underline and a muted placeholder while it's empty. It returns the new text. The Inspector, Assets and Console tabs now use both instead of their own copies, so a mod's tab can look the same with one call.
 
-### Graphs editor and Bridge page
+### Inspector 1.5.0
+
+#### Inspector: keys you can change
+
+- The Inspector's shortcut keys can be changed now: the gizmo's move, rotate, scale and off (W, E, R, Q), pick (P), highlight (H), tree (T), free camera (C), bones (B), wireframe (N) and edit mesh (M). They stay as they were until you change one.
+- In the F1 window, open the Inspector tab's "?" panel and click a key. It says "Press a key…", and the next key you press becomes the new one, with Ctrl, Shift or Alt if you hold them. Esc stops without changing anything, and Backspace leaves the action with no key ("none"). "Reset all keys" at the bottom of the panel puts all eleven back.
+- The same keys are on the Mods screen too (Options → Mods, open Libraries, then Inspector → Settings → Keys), each with a **Change** button. Both places change the same setting.
+- When another setting has the same key, in another mod or in the Inspector itself, the key gets a yellow bar in the panel and the line the Mods screen shows under it, like "C is also used by Screenshot key (Photo Mode). Both will answer it." One key for two things is allowed, and both answer it.
+- The arrows, Home, End, Page Up and Page Down, Ctrl+Z, Ctrl+Up, Esc and ? can't be changed, and neither can the free camera's W A S D, Q E and Shift while you fly.
+- The Edit and View menus, the Tree and Pick tooltips and the free camera's notice name the key you set, and leave it out when there's none.
+- `ModFramework.SharedKeyNote(ConfigEntryBase)` (core), new: the line the Mods screen shows under a shortcut setting whose key another setting also has, for a mod that lets people change keys in a window of its own. It gives one English line; the Mods screen shows the same thing in parts a language pack can translate.
+
+#### Inspector: easier to read and reach
+
+- What happens after you press something now shows in the notice strip at the bottom of the window, where you can't miss it: Undo last and Ctrl+Z, Undo and Redo on History's rows, Show private's warning, a Go in Used by whose object is gone, a texture's Assets button without the Assets library, and Export as overrides. A failure is red and a warning yellow. Before, most of these went to the status line, which is hidden behind the breadcrumb while an object is selected in Scene, so a Revert that failed looked like nothing happened. An export that fails is red in the form too, and a folder that can't be written now says so instead of stopping the tab.
+- Used by and the first Graph button of a session show "Looking where ... is used" or "Reading the game's code..." in the middle of the tab before they start, instead of freezing the window without a word.
+- The members pane has its own "Filter members" field over the rows, with "14 of 62" beside it. It keeps what you typed while you select other objects of the same type, and on a Transform it looks through all the members, not only position, rotation and scale.
+- A member name that doesn't fit ends in "..." instead of being cut off. With the pointer on a name, the hint line shows all of it with its type, like "maxAngularVelocity : float  (property).", and for a number it adds that you can drag up or down on the value to change it.
+- Show private, Hold values, Enabled and Code wrap onto a second line in a narrow window instead of running off the edge. Freeze is now called Hold values, and its hint says what it does: it stops reading the values, and the game keeps changing them.
+- Every member row ends in a small "..." button that opens the same menu as a right click (copy the value or the name, reset, go back one edit, show it in History). A gamepad or the Steam Deck only clicks with the left button, so this is the way to that menu there. The right click still works.
+- An enum's button shows its value with a small arrow and opens a list of all its values, the current one marked, so you pick the one you want, and a long list opens at the value that's set. It used to step to the next value on each press, and going back meant going all the way round.
+- Scene's search says what it found in a line over the results: "3 objects match "wheel"", "Nothing matches "whel".", or "The first 500 are shown; type more to narrow it." Before, no match just left the tree empty, and the cut at 500 was silent.
+- Scene's search takes `t:Rigidbody` (or any component type) like Objects does, for the objects that have that component, with a name after it to narrow it down. It runs once you stop typing, since each one looks through every object of the type. A name no component type has says so.
+- In a narrow window, typing in the search goes to the results page, so it no longer looks like nothing happened.
+- The selected row in Scene's tree and in Objects' list has a 2 px accent line on its left, so it stands out by more than its text colour.
+- A name too long for Scene's tree, in a narrow window say, ends in "..." instead of being cut off at the edge, and the whole name shows on the hint line while the pointer is on it.
+- The same goes for the names, types and folder titles in Objects' list, which used to run into each other, and for method signatures in Code. Code no longer leaves an empty gap before the signatures where no method has a Graph button, and an enum's list of values is never narrower than its button. The grey hint in the search and filter fields stays on one line and ends in "..." in a narrow window, instead of wrapping and being cut in half.
+- The View menu is split under headings: OVER THE GAME, DEBUG VIEW (PICK ONE), IT SHOWS, HOW IT DRAWS and IN THE PANE. The five settings that were indented under Rigidbodies, and looked like they belonged to it, are under HOW IT DRAWS now, since they're for the whole debug view. The debug view's three scopes, where only one can be on, have round marks, and the rest a tick when they're on (x and * where the window font has no such marks). The keys are the same. Where the window is too short for the whole menu, it scrolls with the wheel or a gamepad's stick.
+- History, Rigidbodies, Scenes and levels, Layers, Clips, Used by and Code, the views that take the members' place, all have the same band on top: "< Members" on the left, then the view's name and a few words about it. "< Members" used to sit at the end of each view's buttons, somewhere else in each one, and on a second line when they wrapped.
+- Going back has two words now. Undo and Redo go one edit back or forward, and Reset goes back to the value before the first edit. History's Revert button is called Undo, an undone edit says "(undone)" instead of "(put back)", and the row menu's "Back to previous" reads "Undo: back to ...". The results read "Undid drag: back to 0.05." and "Redid drag: 2 again.", and the log's `[inspector] Reverted ...` and `Reapplied ...` lines say `Undid ...` and `Redid ...` now.
+- History's buttons wrap in a narrow window, so Export as overrides no longer gets cut off, and an edit's long lines end in "..." with the whole text on the hint line.
+- With nothing to export, the Export button is greyed out like any other button that can't be used, with the reason next to it. Before, it looked selected, as if you could press it.
+- Typing in Export's Name, Author and Description fields, or in the Clips and Rigidbodies filters, no longer sets off the Inspector's keys. Before, a letter that is a shortcut, ?, Home, End or an arrow did its shortcut instead of going into the field.
+
+### Assets 1.5.0
+
+#### Assets tab: a toolbar that fits, and replacements that say why they don't show
+
+- `ToolWindow.FlowButton` (ToolWindow library), new: a button in a row of buttons that wraps onto the next row when the window is too narrow, sized to its label (or to a width you give, so a button whose label changes doesn't make the row jump). A selected one has the accent line under it, the way a view switch shows what's showing. It takes a string or a `GUIContent`, whose tooltip goes on the hint line.
+- Assets tab: the top row switches between **Textures (1,234)** and **Replacements (4)** like tabs, with the one showing marked, and the name filter takes the rest of that row. Before, one button said the name of the list that wasn't showing, so you couldn't tell which one you were looking at. **List again**, **Apply replacements** and **Reload files** sit on the row under it. Both rows wrap in a narrow window, so the filter and Reload files no longer end up off the edge. The status gets a line of its own instead of sharing one with the replacement count, where it was cut off. The buttons explain themselves on the hint line.
+- Assets tab, Replacements: the right column says how each file is doing. **In 12 places** is fine. **Not used yet** (yellow) means it hasn't gone in anywhere, and the hint line says whether a texture of that name is loaded at all, so a typo in the file name shows. **Not used: CleanSponges wins** (yellow) means another mod's file of the same name is used; the mod that lost now has a row of its own too, where before it was only named at the end of the winner's row. **Off** (dim) is a language picture its mod switched off, which used to look as if it applied. **Not reloaded: ...** (red) is a file that couldn't be read. The switch above the list says how many rows are yellow or red ("2 to check"). When a language's pictures wait for a restart on Direct3D 12, a band above the list says so; before, only the `assets replacements` command did. The filter works on this list too, by texture name or mod. A narrow window leaves the mod column out, and a row's hint shows what was cut off.
+- Assets tab: the replacements list is only worked out again when the replacements change, and only the rows in sight are drawn.
+- Assets tab, Textures: the tab lists the textures by itself the first time it opens (after a frame of "Listing textures..."), and again after Apply replacements or Reload files, instead of leaving "Nothing listed yet." behind. When a scene loads after the list was made, a yellow band says "The scene changed since this list was made." with a **List again** button. With a filter, the status line says how many of how many show.
+- Assets tab, Textures: the mark column has room now (it was about 34 px wide at the default size, and less than nothing in a narrow window). A mod's replacement says **from SignPack**, and the game's texture it stands in for says **original, replaced** and is dimmed, so the two rows of the same name can be told apart. A narrow list leaves the material and sprite counts out, and the size too when the name would get too little room. Only the rows in sight are drawn, and the filter is only worked out again when it changes.
+- Assets tab: Reload files and Apply replacements say what happened in plain words. "Nothing changed on disk." instead of "Reloaded 0 file(s).", and "Everything was already in place." or "Put replacements into 5 more places." instead of "applied in 0 place(s)". A PNG added after the game started isn't read by Reload files, and nothing used to say so; now a notice names the new files and says they're read when the game starts, so restart to use them. When a watched file reloads by itself (`[Reload] WatchFiles`, Direct3D 11), a notice says so ("shop_sign.png changed on disk and was reloaded.") and the list is made again; before, only the log said it.
+- Assets tab: the two lines explaining the buttons are gone (the buttons explain themselves on the hint line), which gives the list more room. What stays in sight is a warning: on Direct3D 12 that Reload files can crash the game, and when Reload files is off, why and how to have it back (for example "Turn AllowReload back on in Options > Mods > Drag'n Wash ModFramework: Assets to try again."). On Direct3D 11 with reloading on, there's no line at all.
+- Assets tab: both lists scroll with the gamepad stick and d-pad, as the other tabs' lists do, so they no longer need the Steam Deck's trackpad or the touch screen. The preview's Close button is 64 px wide and the rows' Inspect buttons 80 px, easier to hit.
+
+#### Fonts: rasterized characters kept between starts
+
+- Assets: what the fallback fonts rasterized (atlas pixels, glyph and character tables, free space on the last atlas) is kept in `BepInEx/cache/FontAtlases`, one file per face. A face created again from the same font file takes it all back at once and only rasterizes characters that are new. With the localization mod's 17 languages on Direct3D 12, its load goes from about 1230 ms to about 365 ms after the first start (on Direct3D 11, from 315 to 205 ms). A restored glyph is the same, pixel for pixel, as a freshly rasterized one.
+- The cache is written about two seconds after the last change, one face a frame. Each file is written on a worker thread and then moved into place, so a start never reads half a file. A file for another font file or version, other atlas settings, another Unity or TextMeshPro or another library version, or a damaged one, is ignored and written again. Nothing gets uploaded while the game runs that wasn't uploaded before.
+- `[Fonts] CacheAtlases` turns it off (it's on by default and takes effect at the next start).
+
+### Flags and saves 1.5.0
+
+#### Saves: restoring the oldest snapshot
+
+- Restoring a snapshot when the history was full could fail with "Restore failed" and lose that snapshot. Before a restore, the save being replaced is kept as a snapshot, and with the history full that pushed out the oldest one, which could be the very snapshot being restored. Now the snapshot is read first, so the restore goes through. The current save was never at risk.
+
+#### Saves: how many snapshots are kept, and a restored old snapshot counts as the save
+
+- `GameSaves.Keep` (Flags and saves library), new: how many snapshots a slot keeps, the library's `[History] Keep` setting. A tab can show "30 of 30 kept" and say when the next snapshot will push the oldest one out. It's right even while `[History] Enabled` is off.
+- `GameSaves.SnapshotMatchesSave` now says true for a snapshot from before the game update of 2026-09-14 once it has been restored. The restore adds the `{"version":1}` entry the game needs, so the save and the snapshot were never byte for byte the same, and a tab couldn't mark that snapshot as the current save.
+
+#### Saves: no snapshot is lost to another one taken in the same second
+
+- Snapshots are named by the second they're taken, and a second one in the same second was copied over the first. A mod's edit followed by the game saving within that second lost the save from before the edit. Now the second one is named with "-2" (then "-3", and so on) and both are kept.
+- An edit that changes nothing (a level the save already has, flags already set that way) no longer takes a snapshot first. With the history full, that snapshot pushed the oldest one out for nothing.
+
+### Bridge 1.5.0
+
+#### Bridge tab: what's wrong, and the fix, in one place
+
+- The top of the tab is a panel with a 3 px bar: accent while it listens ("Listening on 127.0.0.1:47821"), dim when it's off, red when it can't listen. The red one says why in words a player can follow ("Windows won't let the game use port 47821", "port 47821 is in use"), with the port in the title so a screenshot carries it. Turn on and Turn off sit in that panel. Before, a port Windows had taken showed "On, but the developer tools are off", which was never the reason (the F1 window doesn't open without them), and the real reason under the buttons was cut off by a fixed 44 px height. Turning the Bridge off now clears an old failure instead of leaving it under "Off", and the Inspector's Graph buttons and the console get the real reason too.
+- When it can't listen, the red panel has **Use a free port** and **Try again**. Use a free port looks at the ports after the current one, skips every range in Windows' excluded port list (`netsh interface ipv4 show excludedportrange`, read only, no administrator needed) and every port it can't listen on for a moment on 127.0.0.1, then saves the first good one as `[Bridge] Port` and listens there. It looks on a worker thread, so the game doesn't stop (about 70 ms on a Windows 11 PC, most of it netsh). Only asking is involved: nothing about Windows' settings is changed, the Bridge still listens on 127.0.0.1 only and still needs the token. The notice says "Listening on port 47822 now. Clients set up for 47821 need the new setup (Copy setup).", and a yellow "Port changed from 47821" line stays under the address until something is copied or a client connects. Try again tries the same port, for when the PC has restarted and Windows let it go. Before, the only way was the Mods screen's port stepper, which moves by 3,226 at a time.
+- CODE GRAPH: **Open page** and **Graphs** are now **Code graph** and **Graphs editor**, with "Opens in: App / Browser" beside them, the same setting as the Mods screen's "Open the code graph in". When App is picked but CodeGraph.exe isn't there, a dim line says it opens in the browser (it used to switch without a word), and off Windows it just says it opens in the browser. While the Bridge isn't listening both buttons are greyed out with "Opens once the Bridge is listening." instead of failing after the press.
+- CLIENTS: Disconnect all moved up beside the heading, and each client has a small **Disconnect** of its own, with no question, since the same token lets it straight back in. A long client name is cut with "..." and shows whole, with its MCP version and when it connected, on the hint line; names a client gives go through the window's safe text path. A failed call in LAST CALLS has a red "failed" tag instead of a dim "(failed)".
+- CONNECTION: the address, the token and the setup are a row each, each with its own Copy. The token is still never drawn ("kept in your user profile, never shown here"), and copying it alone gives away no more than Copy setup always did. Setup switches between Claude Code (the `claude mcp add` command, with a note to run `claude mcp remove dragnwash` first when it's already set up, since adding the same name twice fails), VS Code (a `.vscode/mcp.json` with a `servers` entry of type `http`) and Cursor (an `mcp.json` with an `mcpServers` entry), each in the form its own documentation gives, with the token filled in. Copying while the Bridge isn't listening says it won't answer until it is. New token moved to the token's row. The long setup paragraph, which a fixed 60 px height cut off, is gone, and the tab measures how tall it came out instead of guessing, so nothing at the bottom is out of reach in a narrow window.
+
+#### Bridge: a clearer message when Windows holds the port
+
+- When the Bridge can't listen because Windows refused the port ("access denied"), the F1 Bridge tab and the log now say the port has probably been set aside by Windows. Hyper-V, WSL and Docker reserve ranges of ports, and the ranges can change when the PC restarts. The message says to choose another `[Bridge] Port` and register the new address with the client. Before, it said another program might be using the port, which isn't what happens in that case. The system's own error text also no longer leaves a line break in the middle of the message.
+
+#### Graphs editor and Bridge page
 
 - Graphs editor: ✕ removes a block straight away and a toast says what went with it ("and the 2 blocks inside it"). Undo or Ctrl+Z puts it back, and that works for a variable or an on error part too.
 - Graphs editor: Rename, Delete and "changes not saved" use the page's own dialogs instead of the browser's prompt and confirm. New graph now asks before throwing away unsaved changes.
@@ -207,27 +227,37 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Bridge page: ? lists the keyboard shortcuts, the graphs editor's divider moves with the arrow keys, and icon-only buttons and every block field have screen-reader labels.
 - Graphs editor: a refused drop says why, a failed check shows its reason along with Check again and the last result, and a LIVE in game pill shows while the colour picker writes to the game.
 
-### Mods screen
+#### Code Graph app
 
-- The screen opens straight away and lists the loaded mods at once. Reading every plugin DLL and looking for patch conflicts happen off the frame. Until they're in, a "Checking mods..." row ends the list and a band in the details says it's still checking, and On/Off and Uninstall wait for it (Settings doesn't).
-- When a page another mod adds throws while it's being built, it shows a short message and **Try again** instead of half a page.
-- A shortcut setting tells you when another setting uses the same key: "F1 is also used by Open / close key (Drag'n Wash ModFramework: Tool window). Both will answer it." It sits right under the shortcut's row, whether the clash came from a key you just set or was there already. It only reports; the key stays as you set it.
-- Changing a setting shows **Saved** on its row for two seconds, and changes are still saved right away. If a mod turned off BepInEx's saving on every change, the page saves that mod's config file too.
-- A native (non-.NET) DLL in the plugins folder is skipped quietly, at Debug level, instead of an Info line saying it couldn't be read. Other read failures are logged as before.
+- The waiting page says why it's waiting (the game or the Bridge isn't there, there's no token yet, or the token was refused), has a Retry now button, and shows how many tries have been made and when the next one is. A refused token waits for Retry instead of retrying every 2 seconds.
+- When a start hands over to the open window and gets no answer, it opens a window of its own and says so once, instead of quitting without a word.
+- Its own text comes in English, Japanese and Chinese and follows Windows' language, window title included.
 
-### Code graph without the game (standalone app)
+### Graphs 1.5.0
+
+#### Bridge page and Graphs page: the Tool window's look
+
+- Bridge page: the view switches (Code and Graphs, Blocks and Nodes) look like the F1 window's tabs. The one showing sits on the page's ground with a 2 px accent line on top, and the others are plain dim words. The open graph in the list is marked the same way, with the line on its left. The status line is a band under the header with a 3 px bar on its left, in the accent colour, or in the error colour when something went wrong, and a long line wraps instead of making the page scroll sideways.
+- Graphs page on the Mods screen: it sits on the screen's frosted panel like the other tabs, with no dark block of its own. Each graph is a card like a setting's row on the Settings tab (the same see-through fill, corners and padding), the headings, grey and red lines use the screen's colours, which stay readable over the brightest picture behind, and **Stop for this session** is one of the screen's buttons (raised, rounded, bold, lighter under the pointer or the gamepad). The note under the cards lines up with the text in them. With a core older than 1.5.0 the page looks as it did in Graphs 0.1.2.
+- `ModsScreenLook` (core), new: the Mods screen's text colours (`Text`, `Muted`, `Accent`, `Error`, `Warning`), a `Card` like a setting's row and a `Button` like the screen's own, for a `ModsScreenPage` that should look like the rest of the screen. The colours follow the look in use (frosted glass or the tint alone), and an open page is built again when it changes.
+
+### Text 1.5.0
+
+- No change; follows the release.
+
+### Dialogue 1.5.0
+
+- No change; follows the release.
+
+### Overrides 1.5.0
+
+- No change; follows the release.
+
+### Not in the release
+
+#### Code graph without the game (standalone app)
 
 - Experimental, and not in a release. `codegraph-standalone/` (CodeGraphStandalone.exe, Windows) shows the code graph of any .NET assembly without the game (docs/CODE_GRAPH_STANDALONE.md). It opens DLLs, a folder (leaving out .NET's and Unity's own unless you pass `--all`) or a Mono Unity game's folder, through Open…, the command line or a drop, and refuses IL2CPP games with the reason. It shows the Bridge's page in WebView2 and answers its calls inside the process (`WebResourceRequested`), with no port and no network.
-
-### Text-field underline and filter field for tool-window tabs
-
-- `ToolWindow.Underline(Rect)` (ToolWindow library), new: the accent underline the built-in tabs draw under a text field.
-- `ToolWindow.FilterField(Rect, string, string, ToolWindowStyles)`, new: a text field with that underline and a muted placeholder while it's empty. It returns the new text. The Inspector, Assets and Console tabs now use both instead of their own copies, so a mod's tab can look the same with one call.
-
-### Public CSV reading, and a safe write for any library
-
-- `CsvReader` (`DragNWash.ModFramework.Saves`) is public now, no longer internal to the flags catalog. `ReadRows` reads a CSV file the same shared way the catalog does, and `Escape` writes one field back, and now also quotes a value that starts with `#` so it isn't read back as a comment line. It comes from the localization mod.
-- `SafeFile` (`DragNWash.ModFramework`), new: `Write(path, encoding, Action<StreamWriter>)` fills a temporary file next to the target and then moves it into place, so a crash or a sharing violation partway through never leaves the target truncated. It comes from the localization mod, where it protects a translator's saved work. The Flags and saves library writes a save it restores or edits through it, and the Inspector's Export as overrides writes `mod.json` and the override files with it.
 
 ## 2026-09-20: a way into the editor
 

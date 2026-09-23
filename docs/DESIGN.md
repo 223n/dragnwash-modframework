@@ -2,7 +2,7 @@
 
 [日本語](DESIGN.ja.md)
 
-Status: September 2026. The core is released as 1.4.0, with the libraries at Tool window 1.2.0, Dialogue 1.2.0, Assets 1.2.0, Text 1.1.0, Flags and saves 1.1.0, Inspector 1.1.0, Overrides 0.1.0 and Bridge 0.1.0. Graphs 0.1.0 is on `main` and not released yet. Parts marked planned or future are not done yet. Open an issue to discuss any part of it.
+Status: September 2026. The newest release is 1.5.0, and from 1.5.0 on the core and every library share that number. Parts marked planned or future are not done yet. Open an issue to discuss any part of it.
 
 The features this memo once listed as designs are built: [Mod reload (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload), the [Inspector (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector), the [Console (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Console), [Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets) and [Dialogue (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue) all shipped in 1.2.0 or earlier, and their wiki pages describe them as they are now. What is designed but not built is in [ROADMAP.md](ROADMAP.md).
 
