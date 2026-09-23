@@ -101,7 +101,8 @@ namespace DragNWash.Installer
             switch (error)
             {
                 case InstallerException known:
-                    return (known.Text(), null);
+                    // What to do is that of the failure underneath, when there is one.
+                    return (known.Text(), known.InnerException == null ? null : Describe(known.InnerException).Help);
                 case HttpRequestException _:
                 case WebException _:
                     return (Strings.Get(Strings.Key.DownloadFailed), Strings.Get(Strings.Key.DownloadFailedHelp));

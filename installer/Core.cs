@@ -32,6 +32,10 @@ namespace DragNWash.Installer
         internal const string Marker = ".bepinex-installed-by-dragnwash-installer";
         internal const string OldMarker = ".bepinex-installed-by-dragnwash-localization";
 
+        // In BepInEx/: the installer's staging folder and the backup of the files the
+        // last install replaced. BepInEx loads nothing from it.
+        internal const string InstallerFolder = "DragNWash.Installer";
+
         // What Doorstop (winhttp.dll) starts for BepInEx 5, relative to the game folder.
         internal const string BepInExPreloader = @"BepInEx\core\BepInEx.Preloader.dll";
 
@@ -317,18 +321,34 @@ namespace DragNWash.Installer
             string zip = HasBepInEx(game) ? null : bepInExZip ?? DownloadBepInEx(progress, cancel);
             try
             {
+                if (zip != null)
+                {
+                    CheckBepInEx(zip);
+                }
                 // Nothing in the game folder has changed up to here, so stopping is
-                // still clean. From here on it would leave the folder half done.
+                // still clean. From here on a failure is undone from the journal.
                 cancel.ThrowIfCancellationRequested();
                 progress?.Report(InstallProgress.Changing);
-                if (zip == null)
+                var journal = new InstallJournal(game);
+                try
                 {
-                    _log("BepInEx: already present");
+                    Put(journal, game, choices, zip);
                 }
-                else
+                catch (Exception ex)
                 {
-                    InstallBepInEx(game, zip);
+                    _log($"Copying failed, putting everything back: {ex.Message}");
+                    int undone = journal.RollBack(_log, out int failed);
+                    if (failed > 0)
+                    {
+                        throw new InstallerException(Strings.Key.RolledBackPartly, ex, failed, journal.BackupShown);
+                    }
+                    if (undone > 0)
+                    {
+                        throw new InstallerException(Strings.Key.RolledBack, ex, undone);
+                    }
+                    throw;
                 }
+                journal.Commit(_log);
             }
             finally
             {
@@ -337,29 +357,45 @@ namespace DragNWash.Installer
                     TryDelete(zip);
                 }
             }
-            InstallFramework(game);
+            _log($"{_manifest.Name} {_manifest.Version}: installed");
+        }
 
+        // Every change Install makes in the game folder, each through the journal.
+        private void Put(InstallJournal journal, string game, IDictionary<string, string> choices, string zip)
+        {
+            if (zip == null)
+            {
+                _log("BepInEx: already present");
+            }
+            else
+            {
+                InstallBepInEx(journal, game, zip);
+            }
+            InstallFramework(journal, game);
+
+            string payloadPlugins = Path.Combine(_payload, "BepInEx", "plugins");
             string plugins = Path.Combine(game, "BepInEx", "plugins");
             foreach (string plugin in _manifest.Plugins)
             {
                 // Copied over what is there: files the player added (their own
                 // translations, working files) are never deleted by an update.
-                CopyTree(Path.Combine(payloadPlugins, plugin), Path.Combine(plugins, plugin));
-                EnableFiles(game, plugin);
+                journal.CopyTree(Path.Combine(payloadPlugins, plugin), Path.Combine(plugins, plugin));
+                EnableFiles(game, plugin, journal);
                 _log($"{plugin}: copied");
             }
             // Lets the Mods screen and later installers know what belongs to the mod.
-            File.WriteAllText(Path.Combine(plugins, _manifest.Plugins[0], ModManifest.FileName), _manifest.ToJson(), new UTF8Encoding(false));
+            journal.WriteAllText(Path.Combine(plugins, _manifest.Plugins[0], ModManifest.FileName), _manifest.ToJson());
 
             foreach (ModChoice choice in _manifest.Choices)
             {
                 if (choices != null && choices.TryGetValue(choice.Id, out string value) && choice.Options.Any(o => o.Value == value))
                 {
-                    ConfigFile.Set(Path.Combine(game, "BepInEx", "config", choice.Config.File), choice.Config.Section, choice.Config.Key, value);
+                    string config = Path.Combine(game, "BepInEx", "config", choice.Config.File);
+                    journal.Change(config);
+                    ConfigFile.Set(config, choice.Config.Section, choice.Config.Key, value);
                     _log($"{choice.Id}: {value}");
                 }
             }
-            _log($"{_manifest.Name} {_manifest.Version}: installed");
         }
 
         // Into the temp folder, so a download that fails or is stopped leaves the
@@ -438,7 +474,8 @@ namespace DragNWash.Installer
             }
         }
 
-        private void InstallBepInEx(string game, string zip)
+        // Before the game folder is touched: the zip must be the pinned release.
+        private void CheckBepInEx(string zip)
         {
             string hash;
             using (var sha = SHA256.Create())
@@ -451,7 +488,14 @@ namespace DragNWash.Installer
                 throw new InstallerException(Strings.Key.BepInExHash, hash);
             }
             _log("BepInEx: SHA-256 OK, unpacking");
-            string root = Path.GetFullPath(game).TrimEnd('\\') + "\\";
+        }
+
+        // Unpacked into the staging folder first, so a zip that breaks off halfway
+        // has not touched the game's own files, then copied into place.
+        private void InstallBepInEx(InstallJournal journal, string game, string zip)
+        {
+            string staging = journal.Staging(Path.GetFileNameWithoutExtension(new Uri(Paths.BepInExUrl).AbsolutePath));
+            string root = staging + "\\";
             using (ZipArchive archive = ZipFile.OpenRead(zip))
             {
                 foreach (ZipArchiveEntry entry in archive.Entries)
@@ -470,17 +514,18 @@ namespace DragNWash.Installer
                     entry.ExtractToFile(target, true);
                 }
             }
-            File.WriteAllText(Path.Combine(game, "BepInEx", Paths.Marker), "BepInEx was added by the Drag'n Wash mod installer.\r\n");
+            journal.CopyTree(staging, game);
+            journal.WriteAllText(Path.Combine(game, "BepInEx", Paths.Marker), "BepInEx was added by the Drag'n Wash mod installer.\r\n");
             _log("BepInEx: installed");
         }
 
         // The framework and its libraries: another mod may have brought a newer
         // version already, and an older one must never replace it.
-        private void InstallFramework(string game)
+        private void InstallFramework(InstallJournal journal, string game)
         {
             string source = Path.Combine(_payload, "BepInEx", "plugins");
             string plugins = Path.Combine(game, "BepInEx", "plugins");
-            Directory.CreateDirectory(plugins);
+            journal.CreateDirectory(plugins);
             foreach (string folder in Directory.Exists(source) ? Directory.GetDirectories(source) : new string[0])
             {
                 string name = Path.GetFileName(folder);
@@ -495,8 +540,8 @@ namespace DragNWash.Installer
                     _log($"{name}: kept {have} (newer than {offered})");
                     continue;
                 }
-                CopyTree(folder, Path.Combine(plugins, name));
-                EnableFiles(game, name);
+                journal.CopyTree(folder, Path.Combine(plugins, name));
+                EnableFiles(game, name, journal);
                 _log($"{name}: {offered}");
             }
 
@@ -508,8 +553,7 @@ namespace DragNWash.Installer
                 Version have = DllVersion(Path.Combine(patchers, Paths.FrameworkPatcher));
                 if (!(have != null && offered != null && have > offered))
                 {
-                    Directory.CreateDirectory(patchers);
-                    File.Copy(patcher, Path.Combine(patchers, Paths.FrameworkPatcher), true);
+                    journal.CopyFile(patcher, Path.Combine(patchers, Paths.FrameworkPatcher));
                 }
             }
         }
@@ -518,20 +562,21 @@ namespace DragNWash.Installer
         // .dll.disabled. Installing means wanting the mod: drop the switched-off
         // copies and the framework's records of them, including a pending
         // uninstall from the Mods screen.
-        private static void EnableFiles(string game, string folder)
+        private static void EnableFiles(string game, string folder, InstallJournal journal)
         {
             string dir = Path.Combine(game, "BepInEx", "plugins", folder);
             foreach (string off in Directory.GetFiles(dir, "*.dll.disabled", SearchOption.AllDirectories))
             {
                 if (File.Exists(off.Substring(0, off.Length - ".disabled".Length)))
                 {
-                    TryDelete(off);
+                    journal.Delete(off);
                 }
             }
-            RemoveFromFrameworkLists(game, folder);
+            RemoveFromFrameworkLists(game, folder, journal);
         }
 
-        private static void RemoveFromFrameworkLists(string game, string folder)
+        // journal: null when uninstalling, which has nothing to undo.
+        private static void RemoveFromFrameworkLists(string game, string folder, InstallJournal journal = null)
         {
             foreach (string name in Paths.FrameworkLists)
             {
@@ -549,6 +594,7 @@ namespace DragNWash.Installer
                 }).ToArray();
                 if (kept.Length != lines.Length)
                 {
+                    journal?.Change(list);
                     File.WriteAllLines(list, kept, new UTF8Encoding(false));
                 }
             }
@@ -591,6 +637,14 @@ namespace DragNWash.Installer
                 {
                     _log($"{file}: removed");
                 }
+            }
+
+            // The staging folder and the backup of the last install go with any mod's uninstall.
+            string installer = Path.Combine(game, "BepInEx", Paths.InstallerFolder);
+            if (Directory.Exists(installer))
+            {
+                InstallJournal.DeleteTree(installer);
+                _log($"BepInEx\\{Paths.InstallerFolder}: removed");
             }
 
             bool othersLeft = OtherMods(game).Any();
@@ -763,6 +817,7 @@ namespace DragNWash.Installer
                     ? Strings.Get(Strings.Key.PlanHaveBepInEx)
                     : Strings.Get(Strings.Key.PlanDownloadBepInEx, Paths.BepInExVersion, new Uri(Paths.BepInExUrl).Host),
             };
+            steps.Add(Strings.Get(Strings.Key.PlanBackup));
             string core = Path.Combine("BepInEx", "plugins", Paths.FrameworkPrefix, Paths.FrameworkPrefix + ".dll");
             Version offered = DllVersion(Path.Combine(_payload, core));
             Version have = DllVersion(Path.Combine(game, core));
@@ -817,6 +872,11 @@ namespace DragNWash.Installer
                 {
                     steps.Add(Strings.Get(Strings.Key.PlanRemoveConfig, file));
                 }
+            }
+
+            if (Directory.Exists(Path.Combine(game, "BepInEx", Paths.InstallerFolder)))
+            {
+                steps.Add(Strings.Get(Strings.Key.PlanRemoveInstallerFolder));
             }
 
             List<string> others = OtherMods(game).ToList();
@@ -887,19 +947,6 @@ namespace DragNWash.Installer
                 return null;
             }
             return Version.TryParse(FileVersionInfo.GetVersionInfo(path).FileVersion ?? "", out Version v) ? v : new Version(0, 0);
-        }
-
-        private static void CopyTree(string from, string to)
-        {
-            Directory.CreateDirectory(to);
-            foreach (string file in Directory.GetFiles(from))
-            {
-                File.Copy(file, Path.Combine(to, Path.GetFileName(file)), true);
-            }
-            foreach (string dir in Directory.GetDirectories(from))
-            {
-                CopyTree(dir, Path.Combine(to, Path.GetFileName(dir)));
-            }
         }
 
         private static void DeletePath(string path)
@@ -1030,6 +1077,14 @@ namespace DragNWash.Installer
         {
             Key = key;
             Detail = detail;
+            Args = args;
+        }
+
+        // For what failed underneath, which the details show in full.
+        internal InstallerException(Strings.Key key, Exception cause, params object[] args) : base(key + ": " + cause.Message, cause)
+        {
+            Key = key;
+            Detail = cause.ToString();
             Args = args;
         }
 
