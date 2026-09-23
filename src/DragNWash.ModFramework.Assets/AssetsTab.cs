@@ -41,7 +41,7 @@ namespace DragNWash.ModFramework.Assets
             _filter = textureName ?? "";
             _showReplacements = false;
             _scroll = Vector2.zero;
-            _status = $"{_textures.Count} texture(s) loaded; showing \"{_filter}\".";
+            _status = $"{Plural(_textures.Count, "texture", "textures")} loaded; showing \"{_filter}\".";
             TW.Open("Assets");
         }
 
@@ -131,26 +131,47 @@ namespace DragNWash.ModFramework.Assets
                     : $"{AssetReplacements.ReloadingName}  ({AssetReplacements.ReloadingDone + 1} of {AssetReplacements.ReloadingTotal})");
             }
 
-            if (GUI.Button(new Rect(x, y, 90, row), "List", s.Button))
+            // First row: which list shows, like tabs, with how many each has,
+            // and the filter in what is left of the row (or on a row of its own).
+            // Second row: what to do. Both wrap in a narrow window.
+            float bx = x;
+            string texturesLabel = _textures != null ? $"Textures ({Count(_textures.Count)})" : "Textures";
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent(texturesLabel, "Every texture loaded right now. Click a name to see it."), !_showReplacements))
+            {
+                _showReplacements = false;
+            }
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent($"Replacements ({Count(AssetReplacements.All.Count)})", "The PNGs mods ship, and where each one is in use."), _showReplacements))
+            {
+                _showReplacements = true;
+            }
+            if (x + w - bx < 140)
+            {
+                bx = x;
+                y += row + 2;
+            }
+            // The text field blends into the panel; an underline and a placeholder show where it is.
+            _filter = TW.FilterField(new Rect(bx, y, x + w - bx, row), _filter, "Filter by name", s);
+            y += row + 6;
+
+            bx = x;
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("List again", "Lists the textures loaded right now.")))
             {
                 _textures = AssetCatalog.Textures();
-                _status = $"{_textures.Count} texture(s) loaded.";
+                _status = $"{Plural(_textures.Count, "texture", "textures")} loaded.";
                 _selected = null;
             }
-            if (GUI.Button(new Rect(x + 100, y, 170, row), "Apply replacements", s.Button))
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("Apply replacements", "Puts the replacements into materials and sprites that still show the original. Uploads nothing, so it's always safe.")))
             {
                 int n = AssetReplacements.ApplyNow();
                 _status = $"Replacements applied in {n} place(s).";
                 _textures = null;
             }
-            if (GUI.Button(new Rect(x + 280, y, 150, row), _showReplacements ? "Show textures" : "Show replacements", s.Button))
-            {
-                _showReplacements = !_showReplacements;
-                _scroll = Vector2.zero;
-            }
             bool wasEnabled = GUI.enabled;
             GUI.enabled = !AssetReplacements.ReloadDisabled && !AssetReplacements.Reloading;
-            if (GUI.Button(new Rect(x + 440, y, 110, row), "Reload files", s.Button))
+            string reloadTip = GameFonts.RuntimeUploadsAreSafe
+                ? "Reads the PNGs you changed again and swaps them in."
+                : "Reads the PNGs you changed again and swaps them in. -force-d3d11 makes this safe.";
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("Reload files", reloadTip)))
             {
                 if (AssetsLibraryPlugin.Instance != null)
                 {
@@ -163,17 +184,9 @@ namespace DragNWash.ModFramework.Assets
                 }
             }
             GUI.enabled = wasEnabled;
-            // The text field blends into the panel; an underline and a placeholder show where it is.
-            var filterRect = new Rect(x + 560, y, Mathf.Max(80, w - 560), row);
-            _filter = TW.FilterField(filterRect, _filter, "Filter by name", s);
-            y += row + 8;
+            y += row + 6;
 
-            string summary = $"{AssetReplacements.All.Count} replacement(s) from mods";
-            if (AssetReplacements.ConflictCount > 0)
-            {
-                summary += $", {AssetReplacements.ConflictCount} overridden by another mod";
-            }
-            GUI.Label(new Rect(x, y, w, row), _status + "    |    " + summary, s.MutedLabel);
+            GUI.Label(new Rect(x, y, w, row), TW.Elide(_status, s.MutedLabel, w), s.MutedLabel);
             y += row;
             string reloadNote = AssetReplacements.ReloadDisabled
                 ? "Reload files: " + AssetReplacements.ReloadDisabledReason
@@ -215,6 +228,10 @@ namespace DragNWash.ModFramework.Assets
         }
 
         private static TextureInfo _selected;
+
+        // 1,234 whatever the game's culture, and the word that goes with the number.
+        private static string Count(int n) => n.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        private static string Plural(int n, string one, string many) => $"{Count(n)} {(n == 1 ? one : many)}";
 
         // After Reload files: the count on the status line, and a notice - a
         // warning when a file did not load, which the replacements list then shows.
