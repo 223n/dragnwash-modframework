@@ -469,6 +469,60 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         /// <summary>
+        /// Draws a button in a row of buttons that wraps: the button goes at
+        /// <paramref name="bx"/> on <paramref name="y"/>, as wide as its label
+        /// needs (at least 60 px, or <paramref name="minWidth"/>), and when it
+        /// would run past <paramref name="x"/> + <paramref name="width"/> it
+        /// starts a new row at <paramref name="x"/>, <see cref="RowHeight"/> + 2
+        /// lower. Afterwards <paramref name="bx"/> is where the next one goes and
+        /// <paramref name="y"/> is the top of the row it is on, so a narrow
+        /// window keeps every button reachable instead of cutting the last ones
+        /// off. Start a row with <c>bx = x</c>, and after the last button move
+        /// <c>y</c> down by <see cref="RowHeight"/> yourself. A selected button
+        /// is drawn with <see cref="ToolWindowStyles.SelectedButton"/> and the
+        /// accent line under it, the way a view switch shows the view that is
+        /// showing. Returns true on the event it is pressed. Since 1.5.0.
+        /// </summary>
+        /// <param name="bx">Where the button goes; moved past it (and 6 px on).</param>
+        /// <param name="y">Top of the current row; moved down when the button wraps.</param>
+        /// <param name="x">Left edge of the rows.</param>
+        /// <param name="width">Width of the rows.</param>
+        /// <param name="label">Button text, ASCII (see <see cref="PrepareCharacters"/>).</param>
+        /// <param name="selected">True for the view that is showing, or a switch that is on.</param>
+        /// <param name="minWidth">
+        /// At least this wide. For a button whose label changes (Turn on / Turn
+        /// off), pass the width of the longer label so the row doesn't jump.
+        /// </param>
+        public static bool FlowButton(ref float bx, ref float y, float x, float width, string label, bool selected = false, float minWidth = 0f)
+        {
+            return FlowButton(ref bx, ref y, x, width, new GUIContent(label), selected, minWidth);
+        }
+
+        /// <summary>
+        /// As <see cref="FlowButton(ref float, ref float, float, float, string, bool, float)"/>,
+        /// with a <c>GUIContent</c> whose tooltip shows on the hint line while
+        /// the pointer is on the button. Since 1.5.0.
+        /// </summary>
+        public static bool FlowButton(ref float bx, ref float y, float x, float width, GUIContent content, bool selected = false, float minWidth = 0f)
+        {
+            ToolWindowStyles s = Styles;
+            float w = Mathf.Max(Mathf.Max(60f, minWidth), s.Button.CalcSize(content).x + 14f);
+            if (bx > x && bx + w > x + width)
+            {
+                bx = x;
+                y += RowHeight + 2f;
+            }
+            var rect = new Rect(bx, y, w, RowHeight);
+            bool clicked = GUI.Button(rect, content, selected ? s.SelectedButton : s.Button);
+            if (selected)
+            {
+                Underline(rect);
+            }
+            bx += w + 6f;
+            return clicked;
+        }
+
+        /// <summary>
         /// Call just before <c>GUI.BeginScrollView</c> for a scrolling area: moves
         /// it by the gamepad stick or d-pad while the pointer is over it. Returns
         /// true when it moved.
