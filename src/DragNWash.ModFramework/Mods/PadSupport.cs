@@ -17,6 +17,9 @@ namespace DragNWash.ModFramework.Mods
     // as a stick press) click the selected button when the game's UI input did
     // not already click it that frame. On the Steam Deck these presses did not
     // reach the Mods screen's buttons.
+    //
+    // LB and RB go to the tab on the left or right, Y to the search field, and
+    // whatever gets selected is scrolled into view in the list or the tab.
     internal sealed class PadSupport : MonoBehaviour
     {
         internal ModsMenu Menu;
@@ -44,6 +47,10 @@ namespace DragNWash.ModFramework.Mods
             try
             {
                 GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+                if (Shortcuts(selected))
+                {
+                    return;
+                }
                 if (selected == null || !selected.activeInHierarchy || !selected.transform.IsChildOf(Menu.transform))
                 {
                     HideFrame();
@@ -65,6 +72,11 @@ namespace DragNWash.ModFramework.Mods
                 {
                     _selected = selected;
                     _selectedFrame = Time.frameCount;
+                }
+                // For a few frames: a panel built this frame is laid out later.
+                if (Time.frameCount - _selectedFrame <= 2)
+                {
+                    KeepInView(selected);
                 }
 
                 // A text field takes the pad's presses itself (and, on the Steam
@@ -105,6 +117,77 @@ namespace DragNWash.ModFramework.Mods
                 ModFramework.Log.LogWarning($"Mods screen gamepad help failed: {ex.Message}");
                 enabled = false;
             }
+        }
+
+        // The shoulder buttons and Y. Not while typing in a field.
+        private bool Shortcuts(GameObject selected)
+        {
+            Gamepad pad = Gamepad.current;
+            // Only while this screen is the one showing.
+            if (pad == null || Menu == null || Menu.Details == null || !Menu.Details.gameObject.activeInHierarchy ||
+                selected != null && !selected.transform.IsChildOf(Menu.transform))
+            {
+                return false;
+            }
+            TMP_InputField field = selected != null ? selected.GetComponent<TMP_InputField>() : null;
+            if (field != null && field.isFocused)
+            {
+                return false;
+            }
+            if (pad.leftShoulder.wasPressedThisFrame)
+            {
+                Menu.StepTab(-1);
+                return true;
+            }
+            if (pad.rightShoulder.wasPressedThisFrame)
+            {
+                Menu.StepTab(1);
+                return true;
+            }
+            if (pad.buttonNorth.wasPressedThisFrame)
+            {
+                Menu.FocusSearch();
+                return true;
+            }
+            return false;
+        }
+
+        // Scrolls the list or the tab so the selected thing shows, with a
+        // little room around it; one taller than the view shows its top.
+        private static void KeepInView(GameObject selected)
+        {
+            ScrollRect scroll = selected.GetComponentInParent<ScrollRect>();
+            if (scroll == null || scroll.content == null || !scroll.vertical || !selected.transform.IsChildOf(scroll.content))
+            {
+                return;
+            }
+            RectTransform viewport = scroll.viewport != null ? scroll.viewport : (RectTransform)scroll.transform;
+            if (scroll.content.parent != viewport)
+            {
+                return;
+            }
+            var target = (RectTransform)selected.transform;
+            var corners = new Vector3[4];
+            target.GetWorldCorners(corners);
+            float bottom = viewport.InverseTransformPoint(corners[0]).y;
+            float top = viewport.InverseTransformPoint(corners[1]).y;
+            Rect view = viewport.rect;
+            const float margin = 12f;
+            float shift = 0f;
+            if (bottom < view.yMin + margin)
+            {
+                shift = view.yMin + margin - bottom;
+            }
+            if (top + shift > view.yMax - margin)
+            {
+                shift = view.yMax - margin - top;
+            }
+            if (Mathf.Abs(shift) < 0.5f)
+            {
+                return;
+            }
+            scroll.velocity = Vector2.zero;
+            scroll.content.anchoredPosition += new Vector2(0f, shift);
         }
 
         // Added to the selected button's onClick, so a click by the game's UI input is seen.

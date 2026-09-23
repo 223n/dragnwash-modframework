@@ -20,6 +20,10 @@ namespace DragNWash.ModFramework.Mods
     internal sealed partial class ModsMenu
     {
         internal const string TextAbout = "About";
+        internal const string TextSelect = "Select";
+        internal const string TextBack = "Back";
+        internal const string TextSearch = "Search";
+        internal const string TextTabs = "Tabs";
 
         private const string TabAbout = "About";
         private const string TabSettings = "Settings";
@@ -76,6 +80,10 @@ namespace DragNWash.ModFramework.Mods
             LayoutElement bodySize = ModsLook.Size(_body.gameObject, -1f, -1f, 1f, 1f);
             bodySize.minHeight = 140f;
             BuildTab(entry, tabs.First(t => t.Key == _tab));
+            if (UnityEngine.InputSystem.Gamepad.current != null)
+            {
+                BuildHints(view.transform);
+            }
 
             // The notes take what they need, up to about a third of the panel,
             // and scroll beyond that. How much they need is only known once
@@ -649,6 +657,40 @@ namespace DragNWash.ModFramework.Mods
                 x += w + gap;
             }
             ModsLook.Size(holder.gameObject, -1f, y + height, 1f, 0f);
+        }
+
+        // ---- the pad's buttons ----
+
+        // A line at the bottom naming the pad's buttons for this screen.
+        private static void BuildHints(Transform parent)
+        {
+            RectTransform hints = ModsLook.Rect(parent, "Hints");
+            ModsLook.Size(hints.gameObject, -1f, 34f, 1f, 0f);
+            HorizontalLayoutGroup row = hints.gameObject.AddComponent<HorizontalLayoutGroup>();
+            row.spacing = 8f;
+            row.childAlignment = TextAnchor.MiddleRight;
+            row.childControlWidth = true;
+            row.childControlHeight = true;
+            row.childForceExpandWidth = false;
+            row.childForceExpandHeight = false;
+            Hint(hints, new[] { "A" }, TextSelect);
+            Hint(hints, new[] { "B" }, TextBack);
+            Hint(hints, new[] { "Y" }, TextSearch);
+            Hint(hints, new[] { "LB", "RB" }, TextTabs);
+        }
+
+        private static void Hint(RectTransform parent, string[] buttons, string text)
+        {
+            foreach (string button in buttons)
+            {
+                RectTransform glyph = ModsLook.Rect(parent, "Button " + button);
+                ModsLook.Shape(glyph.gameObject, ModsLook.PillOutline, ModsLook.Muted).raycastTarget = false;
+                TMP_Text letter = ModsLook.Text(glyph, "Label", button, 15f, ModsLook.Label, FontStyles.Bold, false);
+                letter.alignment = TextAlignmentOptions.Center;
+                ModsLook.Size(glyph.gameObject, Mathf.Max(32f, ModsLook.Width(letter) + 16f), 32f, 0f, 0f);
+            }
+            TMP_Text label = ModsLook.Text(parent, "Hint", text, 18f, ModsLook.Muted, FontStyles.Bold, false);
+            ModsLook.Size(label.gameObject, ModsLook.Width(label) + 14f, 32f, 0f, 0f);
         }
 
         // ---- going back ----

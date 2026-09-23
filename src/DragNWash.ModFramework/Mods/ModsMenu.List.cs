@@ -210,6 +210,17 @@ namespace DragNWash.ModFramework.Mods
             return field;
         }
 
+        // Y on the pad: the search field, ready to type in.
+        internal void FocusSearch()
+        {
+            if (_search == null || !_search.isActiveAndEnabled || EventSystem.current == null)
+            {
+                return;
+            }
+            EventSystem.current.SetSelectedGameObject(_search.gameObject);
+            _search.ActivateInputField();
+        }
+
         private void OnSearch(string value)
         {
             string query = (value ?? "").Trim();
