@@ -599,13 +599,7 @@ namespace DragNWash.ModFramework.Mods
             }
 
             bool dim = !entry.WantOn;
-            // Under Libraries, a library goes by what follows the framework's
-            // name ("Inspector"): the whole name was cut to "Drag'n Wash
-            // ModFramework: Insp..." in the list. The details show all of it.
-            string shown = IsLibraryLike(entry) && !entry.IsFramework && entry.Guid != null
-                ? ModCatalog.ShortNameOf(_entries, entry.Guid)
-                : entry.DisplayName;
-            TMP_Text name = ModsLook.Text(band, "Name", Escape(shown), 26f, dim ? ModsLook.Muted : ModsLook.Label, FontStyles.Bold, false);
+            TMP_Text name = ModsLook.Text(band, "Name", Escape(ShownName(entry)), 26f, dim ? ModsLook.Muted : ModsLook.Label, FontStyles.Bold, false);
             var nameRect = (RectTransform)name.transform;
             nameRect.anchorMin = new Vector2(0f, 0.5f);
             nameRect.offsetMin = new Vector2(84f, -2f);
@@ -643,6 +637,17 @@ namespace DragNWash.ModFramework.Mods
                 subRect.offsetMax = new Vector2(-right, 2f);
             }
             return row;
+        }
+
+        // A library goes by what follows the framework's name ("Inspector"),
+        // in the list and in the details' title: in full, it was cut to
+        // "Drag'n Wash ModFramework: Insp..." in the list and took three lines
+        // in the details. The details give the whole name on a line of its own.
+        private string ShownName(ModCatalog.Entry entry)
+        {
+            return IsLibraryLike(entry) && !entry.IsFramework && entry.Guid != null
+                ? ModCatalog.ShortNameOf(_entries, entry.Guid)
+                : entry.DisplayName;
         }
 
         // Every tag that applies to a mod, the most pressing first.
@@ -709,13 +714,39 @@ namespace DragNWash.ModFramework.Mods
             return colon >= 0 && colon + 2 < name.Length ? name.Substring(colon + 2) : name;
         }
 
+        // Words that say what state a mod is in, not what it is: no initial.
+        private static readonly string[] StateWords = { "experimental", "beta", "alpha", "preview", "wip" };
+
         // The first letter of each of the first two words, or the first
         // letter alone for one word (and for names in Japanese or Chinese).
+        // What is in brackets and words like "experimental" are passed over:
+        // "Inspector (experimental)" is I, not IE.
         private static string Initials(string name)
         {
-            string letters = "";
-            foreach (string word in name.Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries))
+            var kept = new System.Text.StringBuilder(name.Length);
+            int depth = 0;
+            foreach (char c in name)
             {
+                if (c == '(' || c == '[')
+                {
+                    depth++;
+                }
+                else if ((c == ')' || c == ']') && depth > 0)
+                {
+                    depth--;
+                }
+                else if (depth == 0)
+                {
+                    kept.Append(c);
+                }
+            }
+            string letters = "";
+            foreach (string word in kept.ToString().Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (StateWords.Contains(word.ToLowerInvariant()))
+                {
+                    continue;
+                }
                 char first = word.FirstOrDefault(char.IsLetterOrDigit);
                 if (first != default(char))
                 {

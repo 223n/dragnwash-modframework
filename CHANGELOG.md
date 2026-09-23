@@ -78,6 +78,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Back (Esc, or B on the gamepad) while typing a setting's value puts the old value back and stops typing. Before, leaving the field saved whatever was half typed.
 - The gamepad passing over a text field no longer starts typing in it (on the Steam Deck that could bring up the keyboard); A does, the Deck included.
 - A shortcut's box is as wide as its key, so on the Steam Deck's smaller screen the description beside it keeps its room. A very long tab title is cut short instead of running past the panel.
+- One notch of the mouse wheel moves the list, the notes and a tab about one row. The list used the game's setting, where a notch moved it a few pixels.
+- The list's scrollbar is thin and dark like the panels: no track, a grey thumb that turns the accent colour under the pointer. It was a bright light-grey bar. The gamepad passes over it, since what it selects scrolls into view anyway.
+- The first heading of the list sits right under the filters, with no empty gap above it.
+- The details' title takes two lines at most and ends in ... when longer. A library's title is its short name (Inspector (experimental)), with the whole name on a small grey line under it.
+- A mod's initials pass over what is in brackets and words like "experimental", so Inspector (experimental) is I, not IE.
 
 ### Mods screen: fixes
 

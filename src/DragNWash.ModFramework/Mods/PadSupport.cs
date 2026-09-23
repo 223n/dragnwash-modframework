@@ -60,7 +60,8 @@ namespace DragNWash.ModFramework.Mods
                 // Only the list and the details: the game's own buttons on the left
                 // (Back) already show the game's pointing hand.
                 Transform split = Menu.Details != null ? Menu.Details.parent : null;
-                if (split != null && selected.transform.IsChildOf(split))
+                // Not a scrollbar a click left selected: the pad never goes there.
+                if (split != null && selected.transform.IsChildOf(split) && selected.GetComponent<Scrollbar>() == null)
                 {
                     ShowFrame(selected);
                 }

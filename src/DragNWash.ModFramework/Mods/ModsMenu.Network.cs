@@ -134,7 +134,7 @@ namespace DragNWash.ModFramework.Mods
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 30f;
+            scroll.scrollSensitivity = ModsLook.WheelStep;
             return contentRect;
         }
 

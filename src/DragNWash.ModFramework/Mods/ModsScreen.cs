@@ -291,6 +291,24 @@ namespace DragNWash.ModFramework.Mods
             listCard.offsetMin = new Vector2(ModsMenu.ListPanelLeft, 0f);
             ModsLook.Shape(listCard.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
 
+            // A notch of the wheel moves about a row (the game's view moved 6),
+            // and the scrollbar is thin and dark like the rest of the panel.
+            ScrollRect scrollRect = scroll.GetComponent<ScrollRect>();
+            if (scrollRect != null)
+            {
+                scrollRect.scrollSensitivity = ModsLook.WheelStep;
+                ModsLook.StyleScrollbar(scrollRect.verticalScrollbar);
+            }
+
+            // The game leaves 50 above the first row, for its settings; the
+            // list's first heading sits under the filters as the other
+            // headings sit under the row before them.
+            VerticalLayoutGroup rows = menu.Content.GetComponent<VerticalLayoutGroup>();
+            if (rows != null)
+            {
+                rows.padding = new RectOffset(rows.padding.left, rows.padding.right, 8, rows.padding.bottom);
+            }
+
             // The search field and the filters stay above the scrolling list.
             scroll.SetParent(split, false);
             Fill(scroll, 0f, 0.45f);

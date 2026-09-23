@@ -34,6 +34,14 @@ namespace DragNWash.ModFramework.Mods
 
         internal static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
+        // A scroll view's scrollSensitivity. The game's input module gives 6
+        // for one notch of the wheel, so a notch moves 84, about one row of
+        // the list. (The game's own scroll view had 1: a notch moved 6.)
+        internal const float WheelStep = 14f;
+
+        // How wide a scrollbar is: thin, like the Tool window's.
+        private const float ScrollbarWidth = 8f;
+
         // Filled, with 12-unit corners.
         internal static Sprite Rounded;
 
@@ -313,6 +321,45 @@ namespace DragNWash.ModFramework.Mods
             knob.anchoredPosition = new Vector2(on ? -3f : 3f, 0f);
             Shape(knob.gameObject, Pill, on ? Inset : KnobOff, side / 2f).raycastTarget = false;
             return track;
+        }
+
+        // A scrollbar in the palette: no track, a thin rounded thumb in Muted
+        // that turns Accent under the pointer or while dragged, a little in
+        // from the panel's edge. The pad never lands on it (the selection
+        // scrolls into view by itself), so it is left out of navigation.
+        internal static void StyleScrollbar(Scrollbar bar)
+        {
+            if (bar == null)
+            {
+                return;
+            }
+            var rect = (RectTransform)bar.transform;
+            rect.sizeDelta = new Vector2(ScrollbarWidth, rect.sizeDelta.y);
+            rect.anchoredPosition = new Vector2(-6f, rect.anchoredPosition.y);
+            Image track = bar.GetComponent<Image>();
+            if (track != null)
+            {
+                track.sprite = null;
+                track.color = Clear;
+            }
+            if (bar.handleRect != null)
+            {
+                var area = bar.handleRect.parent as RectTransform;
+                if (area != null && area != rect)
+                {
+                    area.offsetMin = new Vector2(0f, 4f);
+                    area.offsetMax = new Vector2(0f, -4f);
+                }
+                bar.handleRect.sizeDelta = Vector2.zero;
+                Image thumb = Shape(bar.handleRect.gameObject, Pill, Color.white, ScrollbarWidth / 2f);
+                bar.targetGraphic = thumb;
+            }
+            Colors(bar, Muted, Accent, Accent);
+            // A click leaves it selected; it should not stay lit after.
+            ColorBlock colors = bar.colors;
+            colors.selectedColor = Muted;
+            bar.colors = colors;
+            bar.navigation = new Navigation { mode = Navigation.Mode.None };
         }
 
         // A tag: a word in a thin pill of its colour, as wide as the word.

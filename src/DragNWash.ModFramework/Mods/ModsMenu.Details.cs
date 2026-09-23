@@ -38,6 +38,9 @@ namespace DragNWash.ModFramework.Mods
 
         private const float DetailsPadding = 24f;
 
+        // The title in the header, cut to two lines once laid out.
+        private TMP_Text _headerName;
+
         private sealed class Tab
         {
             internal string Key;
@@ -89,6 +92,19 @@ namespace DragNWash.ModFramework.Mods
             // the column is laid out at its width.
             var viewRect = (RectTransform)view.transform;
             LayoutRebuilder.ForceRebuildLayoutImmediate(viewRect);
+            // A title of more than two lines at this width ends in ... on the second.
+            if (_headerName != null)
+            {
+                _headerName.ForceMeshUpdate();
+                int lines = _headerName.textInfo.lineCount;
+                if (lines > 2)
+                {
+                    float height = Mathf.Ceil(_headerName.preferredHeight / lines * 2f) + 2f;
+                    ModsLook.Size(_headerName.gameObject, -1f, height, -1f, -1f);
+                    _headerName.overflowMode = TextOverflowModes.Ellipsis;
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(viewRect);
+                }
+            }
             if (notes != null)
             {
                 float needed = LayoutUtility.GetPreferredHeight(notes);
@@ -130,8 +146,14 @@ namespace DragNWash.ModFramework.Mods
             textSize.minWidth = 0f;
             textSize.preferredWidth = 0f;
 
-            // The whole name, however long: the list cuts it, this does not.
-            ModsLook.Text(text, "Name", Escape(entry.DisplayName), 34f, ModsLook.Label, FontStyles.Bold, true);
+            // Two lines at most (BuildDetails cuts it once it is laid out). A
+            // library's title is its short name, with the whole name under it.
+            string title = ShownName(entry);
+            _headerName = ModsLook.Text(text, "Name", Escape(title), 34f, ModsLook.Label, FontStyles.Bold, true);
+            if (title != entry.DisplayName)
+            {
+                ModsLook.Text(text, "FullName", Escape(entry.DisplayName), 19f, ModsLook.Muted, FontStyles.Normal, false);
+            }
             string meta = string.IsNullOrEmpty(entry.Version) ? "" : "v" + Escape(entry.Version);
             if (!string.IsNullOrEmpty(entry.Authors))
             {
@@ -221,7 +243,7 @@ namespace DragNWash.ModFramework.Mods
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 30f;
+            scroll.scrollSensitivity = ModsLook.WheelStep;
 
             AddNotes(content, entry, newer);
             if (content.childCount == 0)
