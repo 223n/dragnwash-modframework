@@ -4,24 +4,24 @@
 
 [日本語](README.ja.md)
 
-A prerequisite mod for [Drag'n Wash](https://store.steampowered.com/app/4739660/) (BepInEx 5). It is a small core that keeps the code hooking into the game in one place, and gives other mods, and libraries built on top of it, a stable API:
+A prerequisite mod for [Drag'n Wash](https://store.steampowered.com/app/4739660/) (BepInEx 5). It's a small core that keeps the code that hooks into the game in one place, and gives other mods, and the libraries built on top of it, a stable API to work with:
 
-- a Mods screen reached from the game's Options screen (like Minecraft Forge's mod list, with on/off switches)
+- a Mods screen you open from the game's Options screen (like Minecraft Forge's mod list, with on/off switches)
 - settings in the game's Options screen
 - text and dialogue events
-- safe asset loading on Direct3D 12
+- asset loading that's safe on Direct3D 12
 - and more
 
-When the game updates, only the framework has to follow.
+So when the game updates, only the framework has to catch up.
 
 > [!NOTE]
-> **1.4.3** is the latest release. What changed in each version: [Releases](#releases) below, and every detail in [CHANGELOG.md](CHANGELOG.md). What comes next: [docs/ROADMAP.md](docs/ROADMAP.md).
+> **1.4.3** is the latest release. [Releases](#releases) below says what changed in each version, and [CHANGELOG.md](CHANGELOG.md) has every detail. What's coming next is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Where to read
 
 | To... | Read |
 |---|---|
-| Play with mods, get started, or look up a library | The [wiki](https://github.com/TomXV/dragnwash-modframework/wiki): a page for players, a getting-started walkthrough and a reference page for each library |
+| Play with mods, get started, or look up a library | The [wiki](https://github.com/TomXV/dragnwash-modframework/wiki), with a page for players, a getting-started walkthrough and a reference page for each library |
 | Build a mod on it | [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others) |
 | Know the goals and the order of work | [docs/DESIGN.md](docs/DESIGN.md) |
 | See which game builds it was checked on | [docs/GAME_BUILDS.md](docs/GAME_BUILDS.md) |
@@ -41,32 +41,33 @@ When the game updates, only the framework has to follow.
 | **Bridge** (experimental) | `com.tomxv.dragnwash.modframework.bridge` | Offers the read operations to AI clients on this computer over MCP, and serves the code graph's page. Off by default ([Bridge](https://github.com/TomXV/dragnwash-modframework/wiki/Bridge)) |
 | **Graphs** (experimental) | `com.tomxv.dragnwash.modframework.graphs` | Runs mods with no code that *do* things: *when this happens, do these things*, made on the Bridge's page ([Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs)) |
 
-Each library is its own plugin with its own version; install the ones the mods you use need. See [CHANGELOG.md](CHANGELOG.md) for versions.
+Each library is a plugin of its own with its own version, so install the ones your mods need. The versions are in [CHANGELOG.md](CHANGELOG.md).
 
 ### Update notices
 
-From core 1.1.0, the framework tells you on the Mods screen and the title screen when a mod you have installed has a newer release.
+From core 1.1.0, the framework lets you know on the Mods screen and the title screen when a mod you've installed has a newer release.
 
-- **What is checked:** only mods that name their GitHub repository, each at most once a day.
-- **What is sent:** the framework asks GitHub's public API (`api.github.com`) for the repository's latest release, and sends nothing about you, your game or your other mods. GitHub sees your IP address, as with any web page.
-- **What it does:** nothing is downloaded or installed. The Mods screen opens the release page for you.
-- **To switch it off:** open **Options → Mods → Drag'n Wash ModFramework → Settings** and set **Check for updates** to Off, or set `Check for updates = false` in `BepInEx/config/com.tomxv.dragnwash.modframework.cfg`.
+It only checks mods that name their GitHub repository, and each of them at most once a day. It asks GitHub's public API (`api.github.com`) for the repository's latest release and sends nothing about you, your game or your other mods. GitHub does see your IP address, the same as with any web page.
+
+Nothing gets downloaded or installed. The Mods screen just opens the release page for you.
+
+To switch it off, open **Options → Mods → Drag'n Wash ModFramework → Settings** and set **Check for updates** to Off, or set `Check for updates = false` in `BepInEx/config/com.tomxv.dragnwash.modframework.cfg`.
 
 ## Releases
 
-From 1.0.0 on, a change that breaks the public API comes only with a new major version. Every change is in [CHANGELOG.md](CHANGELOG.md).
+From 1.0.0 on, a change that breaks the public API only ever comes with a new major version. Every change is in [CHANGELOG.md](CHANGELOG.md).
 
-- **1.4.3** (latest): **Open page** and **Graphs** buttons on the Bridge tab, so the editor is one press away.
-- **1.4.2**: a graph that answers a key now says which other mods answer it too (`ModFramework.WhoElseUses`).
-- **1.4.1**: **[Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs)** 0.1.0, mods with no code that *do* things (*when this happens, do these things*), with:
+- **1.4.3** (latest): the Bridge tab gets **Open page** and **Graphs** buttons, so the editor is one press away.
+- **1.4.2**: a graph that answers a key now tells you which other mods answer it too (`ModFramework.WhoElseUses`).
+- **1.4.1**: **[Graphs](https://github.com/TomXV/dragnwash-modframework/wiki/Graphs)** 0.1.0, mods with no code that *do* things (*when this happens, do these things*). It comes with:
   - the first write operations
   - an editor of blocks and nodes on the Bridge's page
   - what a graph changes listed on the Mods screen, put back when it stops and named when two mods change one value
 
-  The core and the preloader patcher go to 1.4.1; Overrides to 0.1.1, the Bridge to 0.1.1 and the Inspector to 1.1.1, whose History now lists what other mods change.
+  The core and the preloader patcher go to 1.4.1; Overrides to 0.1.1, the Bridge to 0.1.1 and the Inspector to 1.1.1. The Inspector's History now lists what other mods change too.
 - **1.4.0**:
   - mods with no code ([Overrides](https://github.com/TomXV/dragnwash-modframework/wiki/Overrides), a folder of values to change, made with the Inspector)
-  - an [operations registry](https://github.com/TomXV/dragnwash-modframework/wiki/Operations) every library registers what it can do in
+  - an [operations registry](https://github.com/TomXV/dragnwash-modframework/wiki/Operations) where every library registers what it can do
   - the [Bridge](https://github.com/TomXV/dragnwash-modframework/wiki/Bridge), which offers the read operations to AI clients on this computer over MCP
   - the [code graph](https://github.com/TomXV/dragnwash-modframework/wiki/Code-graph)
   - in the [Inspector](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector): an object explorer, Animators, Rigidbodies, and scenes and levels
@@ -86,18 +87,18 @@ From 1.0.0 on, a change that breaks the public API comes only with a new major v
   - reloading a mod while the game runs
   - [mods that go online say so](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online)
 
-  With it the Tool window, Assets and Dialogue libraries go to 1.1.0 ([Console](https://github.com/TomXV/dragnwash-modframework/wiki/Console), [texture replacements and reloading](https://github.com/TomXV/dragnwash-modframework/wiki/Assets), [stable line keys](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue)), and a new [Inspector](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector) library (1.0.0) arrives. The new features are marked experimental, and the Inspector stays experimental.
-- **1.1.2**: the framework's icon is replaced with the "Dg" monogram from the hand-made logo.
-- **1.1.1**: the framework's icon.
+  Along with it, the Tool window, Assets and Dialogue libraries go to 1.1.0 ([Console](https://github.com/TomXV/dragnwash-modframework/wiki/Console), [texture replacements and reloading](https://github.com/TomXV/dragnwash-modframework/wiki/Assets), [stable line keys](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue)), and there's a new [Inspector](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector) library (1.0.0). The new features are marked experimental, and the Inspector is staying experimental.
+- **1.1.2**: the framework's icon is now the "Dg" monogram from the hand-made logo.
+- **1.1.1**: the framework gets its icon.
 - **1.1.0**: [update notices](#update-notices), the shared installer, and uninstalling from the Mods screen.
-- **1.0.0**: released together with [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on it.
+- **1.0.0**: released alongside [Drag'n Wash Localization](https://github.com/TomXV/dragnwash-localization) v1.0.0, the first mod built on it.
 
 ## For mod developers
 
-Reference `DragNWash.ModFramework.dll` (and the library DLLs you use) and declare each dependency so BepInEx loads them first.
+Reference `DragNWash.ModFramework.dll` (plus the library DLLs you use) and declare each one as a dependency so BepInEx loads them first.
 
-- **What to use for what**, and the rules that keep mods working together: [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others).
-- **A one-click install for players:** ship the shared installer with a `mod-install.json`: [Installer (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Installer).
+- What to use for what, and the rules that keep mods working together, are in [Playing well with others (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Playing-well-with-others).
+- To give players a one-click install, ship the shared installer with a `mod-install.json`. [Installer (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Installer) explains how.
 
 ```csharp
 [BepInPlugin("com.example.mymod", "MyMod", "1.0.0")]
@@ -120,13 +121,13 @@ public class MyMod : BaseUnityPlugin
 ## Building
 
 1. Install the .NET SDK and have BepInEx 5.4.23.5 installed in the game.
-2. Copy the reference assemblies from your own game install (they are never committed):
+2. Copy the reference assemblies from your own game install (they never get committed):
 
    ```bash
    pwsh tools/copy-libs.ps1
    ```
 
-   Pass `-GamePath` if the game is not in the default Steam library.
+   Pass `-GamePath` if the game isn't in the default Steam library.
 3. Build the core, the preloader patcher and the libraries:
 
    ```bash
@@ -136,48 +137,44 @@ public class MyMod : BaseUnityPlugin
    and the same for each `src/DragNWash.ModFramework.*` project.
 
 > [!TIP]
-> With Docker, `docker compose run --rm checks` runs every check CI runs, and `docker compose run --rm build` builds the core and the libraries, in the image CI uses: [docs/DOCKER.md](docs/DOCKER.md). Nothing is installed on your machine.
+> If you have Docker, `docker compose run --rm checks` runs every check CI runs and `docker compose run --rm build` builds the core and the libraries, both in the image CI uses ([docs/DOCKER.md](docs/DOCKER.md)). Nothing gets installed on your machine.
 
-Each DLL goes to its project's `bin/Release/`. To try them:
+Each DLL ends up in its project's `bin/Release/`. To try them out:
 
 - copy each plugin DLL to its own folder, `<Game>/BepInEx/plugins/<assembly name>/`
 - copy `DragNWash.ModFramework.Preloader.dll` to `<Game>/BepInEx/patchers/`
 
 ### Building on GitHub
 
-The **Build** workflow (Actions) builds the release zip on GitHub.
+The **Build** workflow (Actions) builds the release zip on GitHub. It runs on every push to `main`, on a `v*` tag, or when you start it by hand. It never runs for pull requests, so a fork can't get at the token.
 
-- **When it runs:** on every push to `main`, on a `v*` tag, or by hand. It never runs for pull requests, so a fork cannot reach the token.
-- **What it does:** it fetches the reference assemblies from a private repository (`TomXV/dragnwash-libs`, never public) with the `LIBS_TOKEN` secret, runs `tools/pack.ps1` on a Windows runner and uploads `release/DragNWash.ModFramework-<version>.zip` as a workflow artifact.
-- **On a tag:** it also creates a **draft** release with the zip attached; a person writes the notes and publishes it.
-- **After a game update:** refresh the private repository from a game install with `tools/copy-libs.ps1`.
+It fetches the reference assemblies from a private repository (`TomXV/dragnwash-libs`, which is never made public) using the `LIBS_TOKEN` secret, runs `tools/pack.ps1` on a Windows runner and uploads `release/DragNWash.ModFramework-<version>.zip` as a workflow artifact. On a tag it also creates a **draft** release with the zip attached, and a person writes the notes and publishes it.
+
+After a game update, refresh the private repository from a game install with `tools/copy-libs.ps1`.
 
 ## Rules for this repository
 
-- Never commit the game's files, BepInEx binaries or anything from `libs/`. A check on every push and pull request enforces it.
-- Material from the game follows [docs/CONTENT_POLICY.md](docs/CONTENT_POLICY.md): made by hand or changed into something new is fine, the game's data unchanged is not.
+- Never commit the game's files, BepInEx binaries or anything from `libs/`. A check on every push and pull request makes sure of it.
+- Material from the game follows [docs/CONTENT_POLICY.md](docs/CONTENT_POLICY.md). Something made by hand or changed into something new is fine, but the game's data unchanged isn't.
 - Code that touches game classes stays `internal`; mods only see the framework's own types.
 
 ## Taking part
 
-- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) — how to set up, what the rules above mean in practice, and what to put in a pull request.
-- **Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-- **Security:** please report a vulnerability privately, not in an issue — [SECURITY.md](SECURITY.md).
-- **Sponsoring:** [GitHub Sponsors](https://github.com/sponsors/TomXV), if you want to and can. The framework is free and stays free either way.
+- If you'd like to contribute, [CONTRIBUTING.md](CONTRIBUTING.md) covers how to set up, what the rules above mean in practice, and what to put in a pull request.
+- The code of conduct is in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- Please report a security vulnerability privately instead of in an issue. [SECURITY.md](SECURITY.md) says how.
+- If you want to and can, you can sponsor the project on [GitHub Sponsors](https://github.com/sponsors/TomXV). The framework is free and stays free either way.
 
 ## A note to the developers
 
-This is an unofficial fan project and is not affiliated with Gator Dragon Games.
+This is an unofficial fan project and isn't affiliated with Gator Dragon Games. It doesn't contain any of the game's assets or code as they are (see [docs/CONTENT_POLICY.md](docs/CONTENT_POLICY.md)), and it doesn't modify the game's files, since BepInEx loads it at runtime.
 
-- It contains none of the game's assets or code as they are (see [docs/CONTENT_POLICY.md](docs/CONTENT_POLICY.md)).
-- It does not modify the game's files (BepInEx loads it at runtime).
-
-If the development team has any concerns, please open an issue or contact the maintainer, and it will be changed or taken down.
+If the development team has any concerns, please open an issue or contact the maintainer, and it'll be changed or taken down.
 
 ## Credits
 
-- The **logo** above and the framework's **icon** on the Mods screen were drawn by **NotaGames** ([@NotaGames](https://github.com/NotaGames)), after the game's own logo; the game's developers said that is fine ([#15](https://github.com/TomXV/dragnwash-modframework/issues/15)). Used with permission; not covered by the MIT license below.
-- The **Mods button** in the Options screen (`ModsButton0.png`, `ModsButton1.png`) was drawn for the framework by **Mister ERIO** ([@mistererio](https://github.com/mistererio)) and is used with permission. It is their artwork, not the game's, and is not covered by the MIT license below.
+- The **logo** above and the framework's **icon** on the Mods screen were drawn by **NotaGames** ([@NotaGames](https://github.com/NotaGames)) based on the game's own logo, and the game's developers said that's fine ([#15](https://github.com/TomXV/dragnwash-modframework/issues/15)). They're used with permission and aren't covered by the MIT license below.
+- The **Mods button** in the Options screen (`ModsButton0.png`, `ModsButton1.png`) was drawn for the framework by **Mister ERIO** ([@mistererio](https://github.com/mistererio)) and is used with permission. It's their own artwork and doesn't come from the game, so it isn't covered by the MIT license below.
 
 ## License
 
