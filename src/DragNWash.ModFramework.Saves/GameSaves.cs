@@ -82,6 +82,15 @@ namespace DragNWash.ModFramework.Saves
         /// <summary>Folder the snapshots are kept in, one subfolder per slot.</summary>
         public static string HistoryFolder { get; internal set; }
 
+        /// <summary>
+        /// How many snapshots are kept per slot: the library's
+        /// <c>[History] Keep</c> setting. Once a slot has this many, each new
+        /// snapshot deletes the oldest one. A new snapshot is only taken when the
+        /// save differs from the newest one, so an edit or a restore while the
+        /// newest snapshot matches the save deletes nothing. Since 1.5.0.
+        /// </summary>
+        public static int Keep => _keep;
+
         /// <summary>Raised on the main thread when the game wrote a slot's save with new content (the slot name).</summary>
         public static event Action<string> SaveWritten;
 
@@ -346,6 +355,13 @@ namespace DragNWash.ModFramework.Saves
             return moved;
         }
 
+        // From the plugin's Awake and whenever the setting changes, so Keep is
+        // right even while history is off and Tick does not run.
+        internal static void SetKeep(int keep)
+        {
+            _keep = Mathf.Max(1, keep);
+        }
+
         // From the plugin's Update.
         internal static void Tick(int keep)
         {
@@ -354,7 +370,7 @@ namespace DragNWash.ModFramework.Saves
                 return;
             }
             _nextPoll = Time.unscaledTime + PollInterval;
-            _keep = Mathf.Max(1, keep);
+            SetKeep(keep);
 
             foreach (string slot in Slots())
             {
