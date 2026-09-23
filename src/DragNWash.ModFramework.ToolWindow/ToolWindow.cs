@@ -20,11 +20,14 @@ namespace DragNWash.ModFramework.ToolWindow
     /// <c>[BepInDependency(ToolWindow.Guid, BepInDependency.DependencyFlags.HardDependency)]</c>.
     /// </para>
     /// <para>
-    /// On Direct3D 12, rasterizing a character the window font has not drawn yet
-    /// uploads a texture, and an upload while the game is presenting a frame can
-    /// crash the game (Unity UUM-140564). Prepare every non-ASCII character a tab
-    /// shows with <see cref="PrepareCharacters"/> from Awake or Update, never
-    /// from the draw callback.
+    /// On Direct3D 12, a texture upload at the wrong moment can crash the game
+    /// (Unity UUM-140564), and drawing a character for the first time adds it
+    /// to a font atlas that has to be uploaded. The core uploads those atlases
+    /// once per frame, so the window can draw any text; a non-ASCII character
+    /// the window has not shown before comes out as "?" for one frame. Still
+    /// pass the non-ASCII characters a tab shows to
+    /// <see cref="PrepareCharacters"/> from Awake or Update, never from the
+    /// draw callback: without the core's batching they are rasterized then.
     /// </para>
     /// </remarks>
     public static class ToolWindow
@@ -74,8 +77,12 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <summary>The styles controls in a tab should use. Only valid inside a draw callback.</summary>
         public static ToolWindowStyles Styles { get; } = new ToolWindowStyles();
 
-        /// <summary>The font the window draws with, or null for the IMGUI skin's font.</summary>
-        public static Font Font => MenuFont.Font;
+        /// <summary>
+        /// The font the window draws with, or null for the IMGUI skin's font. It is
+        /// made when the window first opens; read before that from Awake or Update,
+        /// it is made then, and from a draw callback it is null until the next frame.
+        /// </summary>
+        public static Font Font => MenuFont.Needed();
 
         /// <summary>Font size used by every style.</summary>
         public static int FontSize => MenuFont.Size;
@@ -196,10 +203,9 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         /// <summary>
-        /// The text as the window can draw it now: characters the window font has
-        /// not rasterised yet come out as '?' (and are prepared for later frames
-        /// where that is safe). For text a tab did not know in advance, such as
-        /// object names.
+        /// The text as the window can draw it now: characters not prepared yet
+        /// come out as '?' (and are prepared for later frames where that is
+        /// safe). For text a tab did not know in advance, such as object names.
         /// </summary>
         public static string Drawable(string text)
         {
@@ -380,7 +386,7 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         // "..." where the window font has no ellipsis, and "v" where it has no
-        // small down-pointing triangle; set at startup.
+        // small down-pointing triangle; set when the font is made.
         internal static string Ellipsis = "...";
         internal static string DownArrow = "v";
 
@@ -409,9 +415,11 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         /// <summary>
-        /// Rasterizes these characters into the window font now, so drawing them
-        /// later uploads nothing. Call from Awake or Update. Called from a draw
-        /// callback, the characters are prepared on the next Update instead.
+        /// Prepares these characters for the window: <see cref="Drawable"/> draws
+        /// them as they are from then on. On Direct3D 12 without the core's atlas
+        /// batching they are also rasterized into the window font now, so drawing
+        /// them later uploads nothing. Call from Awake or Update. Called from a
+        /// draw callback, the characters are prepared on the next Update instead.
         /// </summary>
         public static void PrepareCharacters(string characters)
         {
@@ -420,11 +428,13 @@ namespace DragNWash.ModFramework.ToolWindow
 
         /// <summary>
         /// True when every character of <paramref name="text"/> has a glyph in the
-        /// window font. Characters it cannot draw are shown as "?".
+        /// window font. Characters it cannot draw are shown as "?". From a draw
+        /// callback, a character not checked before counts as not drawable for
+        /// that one frame, and is checked on the next Update.
         /// </summary>
         public static bool CanDraw(string text)
         {
-            return MenuText.CanDraw(MenuFont.Font, MenuFont.Size, text);
+            return MenuText.CanDraw(MenuFont.Needed(), MenuFont.Size, text);
         }
 
         /// <summary>Fills a rectangle with a colour.</summary>

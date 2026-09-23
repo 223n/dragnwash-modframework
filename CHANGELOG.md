@@ -4,6 +4,13 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Tool window: its font is made when you first open it
+
+- The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.
+- In exchange, the first F1 shows the window one frame later. A character the window hasn't drawn before shows as "?" for one frame, the way the Console already does it.
+- `ToolWindow.PrepareCharacters` now only notes the characters instead of drawing all of them into the font (the Localization mod passes it about 5800). In Unity 6 the window draws its text from an atlas of its own, and on Direct3D 12 the core already uploads that atlas once per frame. With `[Direct3D12] BatchFontAtlasUploads` off, everything happens at startup as before.
+- `ToolWindow.Font` and `ToolWindow.CanDraw`, called from Awake or Update before the window was opened, make the font right then, so they answer as they did before.
+
 ### Saves: restoring the oldest snapshot
 
 - Restoring a snapshot when the history was full could fail with "Restore failed" and lose that snapshot. Before a restore, the save being replaced is kept as a snapshot, and with the history full that pushed out the oldest one, which could be the very snapshot being restored. Now the snapshot is read first, so the restore goes through. The current save was never at risk.

@@ -1,17 +1,28 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using BepInEx;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace DragNWash.ModFramework.ToolWindow
 {
-    // The window's font. IMGUI draws through a dynamic font that grows its
-    // texture the first time it is asked for a character; on Direct3D 12 an
-    // upload on the frame the window opens is the UUM-140564 crash, so the font
-    // is chosen and filled at startup, and characters mods need are prepared
-    // from Update, never from OnGUI.
+    // The window's font. On Unity 6, IMGUI does not draw from this font's own
+    // texture: it makes a TextCore font asset from it, with an atlas of its
+    // own that fills glyph by glyph as text is drawn, and on Direct3D 12 the
+    // core uploads that atlas once per frame (FontAtlasUploads), which keeps
+    // it clear of the UUM-140564 crash. This font is still the key IMGUI finds
+    // that asset by, and what MenuText asks whether a character has a glyph.
+    //
+    // Choosing it reads the OS font table, tens of milliseconds and up to a
+    // second and a half on a cold disk, so it is made the first time the
+    // window opens (from Update; the window shows on the next frame) rather
+    // than at startup, and the characters mods prepare are only noted, not
+    // rasterised. On Direct3D 12 without the core's batching it is chosen and
+    // filled at startup as before, and characters are prepared from Update,
+    // never from OnGUI.
     //
     // IMGUI can only use fonts Unity itself knows: OS fonts by name, or Font
     // assets. Inside Steam's Linux runtime (Steam Deck) no OS font has CJK
@@ -29,10 +40,90 @@ namespace DragNWash.ModFramework.ToolWindow
         // bold gives it the weight of the OS fonts.
         internal static bool Bold { get; private set; }
 
+        // True once Create has run, whatever it found (the skin's font included).
+        internal static bool Ready { get; private set; }
+
+        // Made on an earlier frame, so the window's first text and the making
+        // of its font never land on the same frame.
+        internal static bool Usable => Ready && Time.frameCount > _madeOnFrame;
+
+        // Asked for from OnGUI before it was made: the next Update makes it.
+        internal static bool Wanted { get; private set; }
+
         private static readonly StringBuilder Queued = new StringBuilder();
         private static AssetBundle _bundle;
+        private static string _mode;
+        private static bool _eager;
+        private static int _madeOnFrame = -1;
 
-        internal static void Create(string mode)
+        // From Awake: what to make later, or, on Direct3D 12 without the
+        // core's batching, the font itself.
+        internal static void Configure(string mode)
+        {
+            _mode = mode;
+            _eager = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Direct3D12 && !UploadsBatched();
+            if (_eager)
+            {
+                Create();
+                _madeOnFrame = -1;
+            }
+        }
+
+        // For callers outside the window (ToolWindow.Font, CanDraw): made on
+        // the spot from Awake or Update; from OnGUI, on the next Update.
+        internal static Font Needed()
+        {
+            if (!Ready && _mode != null)
+            {
+                if (Event.current == null)
+                {
+                    Create();
+                }
+                else
+                {
+                    Wanted = true;
+                }
+            }
+            return Font;
+        }
+
+        // Its own method, so a core without the property (older than this Tool
+        // window) is caught here instead of failing the whole class.
+        internal static bool UploadsBatched()
+        {
+            try
+            {
+                return BatchedFromCore();
+            }
+            catch (MissingMemberException)
+            {
+                return false;
+            }
+        }
+
+        private static bool BatchedFromCore() => GameInfo.FontAtlasUploadsBatched;
+
+        // From Update or Awake, never from OnGUI. Also settles what cut text
+        // and More end in, which depends on the font.
+        internal static void Create()
+        {
+            if (Ready || _mode == null)
+            {
+                return;
+            }
+            Ready = true;
+            Wanted = false;
+            _madeOnFrame = Time.frameCount;
+            long started = Stopwatch.GetTimestamp();
+            Choose(_mode);
+            // Cut text ends in an ellipsis, and More has its triangle, where the font has them.
+            Request("\u2026\u25BE", _eager);
+            ToolWindow.Ellipsis = MenuText.CanDraw(Font, Size, "\u2026") ? "\u2026" : "...";
+            ToolWindow.DownArrow = MenuText.CanDraw(Font, Size, "\u25BE") ? "\u25BE" : "v";
+            ToolWindowPlugin.Log.LogDebug($"Window font made in {(Stopwatch.GetTimestamp() - started) * 1000 / Stopwatch.Frequency} ms.");
+        }
+
+        private static void Choose(string mode)
         {
             try
             {
@@ -105,7 +196,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 {
                     ascii.Append(c);
                 }
-                Request(ascii.ToString());
+                Request(ascii.ToString(), true);
             }
             catch (Exception ex)
             {
@@ -129,7 +220,7 @@ namespace DragNWash.ModFramework.ToolWindow
                 }
                 return;
             }
-            Request(characters);
+            Request(characters, _eager);
         }
 
         // From Update.
@@ -145,10 +236,10 @@ namespace DragNWash.ModFramework.ToolWindow
                 pending = Queued.ToString();
                 Queued.Length = 0;
             }
-            Request(pending);
+            Request(pending, _eager);
         }
 
-        // Every character rasterised so far, so a caller that draws arbitrary
+        // Every character prepared so far, so a caller that draws arbitrary
         // text (the console) can tell what is safe to draw this frame.
         private static readonly HashSet<char> Requested = new HashSet<char>();
 
@@ -160,9 +251,13 @@ namespace DragNWash.ModFramework.ToolWindow
             }
         }
 
-        private static void Request(string characters)
+        // Notes the characters, and rasterises them into this font when asked
+        // to. Not rasterised, they cost nothing: what IMGUI draws is its
+        // TextCore atlas, which fills itself (see the top).
+        private static void Request(string characters, bool rasterise)
         {
-            if (Font == null)
+            // The skin's font, or none could be made: nothing to prepare.
+            if (Font == null && (Ready || _mode == "skin"))
             {
                 return;
             }
@@ -174,6 +269,10 @@ namespace DragNWash.ModFramework.ToolWindow
                     {
                         Requested.Add(c);
                     }
+                }
+                if (!rasterise || Font == null)
+                {
+                    return;
                 }
                 Font.RequestCharactersInTexture(characters, Size, FontStyle.Normal);
                 if (Bold)
