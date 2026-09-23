@@ -156,9 +156,8 @@ change leaves a wiki page wrong, say which one in the pull request.
 
 ## The pull request itself
 
-- Branch off `dev` and open the pull request against `dev`, with one topic per
-  pull request. Work collects on `dev` and then goes to `main` together before
-  a release.
+- Fork the repository, branch off `main` and open the pull request against
+  `main`, with one topic per pull request.
 - Write the title and body so that someone reading the history a year from now
   knows what changed and why. The template asks the questions for you.
 - You can write the body in both languages, but nobody expects it. Either one
