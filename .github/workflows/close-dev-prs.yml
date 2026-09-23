@@ -1,0 +1,39 @@
+name: Close pull requests to dev
+
+# dev is where Tom gathers work before a release; contributions go to main.
+# Only the repository's admins can update dev (the "Protect dev branch"
+# ruleset), so a pull request aimed at dev could never be merged anyway.
+# This closes it right away and says where to send it instead, in English
+# and Japanese. Tom's own pull requests are left alone.
+#
+# SECURITY: pull_request_target runs this file from main with a write token,
+# so it must never check out or run anything from the pull request. It only
+# reads the pull request's number and author from the event, which GitHub
+# sets, and posts a fixed comment.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+    branches: [dev]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    if: github.event.pull_request.user.login != github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+            const body = [
+              'Thanks for the pull request! `dev` is where work collects before a release, so pull requests go to `main` instead. I closed this one; please open it again with `main` as the base branch.',
+              '',
+              'プルリクエストありがとうございます！`dev` はリリース前の作業をまとめておくブランチなので、プルリクエストは `main` 宛てにお願いしています。これはいったん閉じました。`main` を向け先にして、もう一度出してください。',
+            ].join('\n');
+            await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+            await github.rest.pulls.update({ owner, repo, pull_number: number, state: 'closed' });
+            core.info(`Closed #${number}: it targeted dev.`);
