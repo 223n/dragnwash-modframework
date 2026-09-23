@@ -241,7 +241,7 @@ namespace DragNWash.ModFramework.Mods
                 MenuContainerField.SetValue(menu, container);
                 MenuIntentsField.SetValue(menu, intents);
                 menu.Content = (RectTransform)content;
-                menu.Details = SplitForDetails(panel);
+                SplitForDetails(panel, menu);
                 menu.Details.gameObject.AddComponent<DetailsResizeWatcher>().Menu = menu;
                 menu.gameObject.AddComponent<PadSupport>().Menu = menu;
                 menu.gameObject.AddComponent<UpdateResultWatcher>().Menu = menu;
@@ -266,7 +266,7 @@ namespace DragNWash.ModFramework.Mods
         // Each side sits on a solid panel in the Tool window's colours: over
         // the game's see-through panel, how readable the text was depended on
         // the picture behind the menu.
-        private static RectTransform SplitForDetails(Transform panel)
+        private static void SplitForDetails(Transform panel, ModsMenu menu)
         {
             var scroll = (RectTransform)panel.Find("Scroll View");
             Transform horizontal = scroll.Find("Scrollbar Horizontal");
@@ -291,8 +291,17 @@ namespace DragNWash.ModFramework.Mods
             listCard.offsetMin = new Vector2(ModsMenu.ListPanelLeft, 0f);
             ModsLook.Shape(listCard.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
 
+            // The search field and the filters stay above the scrolling list.
             scroll.SetParent(split, false);
             Fill(scroll, 0f, 0.45f);
+            scroll.offsetMax = new Vector2(0f, -ModsMenu.ListTopHeight);
+            RectTransform listTop = ModsLook.Rect(split, "ListTop");
+            Fill(listTop, 0f, 0.45f);
+            listTop.anchorMin = new Vector2(0f, 1f);
+            listTop.pivot = new Vector2(0.5f, 1f);
+            listTop.offsetMin = new Vector2(0f, -ModsMenu.ListTopHeight);
+            listTop.offsetMax = Vector2.zero;
+            menu.ListTop = listTop;
 
             RectTransform detailsCard = ModsLook.Rect(split, "DetailsPanel");
             Fill(detailsCard, 0.47f, 1f);
@@ -301,7 +310,7 @@ namespace DragNWash.ModFramework.Mods
             var details = (RectTransform)new GameObject("Details", typeof(RectTransform)).transform;
             details.SetParent(split, false);
             Fill(details, 0.47f, 1f);
-            return details;
+            menu.Details = details;
         }
 
         private static void Fill(RectTransform rect, float left, float right)

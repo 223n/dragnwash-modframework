@@ -60,6 +60,9 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - The list and the details sit on solid panels in the Tool window's colours, with rounded corners. Before, they were drawn on the game's see-through panel, so how easy the text was to read depended on the picture behind the menu. The rounded corners are small shapes the framework draws in code when the game starts; there are no image files.
 - The frame that shows where the gamepad is has rounded corners and the accent colour.
+- The list puts your own mods first, under "Your mods". The framework and its libraries are folded into "Libraries" at the bottom, so they no longer fill the top of the list; press the row to open it. When a library needs attention or has an update, the folded row says so.
+- Each row shows the mod's icon (or its initials on a coloured square when it has none), its name at one size, its version and author, a picture of its switch, and every tag that applies: Not loaded, Conflict, Online, Update and Needs restart. The row of the mod the details show is marked with a line on its left. Rows are 80 high instead of 96, so more fit on the screen.
+- A search field above the list finds mods by name, id or author, and the filters All, On, Off and Needs attention show how many mods each holds. "Needs attention" means a conflict, a connection the mod didn't declare, a mod that didn't load, or a feature this game build doesn't have.
 
 ### Mods screen: fixes
 

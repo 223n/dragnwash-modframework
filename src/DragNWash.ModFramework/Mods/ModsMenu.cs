@@ -53,7 +53,7 @@ namespace DragNWash.ModFramework.Mods
         // over the start of the list; keep the text clear of it.
         private const float ListLeftMargin = 110f;
         internal const float ListPanelLeft = ListLeftMargin - 34f;
-        private const float RowHeight = 96f;
+        private const float RowHeight = 80f;
 
         private static readonly Color OnColor = new Color(0.36f, 0.62f, 0.36f, 1f);
         private static readonly Color OffColor = new Color(0.62f, 0.3f, 0.27f, 1f);
@@ -72,13 +72,16 @@ namespace DragNWash.ModFramework.Mods
             _confirmingUninstall = null;
             _settingsFor = null;
             _page = null;
+            _query = "";
+            _filter = ListFilter.All;
+            _search?.SetTextWithoutNotify("");
             DropCheck();
             try
             {
                 // The loaded mods at once; the rest when the check is in (ModsMenu.Check.cs).
                 _entries = ModCatalog.Build(null);
                 _conflicts = new List<PatchConflicts.Conflict>();
-                _selected = _entries.FirstOrDefault(e => SameMod(e, _selected)) ?? _entries.FirstOrDefault();
+                _selected = _entries.FirstOrDefault(e => SameMod(e, _selected)) ?? FirstShown(_entries);
                 StartCheck();
                 RebuildList();
                 RebuildDetails(false);
@@ -118,6 +121,12 @@ namespace DragNWash.ModFramework.Mods
             {
                 return;
             }
+            // The list's filters and tags are measured too.
+            if (_settingsFor == null)
+            {
+                RebuildKeepingFocus();
+                return;
+            }
             GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             string focusName = focused != null && _detailParts.Contains(focused) ? focused.name : null;
             RebuildDetails(false);
@@ -136,6 +145,7 @@ namespace DragNWash.ModFramework.Mods
             _selected = entry;
             _confirming = null;
             _confirmingUninstall = null;
+            MarkShownRow();
             RebuildDetails(false);
         }
 
@@ -152,123 +162,22 @@ namespace DragNWash.ModFramework.Mods
             }
             _rows.Clear();
 
+            // The search and the filters are for the mods, not for a mod's settings.
+            if (ListTop != null)
+            {
+                ListTop.gameObject.SetActive(_settingsFor == null);
+            }
             if (_settingsFor != null)
             {
                 BuildSettingsList();
                 return;
             }
 
-            foreach (ModCatalog.Entry entry in _entries)
-            {
-                _rows.Add(CreateListRow(entry));
-            }
+            BuildModList();
             if (Checking)
             {
                 _rows.Add(CreateCheckingRow());
             }
-        }
-
-        private GameObject CreateListRow(ModCatalog.Entry entry)
-        {
-            var row = new GameObject("Mod " + entry.Name, typeof(RectTransform));
-            row.transform.SetParent(Content, false);
-            LayoutElement layout = row.AddComponent<LayoutElement>();
-            layout.minHeight = RowHeight;
-            layout.preferredHeight = RowHeight;
-            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, RowHeight);
-            layout.flexibleWidth = 1f;
-
-            var band = new GameObject("Band", typeof(RectTransform));
-            var bandRect = (RectTransform)band.transform;
-            bandRect.SetParent(row.transform, false);
-            bandRect.anchorMin = Vector2.zero;
-            bandRect.anchorMax = Vector2.one;
-            bandRect.offsetMin = new Vector2(ListLeftMargin - 20f, 6f);
-            bandRect.offsetMax = new Vector2(0f, -6f);
-            Image bandImage = ModsLook.Shape(band, ModsLook.Rounded, Color.white);
-
-            Button button = band.AddComponent<Button>();
-            button.targetGraphic = bandImage;
-            button.colors = ListColors(button.colors);
-            ModRowSelect select = band.AddComponent<ModRowSelect>();
-            select.Menu = this;
-            select.Entry = entry;
-            button.onClick.AddListener(() =>
-            {
-                Select(entry);
-                // With the pad, pressing a mod moves on to its buttons.
-                if (PadSupport.PadPressedThisFrame())
-                {
-                    Focus("Settings", "Switch");
-                }
-            });
-
-            // From the right: the on/off state, then a tag, each as wide as its
-            // text (which differs a lot between languages); the name takes what
-            // is left and ends in an ellipsis. Measured widths do not depend on
-            // the window size, so the row holds together however narrow it gets.
-            float used = 20f;
-            if (!entry.IsFramework && !entry.IsPatcher)
-            {
-                TMP_Text state = UiText.Create(band.transform, "State", entry.PendingUninstall ? TextUninstall : entry.WantOn ? TextOn : TextOff, UiText.BodySize);
-                state.color = entry.PendingUninstall ? WarnColor : entry.WantOn ? new Color(0.65f, 0.95f, 0.65f, 1f) : new Color(1f, 0.6f, 0.55f, 1f);
-                used += FitRight(state, used) + 16f;
-            }
-
-            // Every tag that applies: a library can have a conflict or an update
-            // too, and one tag must not hide another.
-            bool conflict = ConflictsOf(entry).Count > 0;
-            bool update = entry.Loaded && Updates.UpdateCheck.NewerRelease(entry.Guid, entry.Version) != null;
-            if (update)
-            {
-                TMP_Text tag = UiText.Create(band.transform, "Update", TextUpdateTag, UiText.BodySize * 0.8f);
-                tag.color = UpdateColor;
-                used += FitRight(tag, used) + 16f;
-            }
-            if (conflict)
-            {
-                TMP_Text tag = UiText.Create(band.transform, "Conflict", TextConflictTag, UiText.BodySize * 0.8f);
-                tag.color = WarnColor;
-                used += FitRight(tag, used) + 16f;
-            }
-            if (entry.IsLibrary)
-            {
-                TMP_Text tag = UiText.Create(band.transform, "Library", TextLibrary, UiText.BodySize * 0.8f);
-                tag.color = new Color(0.7f, 0.8f, 1f, 1f);
-                used += FitRight(tag, used) + 16f;
-            }
-            if (IsOnline(entry, out bool undeclaredOnline))
-            {
-                TMP_Text net = UiText.Create(band.transform, "Online", TextOnlineTag, UiText.BodySize * 0.8f);
-                net.color = undeclaredOnline ? WarnColor : OnlineColor;
-                used += FitRight(net, used) + 16f;
-            }
-
-            TMP_Text name = UiText.Create(band.transform, "Name", Escape(entry.DisplayName), UiText.NameSize);
-            name.alignment = TextAlignmentOptions.MidlineLeft;
-            name.textWrappingMode = TextWrappingModes.NoWrap;
-            name.overflowMode = TextOverflowModes.Ellipsis;
-            var nameRect = (RectTransform)name.transform;
-            nameRect.offsetMin = new Vector2(20f, 0f);
-            nameRect.offsetMax = new Vector2(-used, 0f);
-            return row;
-        }
-
-        // Puts a one-line label at the right of its row, ending `right` pixels
-        // from the row's right edge and as wide as its text. Returns the width.
-        private static float FitRight(TMP_Text label, float right)
-        {
-            label.enableAutoSizing = false;
-            label.textWrappingMode = TextWrappingModes.NoWrap;
-            label.alignment = TextAlignmentOptions.MidlineRight;
-            float width = Mathf.Ceil(label.GetPreferredValues(label.text).x) + 2f;
-            var rect = (RectTransform)label.transform;
-            rect.anchorMin = new Vector2(1f, 0f);
-            rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 0.5f);
-            rect.offsetMin = new Vector2(-right - width, 0f);
-            rect.offsetMax = new Vector2(-right, 0f);
-            return width;
         }
 
         // ---- details ----
@@ -834,18 +743,6 @@ namespace DragNWash.ModFramework.Mods
             {
                 ModFramework.Log.LogError($"Could not show update check results: {ex}");
             }
-        }
-    }
-
-    // Shows a mod's details as soon as its row is selected, by mouse or pad.
-    internal sealed class ModRowSelect : MonoBehaviour, ISelectHandler
-    {
-        internal ModsMenu Menu;
-        internal ModCatalog.Entry Entry;
-
-        public void OnSelect(BaseEventData eventData)
-        {
-            Menu?.Select(Entry);
         }
     }
 }
