@@ -162,6 +162,13 @@ namespace DragNWash.ModFramework.Assets
             return name != null && ByName.TryGetValue(name, out TextureReplacement r) && r.Texture != null ? r : null;
         }
 
+        // For the Assets tab: what applies to a name now, whether a language
+        // picture's folder is switched off, and a count that goes up whenever
+        // what the replacements list shows may have changed.
+        internal static TextureReplacement EffectiveFor(string name) => Effective(name);
+        internal static bool IsSwitchedOff(TextureReplacement r) => r != null && FolderOf.TryGetValue(r, out LanguageFolder f) && !f.Enabled;
+        internal static int Revision { get; private set; }
+
         // Direct3D 12 waiting for a restart: the loaded pictures stay in memory
         // but no longer apply, as if their folders were off.
         private static readonly HashSet<TextureReplacement> Suspended = new HashSet<TextureReplacement>();

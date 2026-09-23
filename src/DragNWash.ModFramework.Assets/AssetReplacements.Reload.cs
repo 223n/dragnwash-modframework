@@ -168,6 +168,7 @@ namespace DragNWash.ModFramework.Assets
         // failure is that file's result; the others still go.
         private static void ReloadOne(TextureReplacement r, List<ReloadResult> results)
         {
+            Revision++;
             try
             {
                 Texture2D fresh = GameAssets.LoadTextureFresh(r.Path, out string error);

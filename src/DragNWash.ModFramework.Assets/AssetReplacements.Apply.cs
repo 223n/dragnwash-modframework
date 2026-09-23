@@ -115,6 +115,7 @@ namespace DragNWash.ModFramework.Assets
         /// </summary>
         public static int ApplyNow()
         {
+            Revision++;
             if (ByName.Count == 0 && LanguageByName.Count == 0)
             {
                 return 0;
