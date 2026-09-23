@@ -131,7 +131,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (GUI.Button(new Rect(bx, y, 120, row), "Show private", _showPrivate ? s.SelectedButton : s.Button))
                 {
                     _showPrivate = !_showPrivate;
-                    if (_showPrivate) _status = "Private members: setting them is the mod author's own risk.";
+                    if (_showPrivate) Tell("Private members: setting them is the mod author's own risk.", NoticeKind.Warning);
                 }
                 bx += 128;
                 if (GUI.Button(new Rect(bx, y, 80, row), "Freeze", _freeze ? s.SelectedButton : s.Button))

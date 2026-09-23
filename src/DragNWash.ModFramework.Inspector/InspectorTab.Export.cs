@@ -16,6 +16,7 @@ namespace DragNWash.ModFramework.Inspector
         private static string _exportAuthor = "";
         private static string _exportDescription = "";
         private static string _exportNote = "";
+        private static bool _exportOk;
 
         // The mod's name, author and description, what will be written, and Export.
         private static float DrawExportForm(float x, float y, float w, ToolWindowStyles s, float row)
@@ -28,7 +29,8 @@ namespace DragNWash.ModFramework.Inspector
             _exportDescription = ExportField("Description", _exportDescription, x, ref y, w, labelW, s, row);
             if (GUI.Button(new Rect(x, y, 100, row), "Export", rows.Count > 0 ? s.Button : s.SelectedButton) && rows.Count > 0)
             {
-                _exportNote = InspectorExport.Write(_exportName, _exportAuthor, _exportDescription);
+                _exportNote = InspectorExport.Write(_exportName, _exportAuthor, _exportDescription, out _exportOk);
+                Tell(_exportNote, _exportOk ? NoticeKind.Info : NoticeKind.Error);
             }
             if (GUI.Button(new Rect(x + 108, y, 90, row), "Cancel", s.Button))
             {
@@ -37,7 +39,7 @@ namespace DragNWash.ModFramework.Inspector
             y += row + 4;
             if (!string.IsNullOrEmpty(_exportNote))
             {
-                y = WrappedLine(_exportNote, x, y, w, _accentCell, row);
+                y = WrappedLine(_exportNote, x, y, w, _exportOk ? _mutedCell : _errorCell, row);
             }
             return y + 4;
         }

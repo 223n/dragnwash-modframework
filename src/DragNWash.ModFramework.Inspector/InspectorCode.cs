@@ -496,6 +496,9 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         // The code graph opens in the browser through the Bridge (docs/CODE_GRAPH.md), when it is installed and on.
+        // The first time, the game's code is read before the page opens, under
+        // Busy, so the wait shows here instead of as a frozen game and a page
+        // that does not answer.
         private static void OpenGraph(string focus)
         {
             if (Operations.Find("bridge.page.open") == null)
@@ -503,6 +506,20 @@ namespace DragNWash.ModFramework.Inspector
                 TW.ShowNotice("The graph needs the Bridge library, on (its tab in this window).", NoticeKind.Warning);
                 return;
             }
+            if (!InspectorCodeGraph.Indexed)
+            {
+                InspectorTab.RunBusy("Reading the game's code...", "Only the first time; the graph opens after", () =>
+                {
+                    InspectorCodeGraph.Index();
+                    OpenGraphPage(focus);
+                });
+                return;
+            }
+            OpenGraphPage(focus);
+        }
+
+        private static void OpenGraphPage(string focus)
+        {
             OperationResult r = Operations.CallNow("bridge.page.open", new Dictionary<string, object> { ["focus"] = focus }, "inspector");
             if (r.Ok) TW.ShowNotice("The graph opens in your browser.", NoticeKind.Info, 6f);
             else TW.ShowNotice(r.Error, NoticeKind.Error);

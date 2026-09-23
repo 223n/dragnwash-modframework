@@ -113,7 +113,7 @@ namespace DragNWash.ModFramework.Inspector
             _page = 1;
             if (e == null)
             {
-                _status = $"{InspectorObjects.Describe(listed)} is not among the objects listed.";
+                Tell($"{InspectorObjects.Describe(listed)} is not among the objects listed.", NoticeKind.Warning);
                 return;
             }
             if (e.Hidden && !_showHidden)
@@ -138,7 +138,7 @@ namespace DragNWash.ModFramework.Inspector
             UnityEngine.Object o = InspectorObjects.Find(e);
             if (o == null)
             {
-                _status = $"{(string.IsNullOrEmpty(e.Name) ? "(no name)" : e.Name)} was destroyed since the list was made; Refresh lists the objects again.";
+                Tell($"{(string.IsNullOrEmpty(e.Name) ? "(no name)" : e.Name)} was destroyed since the list was made; Refresh lists the objects again.", NoticeKind.Warning);
                 return;
             }
             _assetObject = o as GameObject;
@@ -359,7 +359,17 @@ namespace DragNWash.ModFramework.Inspector
 
         // ---- Used by ------------------------------------------------------------------------------
 
+        // Looking goes through every loaded object and holds the game for a
+        // moment, so the tab says so first (RunBusy) and looks on the next frame.
         private static void RunUsedBy(UnityEngine.Object o)
+        {
+            RunBusy($"Looking where {InspectorObjects.Describe(o)} is used...", "Renderers, materials, sprites, sounds, animators and scripts' fields", () =>
+            {
+                if (o != null && o) LookUsedBy(o);
+            });
+        }
+
+        private static void LookUsedBy(UnityEngine.Object o)
         {
             _usedBy = InspectorObjects.UsedBy(o, InspectorObjects.HitCap, out _usedBySummary);
             _usedByFor = o.GetInstanceID();
@@ -415,7 +425,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (GUI.Button(new Rect(inner - 46, ry + 2, 44, row - 4), "Go", s.Button))
                 {
                     UnityEngine.Object holder = InspectorObjects.Find(hit.Id);
-                    if (holder == null) _status = $"{hit.Where} was destroyed since Used by looked.";
+                    if (holder == null) Tell($"{hit.Where} was destroyed since Used by looked.", NoticeKind.Error);
                     else Select(holder);
                 }
             }
@@ -430,7 +440,7 @@ namespace DragNWash.ModFramework.Inspector
                 return;
             }
             _sharedNoteShown = true;
-            _status = "A shared object: the change shows everywhere it is used (Used by lists where), until the game reloads it or quits. Nothing is saved.";
+            Tell("A shared object: the change shows everywhere it is used (Used by lists where), until the game reloads it or quits. Nothing is saved.", NoticeKind.Warning);
         }
 
         // ---- the Assets tab, when the Assets library is loaded ------------------------------------
@@ -461,7 +471,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             else
             {
-                _status = $"Texture {texture.name}: the Assets library is not loaded.";
+                Tell($"Texture {texture.name}: the Assets library is not loaded.", NoticeKind.Warning);
             }
         }
 

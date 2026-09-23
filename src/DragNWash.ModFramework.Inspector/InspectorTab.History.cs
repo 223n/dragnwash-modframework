@@ -25,7 +25,7 @@ namespace DragNWash.ModFramework.Inspector
             GUI.enabled = wasEnabled && InspectorHistory.Count > 0;
             if (GUI.Button(new Rect(bx, y, 100, row), "Undo last", s.Button))
             {
-                _status = InspectorHistory.Undo();
+                UndoLast();
             }
             bx += 108;
             // Clearing loses every Revert and cannot be taken back, so it asks.
@@ -87,10 +87,11 @@ namespace DragNWash.ModFramework.Inspector
                     {
                         bool redo = e.Reverted;
                         string problem = redo ? InspectorHistory.Reapply(e) : InspectorHistory.Revert(e);
-                        _status = problem != null
+                        string result = problem != null
                             ? $"{(redo ? "Redo" : "Revert")} of {e.Member} failed: {problem}"
                             : $"{(redo ? "Reapplied" : "Reverted")} {e.Member} = {InspectorModel.Format(redo ? e.After : e.Before)}";
-                        InspectorPlugin.Log.LogInfo($"[inspector] {_status}");
+                        Tell(result, problem != null ? NoticeKind.Error : NoticeKind.Info);
+                        InspectorPlugin.Log.LogInfo($"[inspector] {result}");
                     }
                     if (GUI.Button(new Rect(inner - 76, ry + 2, 72, row - 4), "Copy", s.Button))
                     {
@@ -100,6 +101,13 @@ namespace DragNWash.ModFramework.Inspector
                 ry += lineH;
             }
             GUI.EndScrollView();
+        }
+
+        // Undo last and Ctrl+Z: the latest edit of this session's own that still stands.
+        private static void UndoLast()
+        {
+            string result = InspectorHistory.Undo(out bool failed);
+            Tell(result, failed ? NoticeKind.Error : NoticeKind.Info);
         }
     }
 }

@@ -224,9 +224,11 @@ namespace DragNWash.ModFramework.Inspector
 
         // ---- writing -------------------------------------------------------------------
 
-        // Writes the mod folder; returns what happened, for the History view.
-        internal static string Write(string name, string author, string description)
+        // Writes the mod folder; returns what happened, for the History view,
+        // and whether it was written.
+        internal static string Write(string name, string author, string description, out bool ok)
         {
+            ok = false;
             List<Row> rows = Collect(out List<string> skipped);
             if (rows.Count == 0)
             {
@@ -240,14 +242,23 @@ namespace DragNWash.ModFramework.Inspector
             {
                 return $"BepInEx/plugins/{folderName} already holds something that is not an overrides mod; choose another name.";
             }
-            Directory.CreateDirectory(overrides);
-            if (!exists)
-            {
-                File.WriteAllText(Path.Combine(folder, "mod.json"), Manifest(name, author, description), new UTF8Encoding(false));
-            }
             // A second export into the same mod adds a file; the mod.json stays.
             string file = exists ? $"inspector-{DateTime.Now:yyyyMMdd-HHmmss}.json" : "main.json";
-            File.WriteAllText(Path.Combine(overrides, file), OverridesJson(rows), new UTF8Encoding(false));
+            try
+            {
+                Directory.CreateDirectory(overrides);
+                if (!exists)
+                {
+                    File.WriteAllText(Path.Combine(folder, "mod.json"), Manifest(name, author, description), new UTF8Encoding(false));
+                }
+                File.WriteAllText(Path.Combine(overrides, file), OverridesJson(rows), new UTF8Encoding(false));
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                InspectorPlugin.Log.LogWarning($"[export] Could not write BepInEx/plugins/{folderName}: {ex.Message}");
+                return $"Could not write BepInEx/plugins/{folderName}: {ex.Message}";
+            }
+            ok = true;
             InspectorPlugin.Log.LogInfo($"[export] {rows.Count} override(s) to BepInEx/plugins/{folderName}/overrides/{file}; {skipped.Count} edit(s) left out.");
             foreach (string s in skipped) InspectorPlugin.Log.LogInfo("[export] left out: " + s);
             return $"Exported {rows.Count} value(s) to BepInEx/plugins/{folderName}/overrides/{file}{(skipped.Count > 0 ? $"; {skipped.Count} edit(s) could not be (see the log)" : "")}. Type \"overrides reload\" in the Console, or restart the game, to run it as a mod.";

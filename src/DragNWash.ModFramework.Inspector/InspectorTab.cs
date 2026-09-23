@@ -217,6 +217,7 @@ namespace DragNWash.ModFramework.Inspector
             float row = TW.RowHeight, pad = TW.Padding;
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
             Event ev = Event.current;
+            RunBusyWork(ev);
 
             // A button paints its hover look wherever the pointer is, even under
             // a menu. While the pointer is over an open menu, everything painted
@@ -319,7 +320,7 @@ namespace DragNWash.ModFramework.Inspector
                     // the ones a setting names.
                     switch (ev.keyCode)
                     {
-                        case KeyCode.Z: _status = InspectorHistory.Undo(); break;
+                        case KeyCode.Z: UndoLast(); break;
                         case KeyCode.UpArrow:
                             if (ctrl && SelectedObject != null && SelectedObject.transform.parent != null) Select(SelectedObject.transform.parent.gameObject);
                             else handled = !ctrl && ListKey(KeyCode.UpArrow);
@@ -681,6 +682,56 @@ namespace DragNWash.ModFramework.Inspector
             float h = Mathf.Max(row, wrapped.CalcHeight(content, w));
             GUI.Label(new Rect(x, y, w, h), content, wrapped);
             return y + h;
+        }
+
+        // ---- results and waits ---------------------------------------------------------
+
+        // The outcome of something the person did, in the footer's notice
+        // strip: the status line is hidden behind the breadcrumb while Scene
+        // has a selection, so a result put there could go unseen. Errors red,
+        // warnings yellow, the rest in the accent colour.
+        private static void Tell(string text, NoticeKind kind = NoticeKind.Info)
+        {
+            TW.ShowNotice(Drawable(text), kind, kind == NoticeKind.Info ? 6f : 8f);
+        }
+
+        // Work that holds the game for a moment (Used by's look through every
+        // object, the first reading of the game's code): the tab shows Busy
+        // first and runs it once the window has drawn that, so the wait says
+        // what it is instead of looking like a freeze.
+        private static Action _busyWork;
+        private static string _busyWhat, _busyDetail;
+        private static int _busyPaints;
+
+        internal static void RunBusy(string what, string detail, Action work)
+        {
+            _busyWork = work;
+            _busyWhat = what;
+            _busyDetail = detail;
+            _busyPaints = 0;
+        }
+
+        // Busy is drawn from the frame after the tab first asks for it, so
+        // the work waits for a second paint: by then the window shows it.
+        private static void RunBusyWork(Event ev)
+        {
+            if (_busyWork == null)
+            {
+                return;
+            }
+            TW.Busy(_busyWhat, _busyDetail);
+            if (ev.type == EventType.Repaint)
+            {
+                _busyPaints++;
+                return;
+            }
+            if (_busyPaints < 2)
+            {
+                return;
+            }
+            Action work = _busyWork;
+            _busyWork = null;
+            work();
         }
 
         // ---- helpers -------------------------------------------------------------------

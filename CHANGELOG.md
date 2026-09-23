@@ -14,6 +14,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 - The Edit and View menus, the Tree and Pick tooltips and the free camera's notice name the key you set, and leave it out when there's none.
 - `ModFramework.SharedKeyNote(ConfigEntryBase)` (core), new: the line the Mods screen shows under a shortcut setting whose key another setting also has, for a mod that lets people change keys in a window of its own. The Mods screen uses it as well, so both always say the same thing.
 
+### Inspector: easier to read and reach
+
+- What happens after you press something now shows in the notice strip at the bottom of the window, where you can't miss it: Undo last and Ctrl+Z, Revert and Redo in History, Show private's warning, a Go in Used by whose object is gone, a texture's Assets button without the Assets library, and Export as overrides. A failure is red and a warning yellow. Before, most of these went to the status line, which is hidden behind the breadcrumb while an object is selected in Scene, so a Revert that failed looked like nothing happened. An export that fails is red in the form too, and a folder that can't be written now says so instead of stopping the tab.
+- Used by and the first Graph button of a session show "Looking where ... is used" or "Reading the game's code..." in the middle of the tab before they start, instead of freezing the window without a word.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.
