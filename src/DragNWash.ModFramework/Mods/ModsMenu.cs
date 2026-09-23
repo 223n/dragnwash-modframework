@@ -519,20 +519,23 @@ namespace DragNWash.ModFramework.Mods
                 }
             }
 
-            // A row of up to two buttons above Switch and Settings: the release page
-            // first, then the pages the mod added.
+            // A row of buttons above Switch and Settings: the release page first,
+            // then every page the mod added. They share the row's width, so none
+            // is left out; with many, their labels shrink.
+            int slots = pages.Count + (newer != null ? 1 : 0);
+            float slotWidth = slots == 0 ? 0f : (0.92f - (slots - 1) * 0.02f) / slots;
             int slot = 0;
             if (newer != null)
             {
                 string url = newer.Url;
-                MakeButton("Release", TextOpenReleasePage, 0.04f, 0.4f, 0.18f, 0.26f, SettingsColor, () => OpenReleasePage(url));
+                MakeButton("Release", TextOpenReleasePage, 0.04f, 0.04f + slotWidth, 0.18f, 0.26f, SettingsColor, () => OpenReleasePage(url));
                 slot++;
             }
-            for (int i = 0; i < pages.Count && slot < 2; i++, slot++)
+            for (int i = 0; i < pages.Count; i++, slot++)
             {
                 ModsScreenPage page = pages[i];
-                float left = 0.04f + slot * 0.4f;
-                MakeButton("Page" + i, page.Title, left, left + 0.36f, 0.18f, 0.26f, SettingsColor, () => OpenPage(entry, page));
+                float left = 0.04f + slot * (slotWidth + 0.02f);
+                MakeButton("Page" + i, page.Title, left, left + slotWidth, 0.18f, 0.26f, SettingsColor, () => OpenPage(entry, page));
             }
         }
 
