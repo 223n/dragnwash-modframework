@@ -389,26 +389,18 @@ namespace DragNWash.ModFramework.Mods
             {
                 return null;
             }
-            List<KeyBindings.Bound> others;
+            string note;
             try
             {
-                others = KeyBindings.SharingKeyWith(item.Entry);
+                note = KeyBindings.Note(item.Entry);
             }
             catch (Exception ex)
             {
                 ModFramework.Log.LogWarning($"Could not look for other mods on the key of {item.Section}.{item.Key}: {ex.Message}");
                 return null;
             }
-            if (others.Count == 0)
-            {
-                return null;
-            }
-            // By the name each setting has on its own page, and its mod's when
-            // that is another one.
-            IEnumerable<string> names = others.Select(b =>
-                Escape(ConfigItem.TitleOf(b.Entry)) + (b.Guid == _settingsFor?.Guid ? "" : " (" + Escape(b.Mod) + ")"));
-            string key = ((KeyboardShortcut)item.Entry.BoxedValue).MainKey.ToString();
-            return key + " " + TextAlsoUsedBy + " " + string.Join(", ", names.Distinct()) + ". " + (others.Count == 1 ? TextBothAnswer : TextAllAnswer);
+            // The names are the mods' own words: not read as rich text.
+            return note == null ? null : Escape(note);
         }
 
         // A text field for values BepInEx reads as text (strings, shortcuts,

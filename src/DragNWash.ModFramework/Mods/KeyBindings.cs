@@ -53,6 +53,44 @@ namespace DragNWash.ModFramework.Mods
             return All().Where(b => b.Shortcut.MainKey == own.MainKey && !ReferenceEquals(b.Entry, entry)).ToList();
         }
 
+        /// <summary>
+        /// What the Mods screen says under a shortcut setting that shares its
+        /// key, or null when none does: each other setting by the name it has
+        /// on its own page, with its mod's name after it when that is another mod.
+        /// </summary>
+        internal static string Note(ConfigEntryBase entry)
+        {
+            List<Bound> others = SharingKeyWith(entry);
+            if (others.Count == 0)
+            {
+                return null;
+            }
+            string own = OwnerOf(entry);
+            IEnumerable<string> names = others.Select(b => ConfigItem.TitleOf(b.Entry) + (b.Guid == own ? "" : " (" + b.Mod + ")"));
+            string key = ((KeyboardShortcut)entry.BoxedValue).MainKey.ToString();
+            return key + " " + ModsMenu.TextAlsoUsedBy + " " + string.Join(", ", names.Distinct()) + ". " + (others.Count == 1 ? ModsMenu.TextBothAnswer : ModsMenu.TextAllAnswer);
+        }
+
+        // The plugin whose config file holds the entry, or null.
+        private static string OwnerOf(ConfigEntryBase entry)
+        {
+            foreach (KeyValuePair<string, PluginInfo> pair in Chainloader.PluginInfos)
+            {
+                try
+                {
+                    if (entry.ConfigFile != null && ReferenceEquals(pair.Value?.Instance?.Config, entry.ConfigFile))
+                    {
+                        return pair.Key;
+                    }
+                }
+                catch (Exception)
+                {
+                    // A plugin that failed to start has no config to compare.
+                }
+            }
+            return null;
+        }
+
         /// <summary>Every keyboard shortcut every loaded plugin has a setting for.</summary>
         internal static List<Bound> All()
         {

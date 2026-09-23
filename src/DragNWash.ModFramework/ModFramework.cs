@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using UnityEngine;
 
@@ -96,6 +97,30 @@ namespace DragNWash.ModFramework
                 .Select(b => $"{b.Mod}: {b.Setting}")
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
+        }
+
+        /// <summary>
+        /// The line the Mods screen shows under a shortcut setting whose key
+        /// another setting also has, for a mod that lets the player change a key
+        /// in a window of its own: <c>C is also used by Screenshot key (Photo
+        /// Mode). Both will answer it.</c> Each other setting is named as on its
+        /// own settings page, with its mod's name after it when that is another
+        /// mod; settings of the same mod count too. Null when no other setting
+        /// in any loaded plugin has the main key of <paramref name="shortcut"/>,
+        /// or when it is not a <c>KeyboardShortcut</c> setting. Like
+        /// <see cref="WhoElseUses"/>, a report and nothing more. Since 1.5.0.
+        /// </summary>
+        public static string SharedKeyNote(ConfigEntryBase shortcut)
+        {
+            try
+            {
+                return Mods.KeyBindings.Note(shortcut);
+            }
+            catch (Exception)
+            {
+                // A plugin's config that cannot be read is no reason to fail a draw.
+                return null;
+            }
         }
 
         /// <summary>
