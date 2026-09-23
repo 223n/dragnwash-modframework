@@ -130,7 +130,12 @@ namespace DragNWash.ModFramework.Inspector
             var seen = new HashSet<int>();
             foreach (Type componentType in types)
             {
-                foreach (UnityEngine.Object o in Resources.FindObjectsOfTypeAll(componentType))
+                // A type Unity can't look for (an open generic one) is passed over,
+                // not thrown on in the middle of drawing.
+                UnityEngine.Object[] all;
+                try { all = Resources.FindObjectsOfTypeAll(componentType); }
+                catch (Exception) { continue; }
+                foreach (UnityEngine.Object o in all)
                 {
                     Transform t = o is Component c && c != null ? c.transform : null;
                     if (t == null || !t.gameObject.scene.IsValid() || t.hideFlags != HideFlags.None)
@@ -197,7 +202,7 @@ namespace DragNWash.ModFramework.Inspector
                     catch (Exception) { continue; }
                     foreach (Type t in types)
                     {
-                        if (t == null || !typeof(Component).IsAssignableFrom(t)) continue;
+                        if (t == null || t.ContainsGenericParameters || !typeof(Component).IsAssignableFrom(t)) continue;
                         if (!_componentTypes.TryGetValue(t.Name, out List<Type> list))
                         {
                             _componentTypes[t.Name] = list = new List<Type>();

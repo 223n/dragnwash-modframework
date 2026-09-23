@@ -58,6 +58,8 @@ namespace DragNWash.ModFramework.Inspector
         {
             GUI.Label(new Rect(x, y, labelW, row), label, _mutedCell);
             var field = new Rect(x + labelW, y, w - labelW, row);
+            // Named, so typing in it sets off no shortcut.
+            GUI.SetNextControlName("DnWInspectExport" + label);
             string next = GUI.TextField(field, value ?? "", s.TextField);
             TW.Underline(field);
             y += row + 2;

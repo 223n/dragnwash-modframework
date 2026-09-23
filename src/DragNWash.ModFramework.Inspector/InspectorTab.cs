@@ -535,12 +535,11 @@ namespace DragNWash.ModFramework.Inspector
                     _page = 0;
                 }
             }
-            bool typing = InspectorModel.IsTypeSearch(_search) && Time.realtimeSinceStartup - _searchChangedAt < TypeSearchWait;
-            if (_search != _searched && !typing)
+            if (_search != _searched && !(Time.realtimeSinceStartup - _searchChangedAt < TypeSearchWait && InspectorModel.IsTypeSearch(_search)))
             {
                 _searched = _search;
                 if (InspectorDebugView.Mode == InspectorDebugView.Scope.Filter) InspectorDebugView.Filter = _search ?? "";
-                _results = string.IsNullOrEmpty(_search) ? null : InspectorModel.SearchScene(_search, SearchMax, out _resultsMore, out _resultsTypeKnown);
+                SetSearchResults(_search);
                 _scrollTree = Vector2.zero;
                 if (_results != null) _showHierarchy = true;
             }
@@ -755,7 +754,7 @@ namespace DragNWash.ModFramework.Inspector
         // what it is instead of looking like a freeze.
         private static Action _busyWork;
         private static string _busyWhat, _busyDetail;
-        private static int _busyPaints;
+        private static int _busyPaints, _busyFrame;
 
         internal static void RunBusy(string what, string detail, Action work)
         {
@@ -763,17 +762,27 @@ namespace DragNWash.ModFramework.Inspector
             _busyWhat = what;
             _busyDetail = detail;
             _busyPaints = 0;
+            _busyFrame = Time.frameCount;
         }
 
         // Busy is drawn from the frame after the tab first asks for it, so
         // the work waits for a second paint: by then the window shows it.
+        // Work asked for before the window closed or the tab changed is
+        // dropped: done on coming back, it would come out of nowhere.
         private static void RunBusyWork(Event ev)
         {
             if (_busyWork == null)
             {
                 return;
             }
-            TW.Busy(_busyWhat, _busyDetail);
+            if (Time.frameCount - _busyFrame > 1)
+            {
+                _busyWork = null;
+                return;
+            }
+            _busyFrame = Time.frameCount;
+            // An object's name can hold characters the window font lacks.
+            TW.Busy(Drawable(_busyWhat), _busyDetail == null ? null : Drawable(_busyDetail));
             if (ev.type == EventType.Repaint)
             {
                 _busyPaints++;
@@ -785,7 +794,16 @@ namespace DragNWash.ModFramework.Inspector
             }
             Action work = _busyWork;
             _busyWork = null;
-            work();
+            // What throws here must not stop the whole window's drawing.
+            try
+            {
+                work();
+            }
+            catch (Exception ex)
+            {
+                InspectorPlugin.Log.LogWarning($"[inspector] {_busyWhat} failed: {ex}");
+                Tell($"That didn't work: {(ex.InnerException ?? ex).Message}", NoticeKind.Error);
+            }
         }
 
         // ---- helpers -------------------------------------------------------------------

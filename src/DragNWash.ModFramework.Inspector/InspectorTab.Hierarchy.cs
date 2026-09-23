@@ -35,6 +35,21 @@ namespace DragNWash.ModFramework.Inspector
             {
                 return "Looking...";
             }
+            return _foundLine;
+        }
+
+        // SearchLine's words for the last search, made once when it runs
+        // instead of on every draw.
+        private static string _foundLine;
+
+        private static void SetSearchResults(string search)
+        {
+            _results = string.IsNullOrEmpty(search) ? null : InspectorModel.SearchScene(search, SearchMax, out _resultsMore, out _resultsTypeKnown);
+            _foundLine = _results == null ? null : FoundLine();
+        }
+
+        private static string FoundLine()
+        {
             InspectorModel.SplitSearch(_searched, out string words, out string type);
             if (type != null && !_resultsTypeKnown)
             {
@@ -68,14 +83,15 @@ namespace DragNWash.ModFramework.Inspector
             // (a destroyed Transform, not a heading), so search again.
             if (_results != null && _results.Exists(n => !ReferenceEquals(n.Transform, null) && n.Transform == null))
             {
-                _results = InspectorModel.SearchScene(_searched ?? "", SearchMax, out _resultsMore, out _resultsTypeKnown);
+                SetSearchResults(_searched ?? "");
             }
             // Over the results, a line saying what the search found, or that it found nothing.
             string found = SearchLine();
             if (found != null)
             {
                 var line = new Rect(pane.x + 4, pane.y + 2, pane.width - 8, row);
-                GUI.Label(line, new GUIContent(TW.Elide(Drawable(found), _mutedCell, line.width), Drawable(found)), _mutedCell);
+                found = Drawable(found);
+                GUI.Label(line, new GUIContent(TW.Elide(found, _mutedCell, line.width), found), _mutedCell);
                 pane = new Rect(pane.x, pane.y + row + 4, pane.width, pane.height - row - 4);
             }
             List<Node> nodes = _results ?? _tree ?? new List<Node>();

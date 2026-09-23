@@ -27,6 +27,7 @@ namespace DragNWash.ModFramework.Inspector
             _menuRow = r;
             _menuComponent = component;
             _menuValues = values;
+            _valuesWidth = 0;
             _menuAt = GUIUtility.GUIToScreenPoint(at) - _tabScreenOrigin;
         }
 
@@ -215,6 +216,13 @@ namespace DragNWash.ModFramework.Inspector
             {
                 scroll += ev.delta.y * 20f;
             }
+            // And the gamepad's stick, as in the panes: the View menu is
+            // taller than a short window, and a pad has no wheel.
+            var pad = new Vector2(0f, scroll);
+            if (TW.ApplyScroll(box, ref pad))
+            {
+                scroll = pad.y;
+            }
             scroll = Mathf.Clamp(scroll, 0f, Mathf.Max(0f, contentHeight - box.height));
         }
         // A thin bar on the right edge, only when the list does not fit.
@@ -326,6 +334,13 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         // An enum row's values, the one it has marked: picking one sets it.
+        // The values and the menu's width are kept for the type, since one
+        // like KeyCode has hundreds and the menu is drawn several times a frame.
+        private static Type _valuesType;
+        private static Array _values;
+        private static string[] _valueNames;
+        private static float _valuesWidth;
+
         private static void DrawValuesMenu(Rect area, ToolWindowStyles s, float row, RowInfo r, Event ev)
         {
             object now = SafeGet(r.Member, r.Getter);
@@ -333,31 +348,46 @@ namespace DragNWash.ModFramework.Inspector
             var marks = new List<string>();
             if (r.Type != null && r.Type.IsEnum)
             {
-                Array values = Enum.GetValues(r.Type);
-                string[] names = Enum.GetNames(r.Type);
-                for (int i = 0; i < values.Length && i < names.Length; i++)
+                if (_valuesType != r.Type)
                 {
-                    object value = values.GetValue(i);
+                    _valuesType = r.Type;
+                    _values = Enum.GetValues(r.Type);
+                    _valueNames = Enum.GetNames(r.Type);
+                    _valuesWidth = 0;
+                }
+                for (int i = 0; i < _values.Length && i < _valueNames.Length; i++)
+                {
+                    object value = _values.GetValue(i);
                     marks.Add(Mark(Equals(value, now), true));
-                    items.Add(new KeyValuePair<string, Action>(names[i], () => { TrySet(r, value); Drafts.Remove(r.Key); }));
+                    items.Add(new KeyValuePair<string, Action>(_valueNames[i], () => { TrySet(r, value); Drafts.Remove(r.Key); }));
                 }
             }
-            DrawMenuBox(area, s, row, r, ev, items, marks);
+            DrawMenuBox(area, s, row, r, ev, items, marks, ref _valuesWidth);
+        }
+
+        private static void DrawMenuBox(Rect area, ToolWindowStyles s, float row, RowInfo r, Event ev, List<KeyValuePair<string, Action>> items, List<string> marks)
+        {
+            float width = 0;
+            DrawMenuBox(area, s, row, r, ev, items, marks, ref width);
         }
 
         // The row menus' box: framed, kept inside the tab, scrolling with the
         // wheel when it is taller than the tab. Marks, when given, go in a
-        // column of their own before the items.
-        private static void DrawMenuBox(Rect area, ToolWindowStyles s, float row, RowInfo r, Event ev, List<KeyValuePair<string, Action>> items, List<string> marks)
+        // column of their own before the items. A width above 0 is used as
+        // it is; otherwise the items are measured and it is set.
+        private static void DrawMenuBox(Rect area, ToolWindowStyles s, float row, RowInfo r, Event ev, List<KeyValuePair<string, Action>> items, List<string> marks, ref float measured)
         {
             float markWidth = marks != null ? 18 : 0;
             float lineH = row - 4;
-            float width = marks != null ? 140 : 200;
-            foreach (KeyValuePair<string, Action> item in items)
+            if (measured <= 0)
             {
-                width = Mathf.Max(width, s.Button.CalcSize(new GUIContent(Drawable(item.Key))).x + 16 + markWidth);
+                measured = marks != null ? 140 : 200;
+                foreach (KeyValuePair<string, Action> item in items)
+                {
+                    measured = Mathf.Max(measured, s.Button.CalcSize(new GUIContent(Drawable(item.Key))).x + 16 + markWidth);
+                }
             }
-            width = Mathf.Min(width, area.width - 8);
+            float width = Mathf.Min(measured, area.width - 8);
             float contentHeight = items.Count * lineH + 8;
             float height = Mathf.Min(contentHeight, area.height);
             var box = new Rect(Mathf.Clamp(_menuAt.x, area.x, area.xMax - width), Mathf.Clamp(_menuAt.y, area.y, area.yMax - height), width, height);
@@ -366,6 +396,12 @@ namespace DragNWash.ModFramework.Inspector
             {
                 _menuScrollRow = r;
                 _menuScroll = 0;
+                // A long list of values opens on the one that is set.
+                int set = marks == null ? -1 : marks.FindIndex(m => m.Length > 0 && m != MarkOff);
+                if (set >= 0)
+                {
+                    _menuScroll = Mathf.Max(0f, 4 + set * lineH - (height - lineH) / 2);
+                }
             }
             // A click outside closes it, and does nothing else; a click inside
             // is handled by the buttons.

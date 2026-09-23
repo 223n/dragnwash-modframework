@@ -246,12 +246,16 @@ namespace DragNWash.ModFramework.Inspector
             string file = exists ? $"inspector-{DateTime.Now:yyyyMMdd-HHmmss}.json" : "main.json";
             try
             {
+                // Through a temporary file, so a write cut short never leaves
+                // a half file for the Overrides library to load.
                 Directory.CreateDirectory(overrides);
                 if (!exists)
                 {
-                    File.WriteAllText(Path.Combine(folder, "mod.json"), Manifest(name, author, description), new UTF8Encoding(false));
+                    string manifest = Manifest(name, author, description);
+                    SafeFile.Write(Path.Combine(folder, "mod.json"), new UTF8Encoding(false), w => w.Write(manifest));
                 }
-                File.WriteAllText(Path.Combine(overrides, file), OverridesJson(rows), new UTF8Encoding(false));
+                string json = OverridesJson(rows);
+                SafeFile.Write(Path.Combine(overrides, file), new UTF8Encoding(false), w => w.Write(json));
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {

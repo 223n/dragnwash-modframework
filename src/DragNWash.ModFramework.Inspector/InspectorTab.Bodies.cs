@@ -99,6 +99,7 @@ namespace DragNWash.ModFramework.Inspector
             PhysicsButtons(ref bx, ref y, x, w, s, row);
             y += row + 4;
             var filterRect = new Rect(x, y, w, row);
+            GUI.SetNextControlName("DnWInspectBodiesFilter");
             _bodiesFilter = TW.FilterField(filterRect, _bodiesFilter, "Filter by name or type", s);
             y += row + 4;
             var view = new Rect(x, y, w, pane.yMax - y - 2);

@@ -270,7 +270,7 @@ namespace DragNWash.ModFramework.Inspector
             // there is not. Shorter still, the panel scrolls with the wheel.
             const float separator = 9f;
             const float edges = 10 + 4 + 6 + 8 + 2 * separator;
-            int lines = 1 + FixedKeysAbove.Length + ChangeableKeys.Length + FixedKeysBelow.Length + 1;
+            int lines = 2 + FixedKeysAbove.Length + ChangeableKeys.Length + FixedKeysBelow.Length + 1;
             float width = Mathf.Min(420f, area.width - 8);
             float w = width - 24;
             float top = _toolbarRect.yMax + 2;
@@ -305,15 +305,14 @@ namespace DragNWash.ModFramework.Inspector
             GUI.BeginGroup(box);
             float x = 12, y = 10 - _keysScroll;
 
-            // Heading, and on the right what a click on a key does.
-            string clickNote = "Click a key to change it";
-            float noteWidth = Mathf.Min(_mutedCell.CalcSize(new GUIContent(clickNote)).x, w * 0.45f);
+            // Heading, and under it what a click on a key does: side by side
+            // they don't both fit the panel's width.
             if (paint)
             {
-                GUI.Label(new Rect(x, y, w - noteWidth - 12, lineH), TW.Elide("KEYS   (while no field has the keyboard)", _cell, w - noteWidth - 12), _cell);
-                GUI.Label(new Rect(x + w - noteWidth, y, noteWidth, lineH), TW.Elide(clickNote, _mutedCell, noteWidth), _mutedCell);
+                GUI.Label(new Rect(x, y, w, lineH), TW.Elide("KEYS   (while no field has the keyboard)", _cell, w), _cell);
+                GUI.Label(new Rect(x, y + lineH, w, lineH), TW.Elide("Click a key to change it.", _mutedCell, w), _mutedCell);
             }
-            y += lineH + 4;
+            y += 2 * lineH + 4;
 
             float keyWidth = KeyColumnWidth(w);
             foreach (string[] k in FixedKeysAbove)

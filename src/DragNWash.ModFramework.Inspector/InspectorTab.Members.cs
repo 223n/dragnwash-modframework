@@ -138,7 +138,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Show private"), "Show private", _showPrivate, s, row, "Also lists private fields and properties. Changing them is at your own risk."))
                 {
                     _showPrivate = !_showPrivate;
-                    if (_showPrivate) Tell("Private members: setting them is the mod author's own risk.", NoticeKind.Warning);
+                    if (_showPrivate) Tell("Private members: changing them is at your own risk as a mod author.", NoticeKind.Warning);
                 }
                 if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Hold values"), "Hold values", _freeze, s, row, "Stops reading the values; the game keeps changing them."))
                 {
@@ -469,8 +469,11 @@ namespace DragNWash.ModFramework.Inspector
             Event ev = Event.current;
             string label = r.Label + (r.Member.IsPrivate && r.Label == r.Member.Name ? "  (private)" : "");
             // Cut with "..." when it does not fit; the whole name and its type show on the hint line.
+            // The hint is only put together for the row the pointer is on.
             GUIStyle nameStyle = r.Member.IsPrivate ? _mutedCell : _cell;
-            GUI.Label(new Rect(rect.x, rect.y, nameWidth - 6, row), new GUIContent(TW.Elide(Drawable(label), nameStyle, nameWidth - 6), Drawable(RowTip(r))), nameStyle);
+            var nameRect = new Rect(rect.x, rect.y, nameWidth - 6, row);
+            string tip = nameRect.Contains(ev.mousePosition) ? Drawable(RowTip(r)) : null;
+            GUI.Label(nameRect, new GUIContent(TW.Elide(Drawable(label), nameStyle, nameRect.width), tip), nameStyle);
             var valueRect = new Rect(rect.x + nameWidth, rect.y, rect.width - nameWidth - RowMenuWidth, row);
 
             // The value: frozen text, or read now.
