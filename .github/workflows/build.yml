@@ -11,9 +11,14 @@ name: Build
 # In a fork the job is skipped: the fork has no LIBS_TOKEN, and a push to
 # its main would otherwise end in a failed run.
 #
-# Every run uploads release/DragNWash.ModFramework-<version>.zip as a workflow
-# artifact. A v* tag also creates a DRAFT GitHub release with the zip attached;
-# publishing it stays a person's decision.
+# Every run uploads release/DragNWash.ModFramework-<version>.zip and
+# release/SHA256SUMS as a workflow artifact. A v* tag also creates a DRAFT GitHub
+# release with both attached; publishing it stays a person's decision.
+#
+# SHA256SUMS is the line `sha256sum -c` reads: "<sha256>  <zip name>". A mod
+# whose zip does not bring the framework pins that hash in its mod-install.json
+# (schema 2), and the installer uses the zip only when it matches, so a published
+# zip must never be replaced: a fix is a new version.
 #
 # When a run fails, the reason is in the run's annotations (the red lines at
 # the top of the summary page) and in the job summary; each step below says
@@ -103,11 +108,23 @@ jobs:
           $zip = Get-ChildItem release/*.zip | Select-Object -First 1
           "### Built ``$($zip.Name)`` ($([math]::Round($zip.Length / 1KB)) KB) from ``$env:GITHUB_REF_NAME`` at ``$($env:GITHUB_SHA.Substring(0, 7))``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
 
-      - name: Keep the zip as a workflow artifact
+      - name: Write SHA256SUMS next to the zip
+        shell: pwsh
+        run: |
+          # "<sha256>  <zip name>", two spaces and LF, as sha256sum writes and checks it.
+          $zip = Get-ChildItem release/*.zip | Select-Object -First 1
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip.FullName).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText((Join-Path $zip.DirectoryName 'SHA256SUMS'), "$hash  $($zip.Name)`n", (New-Object System.Text.UTF8Encoding $false))
+          Write-Host "$hash  $($zip.Name) ($($zip.Length) bytes)"
+          "SHA-256 of ``$($zip.Name)``: ``$hash``, $($zip.Length) bytes (the ``sha256`` and ``size`` a mod's mod-install.json pins)" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+
+      - name: Keep the zip and SHA256SUMS as a workflow artifact
         uses: actions/upload-artifact@v7
         with:
           name: DragNWash.ModFramework
-          path: release/*.zip
+          path: |
+            release/*.zip
+            release/SHA256SUMS
           if-no-files-found: error
 
       - name: Draft a release for the tag (a person publishes it)
@@ -118,9 +135,9 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $zip = (Get-ChildItem release/*.zip | Select-Object -First 1).FullName
-          gh release create $tag $zip --draft --title "Drag'n Wash ModFramework $($tag.TrimStart('v'))" --notes "Draft made by the Build workflow. Replace these notes before publishing."
+          gh release create $tag $zip release/SHA256SUMS --draft --title "Drag'n Wash ModFramework $($tag.TrimStart('v'))" --notes "Draft made by the Build workflow. Replace these notes before publishing."
           if ($LASTEXITCODE -ne 0) {
             Write-Host "::error title=Draft release not created::gh release create failed for $tag. A release for this tag may already exist (delete the draft and re-run), or the workflow token lacks contents: write."
             exit 1
           }
-          "Draft release **$tag** created with ``$(Split-Path -Leaf $zip)``; publish it by hand." | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "Draft release **$tag** created with ``$(Split-Path -Leaf $zip)`` and ``SHA256SUMS``; publish it by hand." | Out-File -Append $env:GITHUB_STEP_SUMMARY
