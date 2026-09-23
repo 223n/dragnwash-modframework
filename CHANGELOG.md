@@ -90,6 +90,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Every page a mod adds gets its button on the details panel. Before, the row held two buttons at most, so a mod with an update and an Internet page had no way to reach its Graphs page.
 - The notes on a mod's details (going online without saying so, a new version, conflicts, what it uses) are never dropped any more. Before, the panel had room for two or three lines, and a long label like "Went online without saying so:" could use two of them, so the update or conflict notes after it disappeared without a word. Now, when there are more notes than lines, the lines get thinner and the text a little smaller so every note fits.
 - The `<` and `>` buttons of a number setting with a range move by a round step now: about a twentieth of the range, rounded down to 1, 2 or 5 times a power of ten, and the value goes to the next multiple of it. Graphs' FrameBudgetMs (0.1 to 8) used to move by 0.395, so one press from 1 gave 1.395; now it moves by 0.2 and gives 1.2.
+- Pressing a tab in the details no longer flashes white. Every button the screen builds (the tabs, a tab's buttons, the rows' faces) came in white and faded to its colour over about five frames, since setting a button's colours starts a fade from what is drawn, and a new button is drawn white. The colours now land at once, and the short fade stays for hover and press.
 
 ### Mods screen: frosted glass
 

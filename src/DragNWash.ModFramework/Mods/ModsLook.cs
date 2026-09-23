@@ -415,6 +415,15 @@ namespace DragNWash.ModFramework.Mods
 
         // Button colours given as they are, not as tints: the button's Image
         // is white, so each state shows exactly the colour named here.
+        //
+        // The colours land at once. Setting them starts a fade from the
+        // colour drawn now, and a button just made is drawn white, so every
+        // new button came in white and faded to its colour over about five
+        // frames: pressing a tab, which builds the tabs and the tab's buttons
+        // again, flashed them white. A fade of 0 is done on the spot; the
+        // second set then finds the colour already there, starts nothing, and
+        // leaves the short fade for hover and press. (Call this after the
+        // button's targetGraphic is set: setting that starts a fade too.)
         internal static void Colors(Selectable selectable, Color normal, Color hover, Color pressed)
         {
             ColorBlock colors = selectable.colors;
@@ -424,6 +433,8 @@ namespace DragNWash.ModFramework.Mods
             colors.pressedColor = pressed;
             colors.disabledColor = normal;
             colors.colorMultiplier = 1f;
+            colors.fadeDuration = 0f;
+            selectable.colors = colors;
             colors.fadeDuration = 0.08f;
             selectable.colors = colors;
         }
