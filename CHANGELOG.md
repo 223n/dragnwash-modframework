@@ -4,6 +4,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Bridge page and Graphs page: the Tool window's look
+
+- Bridge page: the view switches (Code and Graphs, Blocks and Nodes) look like the F1 window's tabs. The one showing sits on the page's ground with a 2 px accent line on top, and the others are plain dim words. The open graph in the list is marked the same way, with the line on its left. The status line is a band under the header with a 3 px bar on its left, in the accent colour, or in the error colour when something went wrong, and a long line wraps instead of making the page scroll sideways.
+- Graphs page on the Mods screen: it uses the Tool window's colours and sits on a dark panel of its own. Before, it was drawn straight over the see-through band, so how readable the dim and red lines were depended on the game's picture behind it. The Stop button has a 1 px edge, and it lights up under the pointer or the gamepad.
+
 ### Installer: ModFramework from its own release
 
 - `mod-install.json` schema 2 adds a `framework` block. It holds the ModFramework release the mod pins (`version`), the SHA-256 and size of its zip, and `needs`, the lowest version of each plugin folder the mod uses (`DragNWash.ModFramework`, `DragNWash.ModFramework.Text`, ...). Every field is checked: the version has to be digits and dots, the hash 64 lowercase hex digits, the size above 0 and at most 20 MB, and the folder names have to start with `DragNWash.ModFramework`. Schema 1 (the framework inside the mod's zip) installs as it did before, and a zip that brings the framework is used even with schema 2. A schema newer than 2 is refused with "Use the installer from the mod's release". `installer/mod-install.example.json` is schema 2.

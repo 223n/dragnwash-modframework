@@ -18,9 +18,19 @@ namespace DragNWash.ModFramework.Graphs
     internal static class GraphsPage
     {
         private const float Size = 20f;
-        private static readonly Color Dim = new Color(1f, 1f, 1f, 0.65f);
-        private static readonly Color Bad = new Color(1f, 0.55f, 0.45f, 1f);
-        private static readonly Color Good = new Color(0.65f, 0.95f, 0.7f, 1f);
+        // The Tool window's palette. The page sits on a Panel-coloured ground of
+        // its own: over the Mods screen's see-through band these colours would
+        // depend on the game's picture behind it, and Muted and Error fall
+        // under 4.5:1 there. The values are copied rather than read from
+        // ToolWindow.*Color: the Tool window is a soft dependency, and without
+        // its DLL the first touch of its class would take this page down.
+        private static readonly Color Label = new Color(0.91f, 0.94f, 0.97f);
+        private static readonly Color Border = new Color(0.165f, 0.2f, 0.26f);
+        private static readonly Color Panel = new Color(0.09f, 0.11f, 0.15f);
+        private static readonly Color Inset = new Color(0.055f, 0.07f, 0.10f);
+        private static readonly Color Dim = new Color(0.60f, 0.66f, 0.73f);
+        private static readonly Color Bad = new Color(0.96f, 0.45f, 0.40f);
+        private static readonly Color Good = new Color(0.32f, 0.78f, 0.72f);
 
         internal static void Build(RectTransform panel, string guid)
         {
@@ -48,7 +58,7 @@ namespace DragNWash.ModFramework.Graphs
 
             foreach (GameGraphs.GraphReport graph in graphs)
             {
-                Line(content, graph.File, Size * 1.1f, FontStyles.Bold, Color.white, 0f);
+                Line(content, graph.File, Size * 1.1f, FontStyles.Bold, Label, 0f);
                 if (!string.IsNullOrEmpty(graph.Name) && graph.Name != graph.File)
                 {
                     Line(content, graph.Name, Size, FontStyles.Normal, Dim, 24f);
@@ -74,7 +84,7 @@ namespace DragNWash.ModFramework.Graphs
                 {
                     // What a graph changes is the thing a player most wants to
                     // see before switching the mod on, so it is not dimmed.
-                    Pair(content, "Changes", string.Join(", ", graph.Changes.ToArray()), Color.white);
+                    Pair(content, "Changes", string.Join(", ", graph.Changes.ToArray()), Label);
                 }
                 if (graph.Needs.Count > 0)
                 {
@@ -82,13 +92,13 @@ namespace DragNWash.ModFramework.Graphs
                 }
                 foreach (string share in graph.Shares)
                 {
-                    Pair(content, "Key shared", share, Color.white);
+                    Pair(content, "Key shared", share, Label);
                 }
                 foreach (string clash in graph.Clashes)
                 {
                     // Why an edit may seem to do nothing: somebody else writes
                     // the same value, and the later write is the one that stands.
-                    Pair(content, "Also changed", clash.Replace(" - also changed by ", ": "), Color.white);
+                    Pair(content, "Also changed", clash.Replace(" - also changed by ", ": "), Label);
                 }
                 if (graph.Started > 0)
                 {
@@ -124,13 +134,25 @@ namespace DragNWash.ModFramework.Graphs
 
             var button = new GameObject("Stop", typeof(RectTransform), typeof(Image), typeof(Button));
             ((RectTransform)button.transform).SetParent(rowRect, false);
-            button.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
+            // The button's own picture is its 1px edge, and a face sits inside
+            // it. Hover and press tint the face only: a tint multiplies, so over
+            // the whole button it would turn the edge black, and on a face that
+            // is Inset already it would hardly show. The face gets its colours
+            // from the button instead.
+            button.GetComponent<Image>().color = Border;
+            var face = new GameObject("Face", typeof(RectTransform), typeof(Image));
+            var faceRect = (RectTransform)face.transform;
+            faceRect.SetParent(button.transform, false);
+            faceRect.anchorMin = Vector2.zero;
+            faceRect.anchorMax = Vector2.one;
+            faceRect.offsetMin = Vector2.one;
+            faceRect.offsetMax = -Vector2.one;
             LayoutElement size = button.AddComponent<LayoutElement>();
             size.minWidth = 300f;
             size.preferredWidth = 300f;
             size.minHeight = Size * 2f;
 
-            TMP_Text label = Text(button.transform, "Stop for this session", Size, FontStyles.Normal, Color.white);
+            TMP_Text label = Text(button.transform, "Stop for this session", Size, FontStyles.Normal, Label);
             label.alignment = TextAlignmentOptions.Center;
             // On one line: wrapped, the label grew past the button and printed
             // over the line above it.
@@ -143,6 +165,16 @@ namespace DragNWash.ModFramework.Graphs
             labelRect.offsetMax = Vector2.zero;
 
             Button press = button.GetComponent<Button>();
+            press.targetGraphic = face.GetComponent<Image>();
+            ColorBlock colors = press.colors;
+            colors.normalColor = Inset;
+            // Selected is where a gamepad is, so it shows as plainly as a pointer.
+            colors.highlightedColor = Border;
+            colors.selectedColor = Border;
+            colors.pressedColor = Panel;
+            // Once used it says "Stopped"; it does not need to grey out as well.
+            colors.disabledColor = Inset;
+            press.colors = colors;
             press.onClick.AddListener(() =>
             {
                 string said = GameGraphs.Stop(guid, file);
@@ -174,9 +206,9 @@ namespace DragNWash.ModFramework.Graphs
             viewRect.anchorMax = Vector2.one;
             viewRect.offsetMin = Vector2.zero;
             viewRect.offsetMax = Vector2.zero;
-            // Something to catch the wheel over empty space.
-            Image catcher = viewport.AddComponent<Image>();
-            catcher.color = new Color(0f, 0f, 0f, 0f);
+            // The page's own ground, which also catches the wheel over empty space.
+            Image ground = viewport.AddComponent<Image>();
+            ground.color = Panel;
 
             var content = new GameObject("GraphsContent", typeof(RectTransform));
             var contentRect = (RectTransform)content.transform;
