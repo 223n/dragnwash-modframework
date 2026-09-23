@@ -196,7 +196,7 @@ namespace DragNWash.ModFramework.Inspector
                 {
                     string problem = Revert(Entries[i]);
                     failed = problem != null;
-                    return failed ? $"Revert of {Entries[i].Member} failed: {problem}" : $"Reverted {Entries[i].Member}.";
+                    return failed ? $"Couldn't undo {Entries[i].Member}: {problem}" : $"Undid {Entries[i].Member}: back to {InspectorModel.Format(Entries[i].Before)}.";
                 }
             }
             return "Nothing of your own to undo.";

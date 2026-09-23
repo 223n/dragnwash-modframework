@@ -8,7 +8,7 @@ namespace DragNWash.ModFramework.Inspector
 {
     // The Inspector tab's two menus: the toolbar's Edit/View tool menu (move,
     // rotate, scale, edit mesh, highlight, bones, wireframe, free camera, debug
-    // view...), and a row's right-click menu (now/original/previous, copy,
+    // view...), and a row's menu (now, reset to original, undo, copy,
     // show in History). Shared drawing: the frame, scrolling and input-swallow
     // that make a menu sit on top of everything under it.
     internal static partial class InspectorTab
@@ -296,7 +296,7 @@ namespace DragNWash.ModFramework.Inspector
                     float[] pv = InspectorModel.Components(previous);
                     if (ci < pv.Length)
                     {
-                        items.Add(new KeyValuePair<string, Action>($"{cname} back to previous:  {InspectorModel.Fmt(pv[ci])}", () =>
+                        items.Add(new KeyValuePair<string, Action>($"Undo {cname}: back to  {InspectorModel.Fmt(pv[ci])}", () =>
                         {
                             float[] cur = InspectorModel.Components(SafeGet(r.Member, r.Getter));
                             if (ci < cur.Length) { cur[ci] = pv[ci]; TrySet(r, InspectorModel.Compose(r.Type, cur)); }
@@ -314,7 +314,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             if (hasPrevious)
             {
-                items.Add(new KeyValuePair<string, Action>("Back to previous:  " + InspectorModel.Format(previous), () => { TrySet(r, previous); Drafts.Remove(r.Key); }));
+                items.Add(new KeyValuePair<string, Action>("Undo: back to  " + InspectorModel.Format(previous), () => { TrySet(r, previous); Drafts.Remove(r.Key); }));
             }
             items.Add(new KeyValuePair<string, Action>("Copy value", () => GUIUtility.systemCopyBuffer = InspectorModel.Format(now)));
             items.Add(new KeyValuePair<string, Action>("Copy name", () => GUIUtility.systemCopyBuffer = r.Member.Name));

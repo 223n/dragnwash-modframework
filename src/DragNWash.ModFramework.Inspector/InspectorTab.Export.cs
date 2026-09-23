@@ -27,7 +27,17 @@ namespace DragNWash.ModFramework.Inspector
             _exportName = ExportField("Name", _exportName, x, ref y, w, labelW, s, row);
             _exportAuthor = ExportField("Author", _exportAuthor, x, ref y, w, labelW, s, row);
             _exportDescription = ExportField("Description", _exportDescription, x, ref y, w, labelW, s, row);
-            if (GUI.Button(new Rect(x, y, 100, row), "Export", rows.Count > 0 ? s.Button : s.SelectedButton) && rows.Count > 0)
+            // With nothing to write, a plain disabled button and the reason beside it.
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = wasEnabled && rows.Count > 0;
+            bool export = GUI.Button(new Rect(x, y, 100, row), "Export", s.Button);
+            GUI.enabled = wasEnabled;
+            if (rows.Count == 0)
+            {
+                string why = skipped.Count > 0 ? "None of these edits can be overrides." : "Nothing to export yet.";
+                GUI.Label(new Rect(x + 206, y, w - 206, row), TW.Elide(why, _mutedCell, w - 206), _mutedCell);
+            }
+            if (export && rows.Count > 0)
             {
                 _exportNote = InspectorExport.Write(_exportName, _exportAuthor, _exportDescription, out _exportOk);
                 Tell(_exportNote, _exportOk ? NoticeKind.Info : NoticeKind.Error);
