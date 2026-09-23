@@ -102,9 +102,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 - Restoring a snapshot when the history was full could fail with "Restore failed" and lose that snapshot. Before a restore, the save being replaced is kept as a snapshot, and with the history full that pushed out the oldest one, which could be the very snapshot being restored. Now the snapshot is read first, so the restore goes through. The current save was never at risk.
 
-### Saves: how many snapshots are kept
+### Saves: how many snapshots are kept, and a restored old snapshot counts as the save
 
 - `GameSaves.Keep` (Flags and saves library), new: how many snapshots a slot keeps, the library's `[History] Keep` setting. A tab can show "30 of 30 kept" and say when the next snapshot will push the oldest one out. It's right even while `[History] Enabled` is off.
+- `GameSaves.SnapshotMatchesSave` now says true for a snapshot from before the game update of 2026-09-14 once it has been restored. The restore adds the `{"version":1}` entry the game needs, so the save and the snapshot were never byte for byte the same, and a tab couldn't mark that snapshot as the current save.
 
 ### Bridge: a clearer message when Windows holds the port
 

@@ -210,13 +210,18 @@ namespace DragNWash.ModFramework.Saves
             return list;
         }
 
-        /// <summary>True when the snapshot holds exactly what the slot's save holds now.</summary>
+        /// <summary>
+        /// True when the snapshot holds what the slot's save holds now. A
+        /// snapshot from before the game update of 2026-09-14 matches the save
+        /// <see cref="Restore"/> made from it, which has the <c>{"version":1}</c>
+        /// entry added.
+        /// </summary>
         public static bool SnapshotMatchesSave(string slot, SaveSnapshot snapshot)
         {
             try
             {
                 string savePath = SavePath(slot);
-                return snapshot != null && File.Exists(savePath) && File.ReadAllText(savePath) == File.ReadAllText(snapshot.Path);
+                return snapshot != null && File.Exists(savePath) && File.ReadAllText(savePath) == ForPath(savePath, File.ReadAllText(snapshot.Path));
             }
             catch
             {
