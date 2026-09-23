@@ -264,10 +264,32 @@ namespace DragNWash.ModFramework.Bridge
 
         // CodeGraph.exe, next to this DLL, on Windows: it signs in with the token by itself,
         // and a window already open takes the focus instead of a second one opening.
+        private static string CodeGraphExe => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(BridgePlugin).Assembly.Location) ?? "", "CodeGraph", "CodeGraph.exe");
+
+        private static bool AppPossible => Application.platform == RuntimePlatform.WindowsPlayer;
+
+        // Whether CodeGraph.exe is there, for the tab: looked up every few
+        // seconds rather than on every draw.
+        private bool _appThere;
+        private float _appCheckedAt = -10f;
+
+        private bool AppThere
+        {
+            get
+            {
+                if (Time.unscaledTime - _appCheckedAt > 3f)
+                {
+                    _appCheckedAt = Time.unscaledTime;
+                    _appThere = AppPossible && System.IO.File.Exists(CodeGraphExe);
+                }
+                return _appThere;
+            }
+        }
+
         private bool OpenInApp(string focus)
         {
-            if (_openIn.Value != "App" || Application.platform != RuntimePlatform.WindowsPlayer) return false;
-            string exe = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(BridgePlugin).Assembly.Location) ?? "", "CodeGraph", "CodeGraph.exe");
+            if (_openIn.Value != "App" || !AppPossible) return false;
+            string exe = CodeGraphExe;
             if (!System.IO.File.Exists(exe)) return false;
             try
             {
@@ -617,6 +639,52 @@ namespace DragNWash.ModFramework.Bridge
             return y + noteHeight;
         }
 
+        // The page's two ways in, and where they open. The page is where
+        // graphs are made, so it needs a way in that does not go through the
+        // game's code (the Inspector's Graph buttons open it at a method), and
+        // somebody writing a graph has no reason to arrive at the code first.
+        private float DrawCodeGraph(float x, float y, float width)
+        {
+            var s = TW.Styles;
+            GUI.Label(new Rect(x, y, width, 26), "CODE GRAPH", s.Label);
+            y += 30;
+            bool listening = Server != null;
+            var row = new ButtonRow(x, y, width);
+            bool was = GUI.enabled;
+            GUI.enabled = was && listening;
+            if (row.Button("Code graph")) OpenPage(null);
+            if (row.Button("Graphs editor")) OpenPage("v:graphs");
+            GUI.enabled = was;
+
+            string note = null;
+            if (!listening)
+            {
+                note = "Opens once the Bridge is listening.";
+            }
+            else if (!AppPossible)
+            {
+                note = "Opens in the browser.";
+            }
+            else
+            {
+                // The same setting as the Mods screen's "Open the code graph in".
+                Rect label = row.Place(s.MutedLabel.CalcSize(new GUIContent("Opens in")).x + 4);
+                GUI.Label(label, "Opens in", s.MutedLabel);
+                foreach (string where in new[] { "App", "Browser" })
+                {
+                    if (row.Button(where, _openIn.Value == where) && _openIn.Value != where) _openIn.Value = where;
+                }
+                if (_openIn.Value == "App" && !AppThere) note = "CodeGraph.exe isn't there, so it opens in the browser.";
+            }
+            y = row.Bottom + 4;
+            if (note != null)
+            {
+                GUI.Label(new Rect(x, y, width, 26), TW.Elide(note, s.MutedLabel, width), s.MutedLabel);
+                y += 26;
+            }
+            return y;
+        }
+
         private void DrawTab(Rect area)
         {
             var s = TW.Styles;
@@ -636,6 +704,7 @@ namespace DragNWash.ModFramework.Bridge
             string who = Connected(sessions);
             if (_portChangedFrom != 0 && sessions.Any(c => c.Started >= _portChangedAt)) _portChangedFrom = 0;
             y = DrawConnection(x, y, inner, who) + 16;
+            y = DrawCodeGraph(x, y, inner) + 16;
             // The row wraps: six buttons do not fit a narrow window, and the
             // last of them was walking off the edge.
             float bx = x, by = y;
@@ -651,19 +720,6 @@ namespace DragNWash.ModFramework.Bridge
                 return pressed;
             }
 
-            // The page is where graphs are made, so it needs a way in that does
-            // not go through the game's code: the Inspector's Graph buttons open
-            // it at a method, which is no help to somebody writing a graph.
-            if (Button("Open page", 120))
-            {
-                OpenPage(null);
-            }
-            // The same page, on the editor: somebody writing a graph has no
-            // reason to arrive at the game's code first.
-            if (Button("Graphs", 120))
-            {
-                OpenPage("v:graphs");
-            }
             // It cuts off whoever is connected, so it asks first - and only
             // then: with nobody connected there is nothing to lose.
             if (Button("Disconnect all", 150, TW.IsConfirming(DisconnectId)))
