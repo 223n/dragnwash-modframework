@@ -15,7 +15,33 @@ namespace DragNWash.ModFramework.Inspector
     {
         private static RowInfo _menuRow;
         private static int _menuComponent = -1;   // which x/y/z field was right-clicked, or -1 for the row
+        // The menu lists an enum row's values to pick from, instead of the row's actions.
+        private static bool _menuValues;
         private static Vector2 _menuAt;
+
+        // Opens a row's menu at a point in the coordinates being drawn in (a
+        // scroll view's too): the right click's place, or under the button
+        // that opened it.
+        private static void OpenRowMenu(RowInfo r, int component, bool values, Vector2 at)
+        {
+            _menuRow = r;
+            _menuComponent = component;
+            _menuValues = values;
+            _menuAt = GUIUtility.GUIToScreenPoint(at) - _tabScreenOrigin;
+        }
+
+        // A menu item's mark: a tick for something on, a filled or an empty
+        // dot for one of several choices. ASCII where the window font lacks them.
+        private const string MarkCheck = "\u2713", MarkOn = "\u25CF", MarkOff = "\u25CB";
+        private static string Mark(bool on, bool choice)
+        {
+            string mark = choice ? (on ? MarkOn : MarkOff) : (on ? MarkCheck : "");
+            if (mark.Length > 0 && !TW.CanDraw(mark))
+            {
+                mark = on ? (choice ? "*" : "x") : "";
+            }
+            return mark;
+        }
         // ---- the toolbar menus ---------------------------------------------------------------
 
         private static string _toolMenu;
@@ -211,6 +237,11 @@ namespace DragNWash.ModFramework.Inspector
                 return;
             }
             RowInfo r = _menuRow;
+            if (_menuValues)
+            {
+                DrawValuesMenu(area, s, row, r, ev);
+                return;
+            }
             string member = MemberId(r);
             bool hasOriginal = InspectorHistory.TryOriginal(_target, member, out object original);
             bool hasPrevious = InspectorHistory.TryPrevious(_target, member, out object previous);
@@ -267,11 +298,40 @@ namespace DragNWash.ModFramework.Inspector
             {
                 items.Add(new KeyValuePair<string, Action>("Show in History", () => _showHistory = true));
             }
+            DrawMenuBox(area, s, row, r, ev, items, null);
+        }
+
+        // An enum row's values, the one it has marked: picking one sets it.
+        private static void DrawValuesMenu(Rect area, ToolWindowStyles s, float row, RowInfo r, Event ev)
+        {
+            object now = SafeGet(r.Member, r.Getter);
+            var items = new List<KeyValuePair<string, Action>>();
+            var marks = new List<string>();
+            if (r.Type != null && r.Type.IsEnum)
+            {
+                Array values = Enum.GetValues(r.Type);
+                string[] names = Enum.GetNames(r.Type);
+                for (int i = 0; i < values.Length && i < names.Length; i++)
+                {
+                    object value = values.GetValue(i);
+                    marks.Add(Mark(Equals(value, now), true));
+                    items.Add(new KeyValuePair<string, Action>(names[i], () => { TrySet(r, value); Drafts.Remove(r.Key); }));
+                }
+            }
+            DrawMenuBox(area, s, row, r, ev, items, marks);
+        }
+
+        // The row menus' box: framed, kept inside the tab, scrolling with the
+        // wheel when it is taller than the tab. Marks, when given, go in a
+        // column of their own before the items.
+        private static void DrawMenuBox(Rect area, ToolWindowStyles s, float row, RowInfo r, Event ev, List<KeyValuePair<string, Action>> items, List<string> marks)
+        {
+            float markWidth = marks != null ? 18 : 0;
             float lineH = row - 4;
-            float width = 200;
+            float width = marks != null ? 140 : 200;
             foreach (KeyValuePair<string, Action> item in items)
             {
-                width = Mathf.Max(width, s.Button.CalcSize(new GUIContent(Drawable(item.Key))).x + 16);
+                width = Mathf.Max(width, s.Button.CalcSize(new GUIContent(Drawable(item.Key))).x + 16 + markWidth);
             }
             width = Mathf.Min(width, area.width - 8);
             float contentHeight = items.Count * lineH + 8;
@@ -297,16 +357,28 @@ namespace DragNWash.ModFramework.Inspector
             TW.Fill(new Rect(box.x, box.y, 3, box.height), TW.AccentColor);
             GUI.BeginGroup(box);
             float y = 4 - _menuScroll;
-            foreach (KeyValuePair<string, Action> item in items)
+            for (int i = 0; i < items.Count; i++)
             {
+                KeyValuePair<string, Action> item = items[i];
                 var line = new Rect(6, y, box.width - 12, lineH);
                 y += lineH;
                 if (line.yMax <= 0 || line.y >= box.height) continue;
+                string mark = marks != null && i < marks.Count ? marks[i] : "";
+                bool on = mark.Length > 0 && mark != MarkOff;
+                if (on)
+                {
+                    TW.Fill(new Rect(3, line.y, box.width - 3, lineH), TW.InsetColor);
+                }
+                if (markWidth > 0)
+                {
+                    GUI.Label(new Rect(line.x, line.y, markWidth, lineH), mark, on ? _accentCell : _mutedCell);
+                }
+                var text = new Rect(line.x + markWidth, line.y, line.width - markWidth, lineH);
                 if (item.Value == null)
                 {
-                    GUI.Label(line, Drawable(item.Key), _mutedCell);
+                    GUI.Label(text, Drawable(item.Key), _mutedCell);
                 }
-                else if (GUI.Button(line, Drawable(item.Key), _cell))
+                else if (GUI.Button(text, Drawable(item.Key), on ? _accentCell : _cell))
                 {
                     item.Value();
                     _menuRow = null;

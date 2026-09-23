@@ -70,7 +70,7 @@ namespace DragNWash.ModFramework.Inspector
                 return;
             }
             _tab = TW.AddTab(TW.Guid, Title, Draw, 45);
-            TW.PrepareCharacters(IconHierarchy + IconPick + IconHighlight + IconParent + IconMove + IconRotate + IconScale + IconResetTransform + IconHistory + IconRefresh + IconCamera + IconBones + IconWire + IconEditMesh + "\u25BE\u2026");
+            TW.PrepareCharacters(IconHierarchy + IconPick + IconHighlight + IconParent + IconMove + IconRotate + IconScale + IconResetTransform + IconHistory + IconRefresh + IconCamera + IconBones + IconWire + IconEditMesh + "\u25BE\u2026" + MarkCheck + MarkOn + MarkOff);
             GameEvents.OnSceneLoaded(TW.Guid, (scene, mode) => { _dirty = true; InspectorObjects.MarkStale(); });
             GameEvents.OnSceneUnloaded(TW.Guid, scene => { _dirty = true; InspectorObjects.MarkStale(); });
             TW.AddCommand(TW.Guid, "inspect",

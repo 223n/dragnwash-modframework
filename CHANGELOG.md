@@ -23,6 +23,9 @@ Versions of the core and of each library are separate, and follow semantic versi
 - A member name that doesn't fit ends in "..." instead of being cut off. With the pointer on a name, the hint line shows all of it with its type, like "maxAngularVelocity : float  (property).", and for a number it adds that you can drag up or down on the value to change it.
 - Show private, Hold values, Enabled and Code wrap onto a second line in a narrow window instead of running off the edge. Freeze is now called Hold values, and its hint says what it does: it stops reading the values, and the game keeps changing them.
 
+- Every member row ends in a small "..." button, faint until the pointer is on the row, that opens the same menu as a right click (copy the value or the name, reset, go back one edit, show it in History). A gamepad or the Steam Deck only clicks with the left button, so this is the way to that menu there. The right click still works.
+- An enum's button shows its value with a small arrow and opens a list of all its values, the current one marked, so you pick the one you want. It used to step to the next value on each press, and going back meant going all the way round.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.

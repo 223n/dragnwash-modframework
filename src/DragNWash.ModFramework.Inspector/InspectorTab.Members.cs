@@ -327,6 +327,11 @@ namespace DragNWash.ModFramework.Inspector
             return tip;
         }
 
+        // The "..." button at the end of every row, which opens the row's menu
+        // as a right click does: a gamepad's click is a left click only.
+        private const float RowMenuWidth = 26f;
+        private static GUIStyle _rowMenuStyle;
+
         // Fields narrower than this are unreadable; the composite then goes on
         // a second line across the whole width.
         private const float MinFieldWidth = 68f;
@@ -339,7 +344,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             int n = InspectorModel.ComponentLabels(r.Type).Length;
             bool isColor = r.Type == typeof(Color) || r.Type == typeof(Color32);
-            float extras = 8 + (isColor ? TW.RowHeight : 0) + (InspectorHistory.TryOriginal(_target, MemberId(r), out _) ? 60 : 0);
+            float extras = 8 + RowMenuWidth + (isColor ? TW.RowHeight : 0) + (InspectorHistory.TryOriginal(_target, MemberId(r), out _) ? 60 : 0);
             return (inner - nameWidth - extras - n * 18) / n < MinFieldWidth;
         }
 
@@ -465,7 +470,7 @@ namespace DragNWash.ModFramework.Inspector
             // Cut with "..." when it does not fit; the whole name and its type show on the hint line.
             GUIStyle nameStyle = r.Member.IsPrivate ? _mutedCell : _cell;
             GUI.Label(new Rect(rect.x, rect.y, nameWidth - 6, row), new GUIContent(TW.Elide(Drawable(label), nameStyle, nameWidth - 6), Drawable(RowTip(r))), nameStyle);
-            var valueRect = new Rect(rect.x + nameWidth, rect.y, rect.width - nameWidth, row);
+            var valueRect = new Rect(rect.x + nameWidth, rect.y, rect.width - nameWidth - RowMenuWidth, row);
 
             // The value: frozen text, or read now.
             string key = r.Key;
@@ -530,9 +535,12 @@ namespace DragNWash.ModFramework.Inspector
             }
             else if (t != null && t.IsEnum && editable)
             {
-                if (GUI.Button(new Rect(control.x, control.y + 2, Mathf.Min(control.width, 220), row - 4), Drawable(shown) + "  >", s.Button))
+                // Opens the list of its values, the one it has marked.
+                string arrow = TW.CanDraw("\u25BE") ? "\u25BE" : "v";
+                var button = new Rect(control.x, control.y + 2, Mathf.Min(control.width, 220), row - 4);
+                if (GUI.Button(button, TW.Elide(Drawable(shown), s.Button, button.width - 30) + "  " + arrow, s.Button))
                 {
-                    TrySet(r, InspectorModel.NextEnum(t, value));
+                    OpenRowMenu(r, -1, true, new Vector2(button.x, button.yMax));
                 }
             }
             else if (editable && InspectorModel.IsComposite(t))
@@ -605,14 +613,25 @@ namespace DragNWash.ModFramework.Inspector
                 float errorY = rect.y + (Stacked(r, rect.width, nameWidth) ? row * 2 : row);
                 GUI.Label(new Rect(rect.x + nameWidth, errorY, rect.width - nameWidth, row), Drawable(error), _errorCell);
             }
+            // "..." at the row's end, faint until the pointer is on the row.
+            float rowHeight = Stacked(r, rect.width, nameWidth) ? row * 2 : row;
+            var rowRect = new Rect(rect.x, rect.y, rect.width, rowHeight);
+            var dots = new Rect(rect.xMax - RowMenuWidth + 4, rect.y + 2, RowMenuWidth - 4, row - 4);
+            if (_rowMenuStyle == null)
+            {
+                _rowMenuStyle = new GUIStyle(_mutedCell) { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Overflow };
+            }
+            bool onRow = rowRect.Contains(ev.mousePosition) || (_menuRow != null && !_menuValues && _menuRow.Key == r.Key);
+            string ellipsis = TW.CanDraw("\u2026") ? "\u2026" : "...";
+            if (GUI.Button(dots, new GUIContent(ellipsis, "Copy, undo, reset and more for this row (a right click opens it too)"), onRow ? s.Button : _rowMenuStyle))
+            {
+                OpenRowMenu(r, -1, false, new Vector2(dots.x, dots.yMax));
+            }
             // Right click anywhere else on the row: the row's menu. A component
             // field's own right click was used above, so it is not overridden here.
-            float rowHeight = Stacked(r, rect.width, nameWidth) ? row * 2 : row;
-            if (ev.type == EventType.MouseDown && ev.button == 1 && new Rect(rect.x, rect.y, rect.width, rowHeight).Contains(ev.mousePosition))
+            if (ev.type == EventType.MouseDown && ev.button == 1 && rowRect.Contains(ev.mousePosition))
             {
-                _menuRow = r;
-                _menuComponent = -1;
-                _menuAt = GUIUtility.GUIToScreenPoint(ev.mousePosition) - _tabScreenOrigin;
+                OpenRowMenu(r, -1, false, ev.mousePosition);
                 ev.Use();
             }
         }
@@ -640,9 +659,7 @@ namespace DragNWash.ModFramework.Inspector
                 var fieldRect = new Rect(bx, control.y, fieldWidth, row);
                 if (ev.type == EventType.MouseDown && ev.button == 1 && fieldRect.Contains(ev.mousePosition))
                 {
-                    _menuRow = r;
-                    _menuComponent = i;
-                    _menuAt = GUIUtility.GUIToScreenPoint(ev.mousePosition) - _tabScreenOrigin;
+                    OpenRowMenu(r, i, false, ev.mousePosition);
                     ev.Use();
                 }
                 if (i < parts.Length && DragNumber(r, key, fieldRect, parts[i], out float dragged))
