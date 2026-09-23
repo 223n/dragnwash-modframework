@@ -4,6 +4,13 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Installer: one loader per game folder, and an install that can be undone
+
+- Install.exe: another mod loader in the game folder (KrazenLabs' dnw-modloader, or any Doorstop setup that does not start BepInEx) stops the install before anything is downloaded or changed, with "Another mod loader (dnw-modloader) is in this game folder. Only one loader can be installed per game folder, so nothing was changed." It used to be overwritten by BepInEx's `winhttp.dll` and `doorstop_config.ini`. The list of what Install will do says so before it runs. What counts: a `DnWModLoader` folder, a `doorstop_config.ini` whose `target_assembly` (Doorstop 4) or `targetAssembly` (Doorstop 3) is not `BepInEx\core\BepInEx.Preloader.dll`, or a `winhttp.dll` with neither BepInEx nor a `doorstop_config.ini`. BepInEx's own leftovers (its `winhttp.dll` and config without `BepInEx\core`) are mended as before.
+- Uninstall keeps `winhttp.dll`, `doorstop_config.ini` and `.doorstop_version` when they start another loader.
+- Install.exe: every file an install replaces or deletes is first copied to `BepInEx\DragNWash.Installer\backup\<date_time>`, and BepInEx is unpacked into `BepInEx\DragNWash.Installer\staging` before it is copied into place. When a step fails halfway (a file in use, a folder that cannot be written), everything is put back as it was: replaced files are restored, new files and new empty folders removed, and the message says "Something went wrong while copying, so everything was put back as it was (N files)." After a successful install the staging folder goes and only that install's backup is kept (none when nothing was replaced); the log ends with `Backup: N files -> BepInEx\DragNWash.Installer\backup\<date_time>`. Files the player added are still never deleted, and a newer framework DLL is still kept.
+- Uninstalling any mod removes `BepInEx\DragNWash.Installer`, and its list says so.
+
 ### Console: level toggles that show on and off
 
 - The Error, Warning, Message, Info and Debug toggles are drawn on the dark panel of the tab strip instead of Unity's grey button. One that is on has a 3 px bar in its level's colour (the colour its log lines have) along the top, a filled square in that colour and bright words; one that is off has an empty square and dimmer words, which brighten under the pointer. On and off differed only in the colour of the word before. Bar and square are painted, not drawn from the font.
