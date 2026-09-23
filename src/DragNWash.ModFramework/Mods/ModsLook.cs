@@ -120,11 +120,11 @@ namespace DragNWash.ModFramework.Mods
             Revision++;
         }
 
-        // The accent as text, any other colour as it is: for a label that
-        // takes the colour of its band or tag.
+        // The accent or the error colour as text, any other colour as it is:
+        // for a label that takes the colour of its band or tag.
         internal static Color Readable(Color color)
         {
-            return color == Accent ? AccentText : color;
+            return color == Accent ? AccentText : color == Error ? ErrorText : color;
         }
 
         private static Color Gamma(int r, int g, int b, float alpha)

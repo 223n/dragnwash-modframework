@@ -13,7 +13,9 @@ namespace DragNWash.ModFramework.Mods
     // [Mods screen] Glass picks how often the copy is made: Snapshot (every
     // 0.2 s, the default), Every frame, or Off (the tint alone, nothing
     // copied). Anything that goes wrong making the copy logs one warning and
-    // leaves the screen on the tint alone until the game restarts.
+    // leaves the screen on the tint alone until the game restarts. When a
+    // copy is asked for but no picture comes (no camera the pass can use in
+    // this scene), the screen uses the tint alone until it is closed.
     //
     // This class touches no URP type: the copy itself is ModsGlassCapture,
     // reached only through the NoInlining methods at the bottom, so a game
@@ -30,6 +32,10 @@ namespace DragNWash.ModFramework.Mods
         // How often Snapshot takes the picture again.
         private const float SnapshotSeconds = 0.2f;
 
+        // How many frames in front a picture may be asked for without one
+        // coming before the screen gives up on it (about a second).
+        private const int PatienceFrames = 60;
+
         // The blurred picture is dimmed as the mock's brightness(0.55). A UI
         // colour is gamma, so this dims the same as the browser does.
         private static readonly Color BackdropColor = new Color(0.55f, 0.55f, 0.55f, 1f);
@@ -45,6 +51,12 @@ namespace DragNWash.ModFramework.Mods
         private static bool _everyFrame;
         private static bool _captured;
 
+        // Goes up by one with each picture taken.
+        private static int _pictures;
+
+        // Whether "no picture came" has been logged this session.
+        private static bool _toldNoPicture;
+
         // Set up by ModsScreen.SplitForDetails.
         internal Image ListTint;
         internal Image DetailsTint;
@@ -54,6 +66,11 @@ namespace DragNWash.ModFramework.Mods
         internal RawImage DetailsBackdrop;
 
         private bool _capturing;
+        // No picture came while the screen was open: the tint alone until
+        // it closes.
+        private bool _noPicture;
+        private int _picturesSeen;
+        private int _waited;
         private float _next;
         private int _width;
         private int _height;
@@ -64,7 +81,7 @@ namespace DragNWash.ModFramework.Mods
             try
             {
                 _mode = config.Bind(Section, Key, ModeSnapshot,
-                    new ConfigDescription("What the list and the details sit on. Snapshot: a blurred picture of the game behind them, taken again every 0.2 seconds. Every frame: the same picture, taken every frame, so it moves with the game; it costs a little more. Off: a see-through dark tint, with no picture taken. When the picture can't be made on this computer, the screen uses Off by itself until the game restarts.",
+                    new ConfigDescription("Puts a blurred picture of the game behind the list and the details, like frosted glass. Snapshot takes the picture again every 0.2 seconds. Every frame takes it every frame, so the glass moves with the game, for a little more work on the graphics card. Off leaves just the dark see-through panels. If the picture can't be made, the panels look as they do with Off, and the log says why.",
                         new AcceptableValueList<string>(ModeSnapshot, ModeEveryFrame, ModeOff),
                         new SettingMeta { DisplayName = "Frosted glass" },
                         new SectionMeta { DisplayName = "Mods screen" }));
@@ -82,6 +99,7 @@ namespace DragNWash.ModFramework.Mods
         internal static void Captured()
         {
             _captured = true;
+            _pictures++;
             if (!_everyFrame)
             {
                 CaptureWanted = false;
@@ -105,6 +123,7 @@ namespace DragNWash.ModFramework.Mods
         private void OnEnable()
         {
             _modeChanged = false;
+            _noPicture = false;
             Apply();
         }
 
@@ -124,13 +143,23 @@ namespace DragNWash.ModFramework.Mods
             {
                 return;
             }
-            if (Screen.width != _width || Screen.height != _height)
+            // Minimised, a window can have no size for a while; the glass
+            // waits for it to come back rather than make 1x1 textures.
+            if (Screen.width < 16 || Screen.height < 16)
+            {
+                return;
+            }
+            if (Screen.width != _width || Screen.height != _height || LostCore())
             {
                 Resize();
                 if (!_capturing)
                 {
                     return;
                 }
+            }
+            if (!Waited())
+            {
+                return;
             }
             if (_everyFrame)
             {
@@ -153,12 +182,43 @@ namespace DragNWash.ModFramework.Mods
             Place(DetailsBackdrop);
         }
 
+        // Counts the frames a picture was asked for and none came. The pass
+        // only goes to a camera drawing the scene to the screen, and a scene
+        // without one would leave the glass with nothing behind it: the
+        // glass's lighter tint over the picture as it is, which is harder to
+        // read than the tint alone. False once the screen has given up.
+        private bool Waited()
+        {
+            if (_pictures != _picturesSeen || !CaptureWanted)
+            {
+                _waited = 0;
+            }
+            else if (Application.isFocused)
+            {
+                // Out of focus, the game may not draw at all.
+                _waited++;
+            }
+            _picturesSeen = _pictures;
+            if (_waited < PatienceFrames)
+            {
+                return true;
+            }
+            if (!_toldNoPicture)
+            {
+                _toldNoPicture = true;
+                ModFramework.Log.LogWarning("The Mods screen's frosted glass got no picture from the game's camera, so the panels keep their tint while the screen is open. It tries again the next time the screen opens.");
+            }
+            _noPicture = true;
+            Apply();
+            return false;
+        }
+
         // Starts or stops the copy for the setting, and colours the panels:
         // glass while a copy can be made, the tint alone otherwise.
         private void Apply()
         {
             string mode = Mode;
-            bool want = mode != ModeOff && !_failed;
+            bool want = mode != ModeOff && !_failed && !_noPicture;
             _everyFrame = mode == ModeEveryFrame;
             if (want && !_capturing)
             {
@@ -191,6 +251,8 @@ namespace DragNWash.ModFramework.Mods
         private void StartCapture()
         {
             _captured = false;
+            _waited = 0;
+            _picturesSeen = _pictures;
             HideBackdrops(null);
             if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
             {
@@ -234,7 +296,8 @@ namespace DragNWash.ModFramework.Mods
             }
         }
 
-        // The window changed size: the textures are made again at the new size.
+        // The window changed size, or the textures were lost: they are made
+        // again, and the backdrops wait hidden for the next picture.
         private void Resize()
         {
             try
@@ -311,10 +374,17 @@ namespace DragNWash.ModFramework.Mods
             ModsGlassCapture.Stop();
         }
 
+        // Always made again: this is only called for a new size or lost textures.
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ResizeCore(int width, int height)
         {
-            ModsGlassCapture.Resize(width, height);
+            ModsGlassCapture.Resize(width, height, true);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool LostCore()
+        {
+            return ModsGlassCapture.Lost;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
