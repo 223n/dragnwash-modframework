@@ -160,6 +160,27 @@ namespace DragNWash.ModFramework.Mods
             _chips.offsetMax = new Vector2(-14f, -78f);
         }
 
+        // The search field is built once and kept: it takes the colours of
+        // the glass, or of the tint alone, when they change.
+        private void RepaintSearch()
+        {
+            if (_search == null)
+            {
+                return;
+            }
+            ModsLook.Colors(_search, ModsLook.Field, ModsLook.Hover, ModsLook.Field);
+            if (_search.placeholder != null)
+            {
+                _search.placeholder.color = ModsLook.Muted;
+            }
+            Transform icon = _search.transform.Find("Icon");
+            Image image = icon != null ? icon.GetComponent<Image>() : null;
+            if (image != null)
+            {
+                image.color = ModsLook.Muted;
+            }
+        }
+
         private TMP_InputField CreateSearchField(RectTransform parent)
         {
             TMP_InputField field = SearchBox(parent, "Search", TextSearchMods, 22f, OnSearch);

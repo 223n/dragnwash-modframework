@@ -70,9 +70,13 @@ namespace DragNWash.ModFramework.Mods
         // done at the end of the frame instead.
         private Action _pending;
 
+        // The colours (ModsLook.Revision) the screen was built with.
+        private int _builtLook;
+
         protected override void OnShow(MenuResponseTransition response)
         {
             base.OnShow(response);
+            _builtLook = ModsLook.Revision;
             _confirming = null;
             _confirmingUninstall = null;
             _tab = TabAbout;
@@ -89,6 +93,7 @@ namespace DragNWash.ModFramework.Mods
                 _selected = _entries.FirstOrDefault(e => SameMod(e, _selected)) ?? FirstShown(_entries);
                 StartCheck();
                 RebuildList();
+                RepaintSearch();
                 RebuildDetails(false);
             }
             catch (Exception ex)
@@ -156,6 +161,14 @@ namespace DragNWash.ModFramework.Mods
             _pending = null;
             pending?.Invoke();
             FlushDetails();
+            // The glass came or went (the setting, or a failure): build the
+            // screen again in the other colours, keeping the focus.
+            if (_builtLook != ModsLook.Revision && isShown)
+            {
+                _builtLook = ModsLook.Revision;
+                RepaintSearch();
+                RebuildKeepingFocus(true);
+            }
         }
 
         // ---- list ----

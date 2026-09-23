@@ -96,6 +96,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 - The list and the details sit on see-through dark panels now, with a faint light line around each, instead of solid ones, so the game shows behind them a little. Rows, notes, settings, the chosen filter and chips are darker see-through cards on top, and the search and value fields have a thin edge.
 - Small grey text and the accent colour where it's text (a website, "New version available:", "Saved") are a little lighter, so they stay easy to read over the brightest picture behind the menu, the white title logo. The switches, bars and lines keep the accent as it was.
 - How see-through things are was matched to the design mock in the game's own colour blending, which lets much more through than a browser does at the same numbers.
+- Behind each panel is a blurred, dimmed copy of the game's picture, lined up with the scene behind it, so the panels look like frosted glass. The copy is small (a quarter of the screen, shrunk to an eighth and back, which is the blur) and made by URP's own copying, after the game's colour grading and before the menu is drawn, so the menu itself is never in it. Nothing is added to the game's renderer settings, and no shader comes with the framework.
+- `[Mods screen] Glass` ("Frosted glass" in Options → Mods → Drag'n Wash ModFramework → Settings): **Snapshot** takes the picture again every 0.2 seconds (the default), **Every frame** takes it every frame so the glass moves with the game, and **Off** leaves the tint alone with no picture taken. It changes at once, while the screen is open.
+- Nothing runs while the Mods screen is closed. Its three small textures (about 2.7 MB at 1920x1080) are made when it opens, made again when the window changes size, and let go when it closes.
+- If the picture can't be made (HDR output, a game update that changed URP, anything else), the log gets one warning and the screen uses the tint alone until the game restarts.
 
 ### Tool window: its font is made when you first open it
 
