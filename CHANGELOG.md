@@ -4,6 +4,16 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Inspector: keys you can change
+
+- The Inspector's shortcut keys can be changed now: the gizmo's move, rotate, scale and off (W, E, R, Q), pick (P), highlight (H), tree (T), free camera (C), bones (B), wireframe (N) and edit mesh (M). They stay as they were until you change one.
+- In the F1 window, open the Inspector tab's "?" panel and click a key. It says "Press a key…", and the next key you press becomes the new one, with Ctrl, Shift or Alt if you hold them. Esc stops without changing anything, and Backspace leaves the action with no key ("none"). "Reset all keys" at the bottom of the panel puts all eleven back.
+- The same keys are on the Mods screen too (Options → Mods → Drag'n Wash ModFramework: Inspector → Keys), with the Capture button. Both places change the same setting.
+- When another setting has the same key, in another mod or in the Inspector itself, the key gets a yellow bar in the panel and the line the Mods screen shows under it, like "C is also used by Screenshot key (Photo Mode). Both will answer it." One key for two things is allowed, and both answer it.
+- The arrows, Home, End, Page Up and Page Down, Ctrl+Z, Ctrl+Up, Esc and ? can't be changed, and neither can the free camera's W A S D, Q E and Shift while you fly.
+- The Edit and View menus, the Tree and Pick tooltips and the free camera's notice name the key you set, and leave it out when there's none.
+- `ModFramework.SharedKeyNote(ConfigEntryBase)` (core), new: the line the Mods screen shows under a shortcut setting whose key another setting also has, for a mod that lets people change keys in a window of its own. The Mods screen uses it as well, so both always say the same thing.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.

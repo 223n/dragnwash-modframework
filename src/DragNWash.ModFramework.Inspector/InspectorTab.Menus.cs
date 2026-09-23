@@ -44,19 +44,19 @@ namespace DragNWash.ModFramework.Inspector
             GameObject sel = SelectedObject;
             if (_toolMenu == "edit")
             {
-                items.Add((IconMove + " Move (W)", InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Move, () => ToggleGizmo(InspectorGizmo.GizmoMode.Move), false));
-                items.Add((IconRotate + " Rotate (E)", InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Rotate, () => ToggleGizmo(InspectorGizmo.GizmoMode.Rotate), false));
-                items.Add((IconScale + " Scale (R)", InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Scale, () => ToggleGizmo(InspectorGizmo.GizmoMode.Scale), false));
-                items.Add((IconEditMesh + " Edit mesh vertices (M) - experimental", InspectorMesh.Editing, () => { if (InspectorMesh.Editing) InspectorMesh.StopEditing(); else InspectorMesh.Editing = true; }, false));
+                items.Add((IconMove + " Move" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoMove), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Move, () => ToggleGizmo(InspectorGizmo.GizmoMode.Move), false));
+                items.Add((IconRotate + " Rotate" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoRotate), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Rotate, () => ToggleGizmo(InspectorGizmo.GizmoMode.Rotate), false));
+                items.Add((IconScale + " Scale" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoScale), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Scale, () => ToggleGizmo(InspectorGizmo.GizmoMode.Scale), false));
+                items.Add((IconEditMesh + " Edit mesh vertices" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.EditMesh) + " - experimental", InspectorMesh.Editing, () => { if (InspectorMesh.Editing) InspectorMesh.StopEditing(); else InspectorMesh.Editing = true; }, false));
                 if (InspectorGizmo.HasOriginal(sel)) items.Add(("Reset transform", false, () => InspectorGizmo.ResetTransform(sel), false));
                 if (InspectorMesh.HasEdited(sel)) items.Add(("Reset mesh", false, () => InspectorMesh.ResetMesh(sel), false));
             }
             else
             {
-                items.Add((IconHighlight + " Highlight the selection (H)", InspectorPick.Highlight, () => InspectorPick.Highlight = !InspectorPick.Highlight, true));
-                items.Add((IconBones + " Bones (B)", InspectorBones.Show, () => InspectorBones.Show = !InspectorBones.Show, true));
-                items.Add((IconWire + " Wireframe (N)", InspectorMesh.Wireframe, () => InspectorMesh.Wireframe = !InspectorMesh.Wireframe, true));
-                items.Add((IconCamera + " Free camera (C)", InspectorFreeCamera.Active, InspectorFreeCamera.Toggle, false));
+                items.Add((IconHighlight + " Highlight the selection" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Highlight), InspectorPick.Highlight, () => InspectorPick.Highlight = !InspectorPick.Highlight, true));
+                items.Add((IconBones + " Bones" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Bones), InspectorBones.Show, () => InspectorBones.Show = !InspectorBones.Show, true));
+                items.Add((IconWire + " Wireframe" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Wireframe), InspectorMesh.Wireframe, () => InspectorMesh.Wireframe = !InspectorMesh.Wireframe, true));
+                items.Add((IconCamera + " Free camera" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.FreeCamera), InspectorFreeCamera.Active, InspectorFreeCamera.Toggle, false));
                 items.Add(("Debug view: everything the camera sees", InspectorDebugView.Mode == InspectorDebugView.Scope.Visible, () => InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Visible ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Visible, true));
                 items.Add(("Debug view: the selection's children", InspectorDebugView.Mode == InspectorDebugView.Scope.Children, () => InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Children ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Children, true));
                 items.Add(("Debug view: what the search text matches", InspectorDebugView.Mode == InspectorDebugView.Scope.Filter, () => { InspectorDebugView.Filter = _search ?? ""; InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Filter ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Filter; }, true));
