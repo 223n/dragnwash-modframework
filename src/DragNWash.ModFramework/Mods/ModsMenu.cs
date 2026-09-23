@@ -61,6 +61,15 @@ namespace DragNWash.ModFramework.Mods
         private ModCatalog.Entry _confirming;
         private ModCatalog.Entry _confirmingUninstall;
 
+        // The details wait for the end of the frame after a row is selected,
+        // so a pad running down the list builds them once, not once a step.
+        private bool _detailsPending;
+
+        // Work that must not happen in the middle of Unity changing the
+        // selection (a field ending its edit because a button was pressed):
+        // done at the end of the frame instead.
+        private Action _pending;
+
         protected override void OnShow(MenuResponseTransition response)
         {
             base.OnShow(response);
@@ -125,17 +134,39 @@ namespace DragNWash.ModFramework.Mods
             _confirmingUninstall = null;
             _tab = TabAbout;
             MarkShownRow();
-            RebuildDetails(false);
+            _detailsPending = true;
+        }
+
+        // Builds the details now if a row was selected this frame.
+        private void FlushDetails()
+        {
+            if (_detailsPending)
+            {
+                RebuildDetails(false);
+            }
+        }
+
+        // Once a frame, from UpdateResultWatcher: what was put off to the end
+        // of the frame.
+        internal void RunPending()
+        {
+            Action pending = _pending;
+            _pending = null;
+            pending?.Invoke();
+            FlushDetails();
         }
 
         // ---- list ----
 
         private void RebuildList()
         {
+            // Hidden at once, destroyed at the end of the frame: a row found
+            // again by name must be the new one.
             foreach (GameObject row in _rows)
             {
                 if (row != null)
                 {
+                    row.SetActive(false);
                     Destroy(row);
                 }
             }
@@ -152,6 +183,7 @@ namespace DragNWash.ModFramework.Mods
 
         private void RebuildDetails(bool focusSwitch)
         {
+            _detailsPending = false;
             // Hidden at once, destroyed at the end of the frame: a search for
             // a button to focus never finds the old ones.
             foreach (GameObject part in _detailParts)
@@ -386,6 +418,7 @@ namespace DragNWash.ModFramework.Mods
         {
             try
             {
+                Menu?.RunPending();
                 Menu?.PollCheck();
             }
             catch (Exception ex)

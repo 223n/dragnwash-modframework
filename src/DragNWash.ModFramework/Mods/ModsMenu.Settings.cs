@@ -69,9 +69,9 @@ namespace DragNWash.ModFramework.Mods
             return _items.Where(i => _showAdvanced || !i.Advanced);
         }
 
+        // Uses the settings TabsOf read for this build.
         private void BuildSettingsTab(ModCatalog.Entry entry)
         {
-            _items = ConfigItem.For(entry);
             _settingRows.Clear();
             RectTransform content = ScrollArea(_body);
             content.GetComponent<VerticalLayoutGroup>().spacing = 8f;
@@ -186,7 +186,11 @@ namespace DragNWash.ModFramework.Mods
                     {
                         built.Field = ValueField(controls, item, 180f);
                         GameObject change = FlatButton(controls, "Capture", TextChange, 20f, ModsLook.Raised, ModsLook.Label, null);
-                        ModsLook.Size(change, ((RectTransform)change.transform).sizeDelta.x, 44f, 0f, 0f);
+                        // Wide enough for "Press a key..." too, which it says while taking one.
+                        TMP_Text changeLabel = change.GetComponentInChildren<TMP_Text>();
+                        float changeWidth = Mathf.Max(((RectTransform)change.transform).sizeDelta.x,
+                            Mathf.Ceil(changeLabel.GetPreferredValues(TextPressKey).x) + 34f);
+                        ModsLook.Size(change, changeWidth, 44f, 0f, 0f);
                         change.GetComponent<Button>().onClick.AddListener(() => ToggleCapture(item, change));
                     }
                     else
@@ -428,7 +432,8 @@ namespace DragNWash.ModFramework.Mods
             RectTransform fillArea = ModsLook.Rect(area, "Fill Area");
             fillArea.anchorMin = new Vector2(0f, 0.5f);
             fillArea.anchorMax = new Vector2(1f, 0.5f);
-            fillArea.sizeDelta = new Vector2(0f, 8f);
+            // Inset like the handle's area, so the fill ends under the knob.
+            fillArea.sizeDelta = new Vector2(-28f, 8f);
             RectTransform fill = ModsLook.Rect(fillArea, "Fill");
             ModsLook.Stretch(fill);
             ModsLook.Shape(fill.gameObject, ModsLook.Pill, ModsLook.Accent).raycastTarget = false;
@@ -436,11 +441,13 @@ namespace DragNWash.ModFramework.Mods
             RectTransform handleArea = ModsLook.Rect(area, "Handle Slide Area");
             ModsLook.Stretch(handleArea, 14f, 0f, 14f, 0f);
             RectTransform handle = ModsLook.Rect(handleArea, "Handle");
-            handle.sizeDelta = new Vector2(28f, 28f);
-            Image knob = ModsLook.Shape(handle.gameObject, ModsLook.Pill, Color.white);
+            // The slider stretches the handle to its area's height (40); 12
+            // less makes it 28 high.
+            handle.sizeDelta = new Vector2(28f, -12f);
+            Image knob = ModsLook.Shape(handle.gameObject, ModsLook.Pill, Color.white, 14f);
             RectTransform ring = ModsLook.Rect(handle, "Ring");
             ModsLook.Stretch(ring);
-            ModsLook.Shape(ring.gameObject, ModsLook.PillOutline, ModsLook.Accent).raycastTarget = false;
+            ModsLook.Shape(ring.gameObject, ModsLook.PillOutline, ModsLook.Accent, 14f).raycastTarget = false;
 
             Slider slider = area.gameObject.AddComponent<Slider>();
             slider.fillRect = fill;
@@ -528,6 +535,9 @@ namespace DragNWash.ModFramework.Mods
             field.caretColor = ModsLook.Label;
             field.selectionColor = new Color(ModsLook.Accent.r, ModsLook.Accent.g, ModsLook.Accent.b, 0.4f);
             ModsLook.Colors(field, ModsLook.Panel, ModsLook.Hover, ModsLook.Panel);
+            // The pad passing over it does not start typing (on the Steam Deck
+            // that would open the keyboard); A does.
+            field.shouldActivateOnSelect = false;
             field.onEndEdit.AddListener(value => ApplyText(item, field, value));
             box.gameObject.SetActive(true);
             // Only now: text given to the field while it was inactive was not shown.
@@ -595,10 +605,10 @@ namespace DragNWash.ModFramework.Mods
             }
             RectTransform tag = ModsLook.Rect(row, "Saved");
             tag.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-            ModsLook.Shape(tag.gameObject, ModsLook.Pill, ModsLook.Panel).raycastTarget = false;
+            ModsLook.Shape(tag.gameObject, ModsLook.Pill, ModsLook.Panel, 13f).raycastTarget = false;
             RectTransform edge = ModsLook.Rect(tag, "Edge");
             ModsLook.Stretch(edge);
-            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, ModsLook.Accent).raycastTarget = false;
+            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, ModsLook.Accent, 13f).raycastTarget = false;
             TMP_Text label = ModsLook.Text(tag, "Label", TextSaved, 17f, ModsLook.Accent, FontStyles.Bold, false);
             label.alignment = TextAlignmentOptions.Center;
             tag.anchorMin = tag.anchorMax = new Vector2(1f, 1f);
@@ -655,15 +665,26 @@ namespace DragNWash.ModFramework.Mods
             {
                 MarkSaved(item, before);
             }
-            // A shortcut can start or stop clashing with other rows' keys.
-            if (item.IsShortcut)
+            // Not now: the edit ends because the selection is changing (a
+            // button was pressed), and building the row now would destroy that
+            // button in the middle of it. At the end of the frame instead.
+            _pending += () =>
             {
-                RebuildSettingsKeeping(item, "Field");
-            }
-            else
-            {
-                RebuildRow(item, "Field");
-            }
+                // The tab may have been left in the meantime.
+                if (_tab != TabSettings || _settingsContent == null || !_settingsContent.gameObject.activeInHierarchy)
+                {
+                    return;
+                }
+                // A shortcut can start or stop clashing with other rows' keys.
+                if (item.IsShortcut)
+                {
+                    RebuildSettingsKeeping(item, "Field");
+                }
+                else
+                {
+                    RebuildRow(item, "Field");
+                }
+            };
         }
 
         // Starts taking the next key for a shortcut, or stops if already taking one.
@@ -728,12 +749,30 @@ namespace DragNWash.ModFramework.Mods
                 RebuildSettingsKeeping(item, focus);
                 return;
             }
+            GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            bool onRow = selected != null && selected.transform.IsChildOf(old.Root);
             int index = old.Root.GetSiblingIndex();
             old.Root.gameObject.SetActive(false);
             Destroy(old.Root.gameObject);
             SettingRow row = BuildSettingRow(_settingsContent, item);
             row.Root.SetSiblingIndex(index);
             _settingRows[item] = row;
+            RefocusRow(row, onRow ? selected.name : null, onRow || selected == null || !selected.activeInHierarchy, focus);
+        }
+
+        // Puts the pad back on the row: on the control it was on, else on the
+        // first of `focus` it has. Selecting a field does not start typing
+        // (shouldActivateOnSelect is off), so the Steam Deck's keyboard stays shut.
+        private static void RefocusRow(SettingRow row, string was, bool move, string[] focus)
+        {
+            if (was != null && FocusIn(row.Root, was))
+            {
+                return;
+            }
+            if (!move)
+            {
+                return;
+            }
             foreach (string name in focus)
             {
                 if (FocusIn(row.Root, name))
@@ -746,6 +785,9 @@ namespace DragNWash.ModFramework.Mods
         // The whole tab again, for changes that reach other rows.
         private void RebuildSettingsKeeping(ConfigItem item, params string[] focus)
         {
+            GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+            bool onRow = selected != null && _settingRows.TryGetValue(item, out SettingRow old) && old.Root != null && selected.transform.IsChildOf(old.Root);
+            bool lost = selected == null || !selected.activeInHierarchy || Details != null && selected.transform.IsChildOf(Details);
             float scroll = _settingsContent != null ? _settingsContent.anchoredPosition.y : 0f;
             RebuildDetails(false);
             if (_settingsContent != null)
@@ -757,13 +799,7 @@ namespace DragNWash.ModFramework.Mods
             }
             if (_settingRows.TryGetValue(item, out SettingRow row))
             {
-                foreach (string name in focus)
-                {
-                    if (FocusIn(row.Root, name))
-                    {
-                        return;
-                    }
-                }
+                RefocusRow(row, onRow ? selected.name : null, onRow || lost, focus);
             }
         }
 

@@ -119,7 +119,7 @@ namespace DragNWash.ModFramework.Mods
             _entries = entries;
             if (rebuild)
             {
-                RebuildKeepingFocus();
+                RebuildKeepingFocus(checkDone: true);
             }
         }
 
@@ -220,11 +220,49 @@ namespace DragNWash.ModFramework.Mods
             group.interactable = false;
         }
 
+        // The names from `root` down to `target`.
+        private static List<string> PathUnder(Transform root, Transform target)
+        {
+            var names = new List<string>();
+            for (Transform t = target; t != null && t != root; t = t.parent)
+            {
+                names.Insert(0, t.name);
+            }
+            return names;
+        }
+
+        // Follows names down from `root`, taking only children that show.
+        private static Transform FollowPath(Transform root, List<string> names)
+        {
+            Transform at = root;
+            foreach (string name in names)
+            {
+                Transform next = null;
+                for (int i = 0; i < at.childCount; i++)
+                {
+                    Transform child = at.GetChild(i);
+                    if (child.name == name && child.gameObject.activeInHierarchy)
+                    {
+                        next = child;
+                        break;
+                    }
+                }
+                if (next == null)
+                {
+                    return null;
+                }
+                at = next;
+            }
+            return at;
+        }
+
         // The list and the details built again with what is now known, keeping
         // what the pad or keyboard had selected. A page another mod built is
-        // left alone, and so is the Settings tab (a value may be half typed)
-        // unless `evenSettings` (the panel changed size).
-        private void RebuildKeepingFocus(bool evenSettings = false)
+        // left alone, and so is the Settings tab (a value may be half typed),
+        // unless `evenSettings` (the panel changed size) or the check just
+        // came in (the switch and Uninstall wait for it) and nothing is being
+        // typed.
+        private void RebuildKeepingFocus(bool evenSettings = false, bool checkDone = false)
         {
             if (!isActiveAndEnabled)
             {
@@ -232,12 +270,15 @@ namespace DragNWash.ModFramework.Mods
             }
             GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             ModCatalog.Entry focusedRow = focused != null ? focused.GetComponent<ModRowSelect>()?.Entry : null;
-            string focusName = focused != null && focused.transform.IsChildOf(Details) ? focused.name : null;
+            List<string> focusPath = focused != null && focused.transform.IsChildOf(Details) ? PathUnder(Details, focused.transform) : null;
+            TMP_InputField field = focused != null ? focused.GetComponent<TMP_InputField>() : null;
+            bool typing = field != null && field.isFocused;
+            bool details = evenSettings || !OnModPage && _tab != TabSettings || checkDone && !typing;
             // A filter or the libraries' row, found again by name.
             string listName = focused != null && focusedRow == null &&
                               (ListTop != null && focused.transform.IsChildOf(ListTop) || focused.transform.IsChildOf(Content)) ? focused.name : null;
             RebuildList();
-            if (!OnModPage && (evenSettings || _tab != TabSettings))
+            if (details)
             {
                 RebuildDetails(false);
             }
@@ -252,9 +293,14 @@ namespace DragNWash.ModFramework.Mods
                     EventSystem.current.SetSelectedGameObject(row.gameObject);
                 }
             }
-            else if (focusName != null)
+            else if (focusPath != null && details && EventSystem.current != null)
             {
-                Focus(focusName);
+                // The same control on the same row, found by its names.
+                Transform again = FollowPath(Details, focusPath);
+                if (again != null && again.GetComponent<Selectable>() is Selectable s && s.IsInteractable())
+                {
+                    EventSystem.current.SetSelectedGameObject(again.gameObject);
+                }
             }
             else if (listName != null && !FocusIn(ListTop, listName))
             {

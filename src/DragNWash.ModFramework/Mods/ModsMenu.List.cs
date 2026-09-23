@@ -47,6 +47,15 @@ namespace DragNWash.ModFramework.Mods
 
         private readonly List<ModRowSelect> _listRows = new List<ModRowSelect>();
 
+        // What the search shows and hides without building the list again.
+        private GameObject _yoursHeader;
+        private TMP_Text _yoursCount;
+        private GameObject _librariesRow;
+        private TMP_Text _librariesCount;
+        private RectTransform _librariesArrow;
+        private readonly List<GameObject> _librariesTags = new List<GameObject>();
+        private GameObject _noMatch;
+
         // Colours for the initials of a mod without an icon, picked by its name.
         private static readonly Color[] InitialsColors =
         {
@@ -205,6 +214,9 @@ namespace DragNWash.ModFramework.Mods
             field.caretColor = ModsLook.Label;
             field.selectionColor = new Color(ModsLook.Accent.r, ModsLook.Accent.g, ModsLook.Accent.b, 0.4f);
             ModsLook.Colors(field, ModsLook.Inset, ModsLook.Hover, ModsLook.Inset);
+            // The pad passing over it does not start typing (on the Steam Deck
+            // that would open the keyboard): A does, or Y (FocusSearch).
+            field.shouldActivateOnSelect = false;
             field.onValueChanged.AddListener(OnSearch);
             box.gameObject.SetActive(true);
             return field;
@@ -213,12 +225,21 @@ namespace DragNWash.ModFramework.Mods
         // Y on the pad: the search field, ready to type in.
         internal void FocusSearch()
         {
+            if (SelectSearch())
+            {
+                _search.ActivateInputField();
+            }
+        }
+
+        // The search field selected, without starting to type.
+        private bool SelectSearch()
+        {
             if (_search == null || !_search.isActiveAndEnabled || EventSystem.current == null)
             {
-                return;
+                return false;
             }
             EventSystem.current.SetSelectedGameObject(_search.gameObject);
-            _search.ActivateInputField();
+            return true;
         }
 
         private void OnSearch(string value)
@@ -229,7 +250,7 @@ namespace DragNWash.ModFramework.Mods
                 return;
             }
             _query = query;
-            RebuildList();
+            ApplySearch();
         }
 
         // The filters, each with how many mods it holds, laid out left to
@@ -274,14 +295,14 @@ namespace DragNWash.ModFramework.Mods
             RectTransform chip = ModsLook.Rect(_chips, name);
             chip.anchorMin = chip.anchorMax = new Vector2(0f, 0.5f);
             chip.pivot = new Vector2(0f, 0.5f);
-            Image face = ModsLook.Shape(chip.gameObject, ModsLook.Pill, Color.white);
+            Image face = ModsLook.Shape(chip.gameObject, ModsLook.Pill, Color.white, 20f);
             Button button = chip.gameObject.AddComponent<Button>();
             button.targetGraphic = face;
             ModsLook.Colors(button, chosen ? ModsLook.Inset : ModsLook.Clear, ModsLook.Hover, ModsLook.Raised);
 
             RectTransform edge = ModsLook.Rect(chip, "Edge");
             ModsLook.Stretch(edge);
-            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, chosen ? ModsLook.Accent : ModsLook.Border).raycastTarget = false;
+            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, chosen ? ModsLook.Accent : ModsLook.Border, 20f).raycastTarget = false;
 
             TMP_Text label = ModsLook.Text(chip, "Label", text, 19f, chosen ? ModsLook.Label : ModsLook.Muted, FontStyles.Bold, false);
             TMP_Text number = ModsLook.Text(chip, "Count", count.ToString(), 19f,
@@ -315,43 +336,87 @@ namespace DragNWash.ModFramework.Mods
 
         // ---- the list ----
 
+        // Every row that passes the filter is built, the folded libraries too;
+        // what the search and the fold show is then only a matter of hiding
+        // rows (ApplySearch), so typing does not build the list again.
         private void BuildModList()
         {
             BuildListTop();
             RebuildChips();
             _listRows.Clear();
+            _librariesTags.Clear();
 
-            List<ModCatalog.Entry> shown = _entries.Where(e => Passes(e, _filter)).ToList();
-            List<ModCatalog.Entry> yours = shown.Where(e => !IsLibraryLike(e)).ToList();
-            List<ModCatalog.Entry> libraries = shown.Where(IsLibraryLike).ToList();
-            bool narrowed = _query.Length > 0 || _filter != ListFilter.All;
-
-            if (yours.Count > 0 || !narrowed)
+            List<ModCatalog.Entry> shown = _entries.Where(e => InFilter(e, _filter)).ToList();
+            _yoursHeader = CreateGroupRow(TextYourMods, out _yoursCount);
+            _rows.Add(_yoursHeader);
+            foreach (ModCatalog.Entry entry in shown.Where(e => !IsLibraryLike(e)))
             {
-                _rows.Add(CreateGroupRow(TextYourMods, yours.Count));
-                foreach (ModCatalog.Entry entry in yours)
-                {
-                    _rows.Add(CreateListRow(entry));
-                }
+                _rows.Add(CreateListRow(entry));
             }
-            if (libraries.Count > 0)
+            List<ModCatalog.Entry> libraries = shown.Where(IsLibraryLike).ToList();
+            _librariesRow = CreateLibrariesRow(libraries);
+            _rows.Add(_librariesRow);
+            foreach (ModCatalog.Entry entry in libraries)
             {
-                bool open = _librariesOpen || narrowed;
-                _rows.Add(CreateLibrariesRow(libraries, open));
-                if (open)
+                _rows.Add(CreateListRow(entry));
+            }
+            _noMatch = EmptyRow("NoMatch", 64f);
+            TMP_Text label = ModsLook.Text(_noMatch.transform, "Label", TextNoMatch, 20f, ModsLook.Muted, FontStyles.Italic, false);
+            ((RectTransform)label.transform).offsetMin = new Vector2(ListLeftMargin, 0f);
+            _rows.Add(_noMatch);
+            ApplySearch();
+        }
+
+        // Shows the rows that match what is typed, opens the libraries while
+        // the list is narrowed, and counts what each group shows.
+        private void ApplySearch()
+        {
+            bool narrowed = _query.Length > 0 || _filter != ListFilter.All;
+            bool open = _librariesOpen || narrowed;
+            int yours = 0;
+            int libraries = 0;
+            foreach (ModRowSelect row in _listRows)
+            {
+                if (row == null)
                 {
-                    foreach (ModCatalog.Entry entry in libraries)
+                    continue;
+                }
+                bool library = IsLibraryLike(row.Entry);
+                bool match = Matches(row.Entry);
+                if (match)
+                {
+                    if (library)
                     {
-                        _rows.Add(CreateListRow(entry));
+                        libraries++;
+                    }
+                    else
+                    {
+                        yours++;
                     }
                 }
+                row.transform.parent.gameObject.SetActive(match && (!library || open));
             }
-            if (shown.Count == 0)
+            if (_yoursHeader != null)
             {
-                GameObject row = EmptyRow("NoMatch", 64f);
-                TMP_Text label = ModsLook.Text(row.transform, "Label", TextNoMatch, 20f, ModsLook.Muted, FontStyles.Italic, false);
-                ((RectTransform)label.transform).offsetMin = new Vector2(ListLeftMargin, 0f);
-                _rows.Add(row);
+                _yoursHeader.SetActive(yours > 0 || !narrowed);
+                _yoursCount.text = yours.ToString();
+            }
+            if (_librariesRow != null)
+            {
+                _librariesRow.SetActive(libraries > 0);
+                _librariesCount.text = libraries.ToString();
+                if (_librariesArrow != null)
+                {
+                    _librariesArrow.localRotation = Quaternion.Euler(0f, 0f, open ? -90f : 0f);
+                }
+                foreach (GameObject tag in _librariesTags)
+                {
+                    tag.SetActive(!open);
+                }
+            }
+            if (_noMatch != null)
+            {
+                _noMatch.SetActive(yours + libraries == 0);
             }
         }
 
@@ -369,7 +434,7 @@ namespace DragNWash.ModFramework.Mods
 
         // A group's heading: its name in small capitals and how many it holds.
         // Not selectable, so the pad passes over it.
-        private GameObject CreateGroupRow(string title, int count)
+        private GameObject CreateGroupRow(string title, out TMP_Text count)
         {
             GameObject row = EmptyRow("Group " + title, 48f);
             TMP_Text label = GroupLabel(row.transform, title);
@@ -377,10 +442,11 @@ namespace DragNWash.ModFramework.Mods
             var rect = (RectTransform)label.transform;
             rect.offsetMin = new Vector2(ListLeftMargin - 6f, 0f);
             rect.offsetMax = new Vector2(0f, -10f);
-            TMP_Text number = ModsLook.Text(row.transform, "Count", count.ToString(), 18f, ModsLook.Muted, FontStyles.Normal, false);
+            TMP_Text number = ModsLook.Text(row.transform, "Count", "0", 18f, ModsLook.Muted, FontStyles.Normal, false);
             var numberRect = (RectTransform)number.transform;
             numberRect.offsetMin = new Vector2(ListLeftMargin - 6f + width + 12f, 0f);
             numberRect.offsetMax = new Vector2(0f, -10f);
+            count = number;
             return row;
         }
 
@@ -395,7 +461,7 @@ namespace DragNWash.ModFramework.Mods
 
         // The framework and its libraries, folded until pressed. A problem in
         // one of them shows on the folded row too, so none is hidden.
-        private GameObject CreateLibrariesRow(List<ModCatalog.Entry> libraries, bool open)
+        private GameObject CreateLibrariesRow(List<ModCatalog.Entry> libraries)
         {
             GameObject row = EmptyRow("Libraries", 60f);
             RectTransform band = ModsLook.Rect(row.transform, "Libraries");
@@ -407,8 +473,7 @@ namespace DragNWash.ModFramework.Mods
             button.onClick.AddListener(() =>
             {
                 _librariesOpen = !_librariesOpen;
-                RebuildList();
-                FocusIn(Content, "Libraries");
+                ApplySearch();
             });
 
             float x = 14f;
@@ -419,32 +484,38 @@ namespace DragNWash.ModFramework.Mods
                 arrow.pivot = new Vector2(0.5f, 0.5f);
                 arrow.sizeDelta = new Vector2(18f, 18f);
                 arrow.anchoredPosition = new Vector2(x + 9f, 0f);
-                arrow.localRotation = Quaternion.Euler(0f, 0f, open ? -90f : 0f);
                 Image image = arrow.gameObject.AddComponent<Image>();
                 image.sprite = ModsLook.Triangle;
                 image.color = ModsLook.Muted;
                 image.raycastTarget = false;
+                _librariesArrow = arrow;
                 x += 30f;
+            }
+            else
+            {
+                _librariesArrow = null;
             }
             TMP_Text label = GroupLabel(band, TextLibraries);
             float width = ModsLook.Width(label);
             Place(label, x, width);
             x += width + 12f;
             TMP_Text number = ModsLook.Text(band, "Count", libraries.Count.ToString(), 18f, ModsLook.Muted, FontStyles.Normal, false);
-            float numberWidth = ModsLook.Width(number);
+            _librariesCount = number;
+            // Room for up to three digits, as the search changes the count.
+            float numberWidth = Mathf.Max(ModsLook.Width(number), 40f);
             Place(number, x, numberWidth);
             x += numberWidth + 14f;
 
-            if (!open)
+            // Shown while folded.
+            if (libraries.Any(NeedsAttention))
             {
-                if (libraries.Any(NeedsAttention))
-                {
-                    x += TagAt(band, "Attention", TextNeedsAttention, ModsLook.Warning, x) + 8f;
-                }
-                if (libraries.Any(e => e.Loaded && Updates.UpdateCheck.NewerRelease(e.Guid, e.Version) != null))
-                {
-                    TagAt(band, "Update", TextUpdateTag, ModsLook.Accent, x);
-                }
+                x += TagAt(band, "Attention", TextNeedsAttention, ModsLook.Warning, x) + 8f;
+                _librariesTags.Add(band.Find("Attention").gameObject);
+            }
+            if (libraries.Any(e => e.Loaded && Updates.UpdateCheck.NewerRelease(e.Guid, e.Version) != null))
+            {
+                TagAt(band, "Update", TextUpdateTag, ModsLook.Accent, x);
+                _librariesTags.Add(band.Find("Update").gameObject);
             }
             return row;
         }
@@ -492,6 +563,7 @@ namespace DragNWash.ModFramework.Mods
                 // With the pad, pressing a mod moves on to its buttons.
                 if (PadSupport.PadPressedThisFrame())
                 {
+                    FlushDetails();
                     Focus("Switch", "Tab" + _tab);
                 }
             });

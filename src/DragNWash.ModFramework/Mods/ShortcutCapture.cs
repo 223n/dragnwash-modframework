@@ -5,6 +5,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace DragNWash.ModFramework.Mods
 {
@@ -13,7 +14,7 @@ namespace DragNWash.ModFramework.Mods
     // button while capturing and removes itself when done; Esc cancels. Keys are read through BepInEx's
     // UnityInput, which works whether the game uses the old Input class or the
     // Input System (this game has the old one switched off).
-    internal sealed class ShortcutCapture : MonoBehaviour
+    internal sealed class ShortcutCapture : MonoBehaviour, IDeselectHandler
     {
         internal ModsMenu Menu;
         internal ConfigItem Item;
@@ -78,6 +79,13 @@ namespace DragNWash.ModFramework.Mods
                 ModFramework.Log.LogWarning($"Could not read the keyboard for a shortcut: {ex.Message}");
                 Cancel();
             }
+        }
+
+        // The pad or the pointer moved on: the next key pressed is not for
+        // this setting (it may be typed into the search field).
+        public void OnDeselect(BaseEventData eventData)
+        {
+            Cancel();
         }
 
         internal void Cancel()

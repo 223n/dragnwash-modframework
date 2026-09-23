@@ -213,7 +213,8 @@ namespace DragNWash.ModFramework.Mods
         }
 
         // An Image in a shape (or square when the shapes could not be made).
-        // `radius` scales the shape's corners; a pill ignores it.
+        // `radius` is the corners' radius in canvas units: for a pill, half
+        // its height, so it stays round when taller than the texture's 32.
         internal static Image Shape(GameObject go, Sprite sprite, Color color, float radius = 12f)
         {
             Image image = go.GetComponent<Image>();
@@ -228,6 +229,10 @@ namespace DragNWash.ModFramework.Mods
                 if (sprite == Rounded || sprite == Outline)
                 {
                     image.pixelsPerUnitMultiplier = 12f / Mathf.Max(1f, radius);
+                }
+                else if (sprite == Pill || sprite == PillOutline)
+                {
+                    image.pixelsPerUnitMultiplier = 16f / Mathf.Max(1f, radius);
                 }
                 image.fillCenter = sprite != Outline && sprite != PillOutline;
             }
@@ -299,14 +304,14 @@ namespace DragNWash.ModFramework.Mods
         {
             RectTransform track = Rect(parent, name);
             track.sizeDelta = new Vector2(width, height);
-            Shape(track.gameObject, Pill, on ? Accent : TrackOff).raycastTarget = false;
+            Shape(track.gameObject, Pill, on ? Accent : TrackOff, height / 2f).raycastTarget = false;
             RectTransform knob = Rect(track, "Knob");
             float side = height - 6f;
             knob.anchorMin = knob.anchorMax = new Vector2(on ? 1f : 0f, 0.5f);
             knob.pivot = new Vector2(on ? 1f : 0f, 0.5f);
             knob.sizeDelta = new Vector2(side, side);
             knob.anchoredPosition = new Vector2(on ? -3f : 3f, 0f);
-            Shape(knob.gameObject, Pill, on ? Inset : KnobOff).raycastTarget = false;
+            Shape(knob.gameObject, Pill, on ? Inset : KnobOff, side / 2f).raycastTarget = false;
             return track;
         }
 
@@ -315,7 +320,7 @@ namespace DragNWash.ModFramework.Mods
         internal static float Tag(Transform parent, string name, string text, Color color, float size, float height)
         {
             RectTransform tag = Rect(parent, name);
-            Shape(tag.gameObject, PillOutline, color).raycastTarget = false;
+            Shape(tag.gameObject, PillOutline, color, height / 2f).raycastTarget = false;
             TMP_Text label = Text(tag, "Label", text, size, color, FontStyles.Bold, false);
             label.alignment = TextAlignmentOptions.Center;
             float width = Width(label) + 22f;

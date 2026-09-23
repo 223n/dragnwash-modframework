@@ -79,7 +79,6 @@ namespace DragNWash.ModFramework.Mods
             _body = ModsLook.Rect(view.transform, "Body");
             LayoutElement bodySize = ModsLook.Size(_body.gameObject, -1f, -1f, 1f, 1f);
             bodySize.minHeight = 140f;
-            BuildTab(entry, tabs.First(t => t.Key == _tab));
             if (UnityEngine.InputSystem.Gamepad.current != null)
             {
                 BuildHints(view.transform);
@@ -88,14 +87,19 @@ namespace DragNWash.ModFramework.Mods
             // The notes take what they need, up to about a third of the panel,
             // and scroll beyond that. How much they need is only known once
             // the column is laid out at its width.
+            var viewRect = (RectTransform)view.transform;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(viewRect);
             if (notes != null)
             {
-                LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)view.transform);
                 float needed = LayoutUtility.GetPreferredHeight(notes);
                 float height = Mathf.Min(needed, Mathf.Max(120f, Details.rect.height * 0.36f));
                 notesSize.minHeight = height;
                 notesSize.preferredHeight = height;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(viewRect);
             }
+            // Only now, with the tab's area at its size: a page another mod
+            // builds may measure it.
+            BuildTab(entry, tabs.First(t => t.Key == _tab));
         }
 
         // ---- header ----
@@ -232,7 +236,7 @@ namespace DragNWash.ModFramework.Mods
         // problems, then news, then plain facts.
         private void AddNotes(RectTransform content, ModCatalog.Entry entry, Updates.UpdateCheck.Release newer)
         {
-            string neededBy = string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g)));
+            string neededBy = Escape(string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g))));
             string status = Status(entry);
             if (_confirmingUninstall == entry)
             {
@@ -253,7 +257,7 @@ namespace DragNWash.ModFramework.Mods
                 if (status == entry.ProblemLabel && entry.ProblemGuids.Count > 0)
                 {
                     // "Not loaded. It needs" and the mods it names, as one note.
-                    Band(content, "Problem", status, string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g))), color);
+                    Band(content, "Problem", status, Escape(string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g)))), color);
                 }
                 else
                 {
@@ -262,7 +266,7 @@ namespace DragNWash.ModFramework.Mods
             }
             if (status != entry.ProblemLabel && entry.ProblemGuids.Count > 0)
             {
-                Band(content, "ProblemMods", null, string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g))), ModsLook.Muted);
+                Band(content, "ProblemMods", null, Escape(string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g)))), ModsLook.Muted);
             }
 
             if (entry.Guid != null)
@@ -270,31 +274,31 @@ namespace DragNWash.ModFramework.Mods
                 List<string> undeclared = NetworkWatch.SeenBy(entry.Guid).Where(c => !c.Declared).Select(c => c.Host).ToList();
                 if (undeclared.Count > 0)
                 {
-                    Band(content, "NetUndeclared", TextUndeclaredOnline, string.Join(", ", undeclared), ModsLook.Warning,
+                    Band(content, "NetUndeclared", TextUndeclaredOnline, Escape(string.Join(", ", undeclared)), ModsLook.Warning,
                         entry.Loaded ? TextInternetPage : null, () => ShowTab(TabInternet));
                 }
             }
             foreach (PatchConflicts.Conflict c in ConflictsOf(entry))
             {
                 string others = string.Join(", ", c.Guids.Where(g => g != entry.Guid).Select(g => ModCatalog.NameOf(_entries, g)));
-                Band(content, "Conflict", c.Risky ? TextSameCodeRisky : TextSameCode, others + " (" + c.Method + ")", ModsLook.Warning);
+                Band(content, "Conflict", c.Risky ? TextSameCodeRisky : TextSameCode, Escape(others + " (" + c.Method + ")"), ModsLook.Warning);
             }
             IReadOnlyList<string> unavailable = GameHooks.UnavailableFeatures(entry.Guid);
             if (unavailable.Count > 0)
             {
-                Band(content, "Unavailable", TextUnavailable, string.Join(", ", unavailable), ModsLook.Warning);
+                Band(content, "Unavailable", TextUnavailable, Escape(string.Join(", ", unavailable)), ModsLook.Warning);
             }
             if (newer != null)
             {
                 string url = newer.Url;
-                Band(content, "Update", TextNewVersion, newer.Tag, ModsLook.Accent, TextOpenReleasePage, () => OpenReleasePage(url));
+                Band(content, "Update", TextNewVersion, Escape(newer.Tag), ModsLook.Accent, TextOpenReleasePage, () => OpenReleasePage(url));
             }
             if (entry.Guid != null && !NetworkWatch.HasUndeclared(entry.Guid))
             {
                 List<string> hosts = NetworkWatch.DeclaredBy(entry.Guid).Select(u => u.Host).Distinct().ToList();
                 if (hosts.Count > 0)
                 {
-                    Band(content, "Net", TextUsesInternet, string.Join(", ", hosts), ModsLook.Muted);
+                    Band(content, "Net", TextUsesInternet, Escape(string.Join(", ", hosts)), ModsLook.Muted);
                 }
             }
             int reloads = ModReload.ReloadCount(entry.Guid);
@@ -310,7 +314,8 @@ namespace DragNWash.ModFramework.Mods
         }
 
         // One note: a bar of its colour on the left, a bold label in that
-        // colour, the text, and maybe a button. A label too long to sit
+        // colour, the text (as given: names from mods are escaped by the
+        // caller), and maybe a button. A label too long to sit
         // beside the text (common in Japanese or German) goes above it.
         private void Band(RectTransform parent, string name, string label, string value, Color color,
             string buttonText = null, UnityAction onClick = null, bool spinner = false)
@@ -383,7 +388,7 @@ namespace DragNWash.ModFramework.Mods
                     head.overflowMode = TextOverflowModes.Overflow;
                 }
             }
-            TMP_Text body = ModsLook.Text(text, "Value", Escape(value), size,
+            TMP_Text body = ModsLook.Text(text, "Value", value, size,
                 spinner ? CheckingColor : ModsLook.Label, spinner ? FontStyles.Italic : FontStyles.Normal, true);
             LayoutElement bodySize = ModsLook.Size(body.gameObject, -1f, -1f, 1f, 0f);
             bodySize.minWidth = 0f;
@@ -423,11 +428,14 @@ namespace DragNWash.ModFramework.Mods
         private List<Tab> TabsOf(ModCatalog.Entry entry)
         {
             var tabs = new List<Tab> { new Tab { Key = TabAbout, Title = TextAbout } };
+            // Read once a build: the Settings tab uses the same list.
+            _items = new List<ConfigItem>();
             if (!entry.Loaded || entry.Guid == null)
             {
                 return tabs;
             }
-            int settings = ConfigItem.For(entry).Count;
+            _items = ConfigItem.For(entry);
+            int settings = _items.Count;
             if (settings > 0)
             {
                 tabs.Add(new Tab { Key = TabSettings, Title = TextSettings, Count = settings.ToString() });
@@ -643,7 +651,7 @@ namespace DragNWash.ModFramework.Mods
                 RectTransform chip = ModsLook.Rect(holder, "Chip");
                 chip.anchorMin = chip.anchorMax = new Vector2(0f, 1f);
                 chip.pivot = new Vector2(0f, 1f);
-                ModsLook.Shape(chip.gameObject, ModsLook.Pill, ModsLook.Inset).raycastTarget = false;
+                ModsLook.Shape(chip.gameObject, ModsLook.Pill, ModsLook.Inset, height / 2f).raycastTarget = false;
                 TMP_Text label = ModsLook.Text(chip, "Label", Escape(text), 19f, ModsLook.Label, FontStyles.Normal, false);
                 label.alignment = TextAlignmentOptions.Center;
                 float w = Mathf.Min(width, ModsLook.Width(label) + 30f);
@@ -684,7 +692,7 @@ namespace DragNWash.ModFramework.Mods
             foreach (string button in buttons)
             {
                 RectTransform glyph = ModsLook.Rect(parent, "Button " + button);
-                ModsLook.Shape(glyph.gameObject, ModsLook.PillOutline, ModsLook.Muted).raycastTarget = false;
+                ModsLook.Shape(glyph.gameObject, ModsLook.PillOutline, ModsLook.Muted, 16f).raycastTarget = false;
                 TMP_Text letter = ModsLook.Text(glyph, "Label", button, 15f, ModsLook.Label, FontStyles.Bold, false);
                 letter.alignment = TextAlignmentOptions.Center;
                 ModsLook.Size(glyph.gameObject, Mathf.Max(32f, ModsLook.Width(letter) + 16f), 32f, 0f, 0f);
@@ -706,9 +714,12 @@ namespace DragNWash.ModFramework.Mods
             {
                 return false;
             }
-            // Esc while a key is being taken stops taking it, and stays.
-            if (focused.GetComponent<ShortcutCapture>() != null)
+            // Back while a key is being taken (Esc, or B on the pad) stops
+            // taking it, and stays.
+            ShortcutCapture capture = focused.GetComponent<ShortcutCapture>();
+            if (capture != null)
             {
+                capture.Cancel();
                 return true;
             }
             if (Details != null && focused.transform.IsChildOf(Details))
@@ -718,7 +729,9 @@ namespace DragNWash.ModFramework.Mods
                 {
                     return true;
                 }
-                return FocusRow(_selected);
+                // The mod's row may be hidden by the search or the folded
+                // libraries: then the first row, or the search field.
+                return FocusRow(_selected) || FocusFirstRow() || SelectSearch();
             }
             // Leaving the search field: to the list, not off the screen.
             if (focused.GetComponent<TMP_InputField>() != null && ListTop != null && focused.transform.IsChildOf(ListTop))
