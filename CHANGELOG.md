@@ -4,6 +4,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Saves: restoring the oldest snapshot
+
+- Restoring a snapshot when the history was full could fail with "Restore failed" and lose that snapshot. Before a restore, the save being replaced is kept as a snapshot, and with the history full that pushed out the oldest one, which could be the very snapshot being restored. Now the snapshot is read first, so the restore goes through. The current save was never at risk.
+
 ### Bridge: a clearer message when Windows holds the port
 
 - When the Bridge can't listen because Windows refused the port ("access denied"), the F1 Bridge tab and the log now say the port has probably been set aside by Windows. Hyper-V, WSL and Docker reserve ranges of ports, and the ranges can change when the PC restarts. The message says to choose another `[Bridge] Port` and register the new address with the client. Before, it said another program might be using the port, which isn't what happens in that case. The system's own error text also no longer leaves a line break in the middle of the message.

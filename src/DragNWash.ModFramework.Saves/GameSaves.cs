@@ -225,6 +225,10 @@ namespace DragNWash.ModFramework.Saves
             try
             {
                 string savePath = SavePath(slot);
+                // Read before the current save is snapshotted: with the history
+                // full, that snapshot makes room by deleting the oldest one, which
+                // may be the very one being restored.
+                string restored = ForPath(savePath, File.ReadAllText(snapshot.Path));
                 if (File.Exists(savePath))
                 {
                     string current = File.ReadAllText(savePath);
@@ -232,7 +236,6 @@ namespace DragNWash.ModFramework.Saves
                     TakeSnapshot(slot, savePath, current);
                 }
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(savePath));
-                string restored = ForPath(savePath, File.ReadAllText(snapshot.Path));
                 // Same bytes as the plain File.WriteAllText(path, text) this
                 // replaces: UTF-8, no byte-order mark.
                 SafeFile.Write(savePath, new UTF8Encoding(false), w => w.Write(restored));
