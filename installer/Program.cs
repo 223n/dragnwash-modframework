@@ -7,14 +7,26 @@ using System.Windows.Forms;
 namespace DragNWash.Installer
 {
     // Double-click: the window. From a terminal, without a window (how it is tested):
-    //
-    //   Install.exe --install [--game-dir <folder>] [--choice <id>=<value>]...
-    //   Install.exe --uninstall [--game-dir <folder>] [--remove-data] [--remove-bepinex]
-    //
-    // Other options: --bepinex-zip <file> uses a local BepInEx zip (still checked
-    // against the pinned SHA-256), --log <file> appends the log to a file.
+    // see Usage below. On the command line, --install is the consent to download what
+    // is missing; the window asks first.
     internal static class Program
     {
+        private const string Usage =
+            "Install.exe                    the window\n" +
+            "Install.exe --install [--game-dir <folder>] [--choice <id>=<value>]...\n" +
+            "            [--bepinex-zip <file>] [--framework-zip <file>] [--no-download] [--keep-framework]\n" +
+            "Install.exe --uninstall [--game-dir <folder>] [--remove-data] [--remove-bepinex]\n" +
+            "\n" +
+            "  --bepinex-zip <file>    use this BepInEx zip instead of downloading it (checked against the pinned SHA-256)\n" +
+            "  --framework-zip <file>  use this ModFramework zip instead of downloading it (checked against the size\n" +
+            "                          and SHA-256 in mod-install.json; no network)\n" +
+            "  --no-download           never go online; stop, with nothing changed, when BepInEx or ModFramework\n" +
+            "                          would have to be downloaded\n" +
+            "  --keep-framework        keep the installed ModFramework when it meets the mod's minimums, and install\n" +
+            "                          only the mod\n" +
+            "  --log <file>            also append the log to a file\n" +
+            "  --help                  this text\n";
+
         [STAThread]
         private static int Main(string[] args)
         {
@@ -30,7 +42,7 @@ namespace DragNWash.Installer
                 }
                 catch (InstallerException ex)
                 {
-                    MessageBox.Show(Strings.Get(ex.Key) + (ex.Detail == null ? "" : Environment.NewLine + Environment.NewLine + ex.Detail),
+                    MessageBox.Show(ex.Text() + (ex.Detail == null ? "" : Environment.NewLine + Environment.NewLine + ex.Detail),
                         "Drag'n Wash Mod Installer", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 1;
                 }
@@ -59,7 +71,8 @@ namespace DragNWash.Installer
 
         private static int RunCommandLine(string[] args, string here)
         {
-            string action = null, game = null, zip = null, logFile = null;
+            string action = null, game = null, logFile = null;
+            var options = new InstallOptions();
             bool removeData = false, removeBepInEx = false;
             var choices = new Dictionary<string, string>();
             for (int i = 0; i < args.Length; i++)
@@ -71,7 +84,15 @@ namespace DragNWash.Installer
                     case "--install": action = "install"; break;
                     case "--uninstall": action = "uninstall"; break;
                     case "--game-dir": game = Next(); break;
-                    case "--bepinex-zip": zip = Next(); break;
+                    case "--bepinex-zip": options.BepInExZip = Next(); break;
+                    case "--framework-zip": options.FrameworkZip = Next(); break;
+                    case "--no-download": options.NoDownload = true; break;
+                    case "--keep-framework": options.KeepFramework = true; break;
+                    case "--help":
+                    case "-h":
+                    case "/?":
+                        Console.Out.Write(Usage.Replace("\n", Environment.NewLine));
+                        return 0;
                     case "--log": logFile = Next(); break;
                     case "--remove-data": removeData = true; break;
                     case "--remove-bepinex": removeBepInEx = true; break;
@@ -83,6 +104,7 @@ namespace DragNWash.Installer
                         break;
                     default:
                         Console.Error.WriteLine($"Unknown option {a}");
+                        Console.Error.Write(Usage.Replace("\n", Environment.NewLine));
                         return 2;
                 }
             }
@@ -114,7 +136,7 @@ namespace DragNWash.Installer
                             choices[choice.Id] = choice.DefaultValue(core.ReadConfig(game, choice.Config));
                         }
                     }
-                    core.Install(game, choices, zip);
+                    core.Install(game, choices, options);
                 }
                 else if (action == "uninstall")
                 {
@@ -123,6 +145,7 @@ namespace DragNWash.Installer
                 else
                 {
                     Console.Error.WriteLine("Pass --install or --uninstall.");
+                    Console.Error.Write(Usage.Replace("\n", Environment.NewLine));
                     return 2;
                 }
                 return 0;
@@ -130,7 +153,7 @@ namespace DragNWash.Installer
             catch (InstallerException ex)
             {
                 Strings.Current = "en";
-                Log("ERROR: " + Strings.Get(ex.Key) + (ex.Detail == null ? "" : " (" + ex.Detail + ")"));
+                Log("ERROR: " + (ex.LogText ?? ex.Text() + (ex.Detail == null ? "" : " (" + ex.Detail + ")")));
                 return 1;
             }
             catch (Exception ex)

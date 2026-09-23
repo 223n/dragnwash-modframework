@@ -57,6 +57,36 @@ namespace DragNWash.Installer
         private CancellationTokenSource _cancel;
         private bool _closeWhenDone;
 
+        // While Install runs, the list is its checklist; afterwards it says what was done,
+        // until the next change in the window.
+        private readonly List<StepRow> _stepRows = new List<StepRow>();
+        private InstallResult _summary;
+        private Font _symbols;
+        private Font _smallSymbols;
+        private Font _bold;
+
+        private static readonly Color Ok = Color.FromArgb(16, 124, 16);
+        private static readonly Color Running = Color.FromArgb(0, 103, 192);
+
+        // Before a line of the list: planned, done, running now, still to do, or left as it was.
+        private enum Mark
+        {
+            Planned,
+            Done,
+            Now,
+            Todo,
+            Kept,
+        }
+
+        private sealed class StepRow
+        {
+            internal InstallStage Stage;
+            internal Label Mark;
+            internal Label Text;
+            internal string BaseText;
+            internal Mark? Shown;
+        }
+
         internal MainForm(ModManifest manifest, string payload)
         {
             _manifest = manifest;
@@ -107,7 +137,11 @@ namespace DragNWash.Installer
                 {
                     box.Items.Add(option.Name ?? option.Value);
                 }
-                box.SelectedIndexChanged += (_, __) => RefreshPlan();
+                box.SelectedIndexChanged += (_, __) =>
+                {
+                    _summary = null;
+                    RefreshPlan();
+                };
                 _choices.Add((choice, label, box));
                 AddRow(install, label, 1, box, 1);
             }
@@ -154,8 +188,16 @@ namespace DragNWash.Installer
             };
 
             _browse.Click += (_, __) => Browse();
-            _game.TextChanged += (_, __) => RefreshStatus();
-            _modeInstall.CheckedChanged += (_, __) => ApplyMode();
+            _game.TextChanged += (_, __) =>
+            {
+                _summary = null;
+                RefreshStatus();
+            };
+            _modeInstall.CheckedChanged += (_, __) =>
+            {
+                _summary = null;
+                ApplyMode();
+            };
             _keepData.CheckedChanged += (_, __) => RefreshPlan();
             _alsoBepInEx.CheckedChanged += (_, __) => RefreshPlan();
             _run.Click += (_, __) => Run(install: _modeInstall.Checked);
@@ -270,8 +312,9 @@ namespace DragNWash.Installer
             return list;
         }
 
-        private static void FillSteps(TableLayoutPanel list, IList<string> steps)
+        private List<(Label Mark, Label Text)> FillSteps(TableLayoutPanel list, IList<(Mark Mark, string Text)> steps)
         {
+            var rows = new List<(Label, Label)>();
             list.SuspendLayout();
             while (list.Controls.Count > 0)
             {
@@ -279,13 +322,50 @@ namespace DragNWash.Installer
             }
             list.RowStyles.Clear();
             list.RowCount = 0;
-            foreach (string step in steps)
+            foreach (var (mark, step) in steps)
             {
-                AddRow(list,
-                    new Label { AutoSize = true, Text = "\u2022", Margin = new Padding(4, 1, 6, 1) }, 1,
-                    new Label { AutoSize = true, Dock = DockStyle.Fill, Text = step, UseMnemonic = false, Margin = new Padding(0, 1, 0, 1) }, 1);
+                var markLabel = new Label { AutoSize = true, MinimumSize = new Size(14, 0), TextAlign = ContentAlignment.TopCenter, Margin = new Padding(4, 1, 6, 1) };
+                var textLabel = new Label { AutoSize = true, Dock = DockStyle.Fill, Text = step, UseMnemonic = false, Margin = new Padding(0, 1, 0, 1) };
+                SetMark(markLabel, textLabel, mark);
+                AddRow(list, markLabel, 1, textLabel, 1);
+                rows.Add((markLabel, textLabel));
             }
             list.ResumeLayout();
+            return rows;
+        }
+
+        // \u2713 in green, \u25b6 in blue with the line in bold, \u25cb and \u2013 in grey; a planned line keeps its bullet.
+        private void SetMark(Label mark, Label text, Mark kind)
+        {
+            if (_symbols == null || _symbols.SizeInPoints != Font.SizeInPoints)
+            {
+                // Windows' symbol font has these marks in every language; the UI fonts may not.
+                _symbols = new Font("Segoe UI Symbol", Font.SizeInPoints);
+                _smallSymbols = new Font("Segoe UI Symbol", Font.SizeInPoints * 0.75f);
+                _bold = new Font(Font, FontStyle.Bold);
+            }
+            switch (kind)
+            {
+                case Mark.Done:
+                    mark.Text = "\u2713";
+                    break;
+                case Mark.Now:
+                    mark.Text = "\u25b6";
+                    break;
+                case Mark.Todo:
+                    mark.Text = "\u25cb";
+                    break;
+                case Mark.Kept:
+                    mark.Text = "\u2013";
+                    break;
+                default:
+                    mark.Text = "\u2022";
+                    break;
+            }
+            mark.Font = kind == Mark.Planned ? null : kind == Mark.Now ? _smallSymbols : kind == Mark.Done ? new Font(_symbols, FontStyle.Bold) : _symbols;
+            mark.ForeColor = kind == Mark.Done ? Ok : kind == Mark.Now ? Running : kind == Mark.Planned ? SystemColors.ControlText : SystemColors.GrayText;
+            text.Font = kind == Mark.Now ? _bold : null;
+            text.ForeColor = kind == Mark.Todo ? SystemColors.GrayText : SystemColors.ControlText;
         }
 
         private void UpdateTexts()
@@ -337,7 +417,9 @@ namespace DragNWash.Installer
                 ApplyMode();
                 return;
             }
+            Version framework = InstallerCore.InstalledFramework(game);
             _status.Text = $"{Strings.Get(Strings.Key.StatusBepInEx)}: {Strings.Get(InstallerCore.HasBepInEx(game) ? Strings.Key.Yes : Strings.Key.No)}    " +
+                           $"{Strings.Get(Strings.Key.StatusFramework)}: {(framework == null ? Strings.Get(Strings.Key.No) : InstallerCore.ShortVersion(framework))}    " +
                            $"{Strings.Get(Strings.Key.StatusMod)}: {_installed ?? Strings.Get(Strings.Key.No)}";
             foreach (var (choice, _, box) in _choices)
             {
@@ -361,7 +443,7 @@ namespace DragNWash.Installer
             }
             _run.Text = Strings.Get(!install ? Strings.Key.UninstallButton : _installed == null ? Strings.Key.InstallButton : Strings.Key.UpdateButton);
             // Installing: why Windows may warn about this file. Uninstalling: the other way to do it.
-            _hint.Text = Strings.Get(install ? Strings.Key.SmartScreenHint : Strings.Key.SteamLaunchHint);
+            _hint.Text = Strings.Get(!install ? Strings.Key.SteamLaunchHint : _core.FetchesFramework ? Strings.Key.SmartScreenHintFramework : Strings.Key.SmartScreenHint);
             RefreshPlan();
         }
 
@@ -370,20 +452,25 @@ namespace DragNWash.Installer
         {
             bool install = _modeInstall.Checked;
             string game = _game.Text.Trim();
-            List<string> steps = null;
+            List<(Mark, string)> steps = null;
+            bool summary = install && _summary != null;
             if (InstallerCore.IsGameFolder(game))
             {
                 try
                 {
-                    steps = install ? _core.InstallPlan(game, SelectedChoices()) : _core.UninstallPlan(game, _keepData.Checked, _alsoBepInEx.Checked);
+                    steps = summary
+                        ? _core.Summary(_summary).Select(l => (l.Done ? Mark.Done : Mark.Kept, l.Text)).ToList()
+                        : (install ? _core.InstallPlan(game, SelectedChoices()) : _core.UninstallPlan(game, _keepData.Checked, _alsoBepInEx.Checked))
+                            .Select(s => (Mark.Planned, s)).ToList();
                 }
                 catch (Exception)
                 {
                     // A folder that cannot be read; Install or Uninstall will say why.
                 }
             }
+            _installWill.Text = Strings.Get(summary ? Strings.Key.DoneList : Strings.Key.InstallWill);
             (install ? _installWill : _uninstallWill).Visible = steps != null;
-            FillSteps(install ? _installSteps : _uninstallSteps, steps ?? new List<string>());
+            FillSteps(install ? _installSteps : _uninstallSteps, steps ?? new List<(Mark, string)>());
         }
 
         private Dictionary<string, string> SelectedChoices()
@@ -402,18 +489,34 @@ namespace DragNWash.Installer
             }
         }
 
-        private void Run(bool install)
+        // options: null to ask before downloading ModFramework; set when retrying or after
+        // a choice in the failure window.
+        private void Run(bool install, InstallOptions options = null)
         {
             string game = _game.Text.Trim();
             Dictionary<string, string> choices = SelectedChoices();
             bool keepData = _keepData.Checked;
             bool alsoBepInEx = _alsoBepInEx.Checked;
+            if (install && options == null)
+            {
+                options = new InstallOptions();
+                if (!AskToDownload(game, options))
+                {
+                    return;
+                }
+            }
             _cancel = new CancellationTokenSource();
             CancellationToken cancel = _cancel.Token;
             var progress = new Progress<InstallProgress>(ShowProgress);
 
+            _summary = null;
             SetBusy(true);
-            ShowProgress(install && InstallerCore.IsGameFolder(game) && !InstallerCore.HasBepInEx(game) ? InstallProgress.Downloaded(0) : InstallProgress.Changing);
+            _stepRows.Clear();
+            if (install)
+            {
+                StartChecklist(game, choices, options);
+            }
+            ShowProgress(InstallProgress.At(install ? InstallStage.Check : InstallStage.Backup));
             _log.Clear();
             Task.Run(() =>
             {
@@ -421,34 +524,36 @@ namespace DragNWash.Installer
                 Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
                 try
                 {
+                    InstallResult result = null;
                     if (install)
                     {
-                        _core.Install(game, choices, progress: progress, cancel: cancel);
+                        result = _core.Install(game, choices, options, progress, cancel);
                     }
                     else
                     {
                         _core.Uninstall(game, keepData, alsoBepInEx);
                     }
-                    return (Cancelled: false, Error: (Exception)null, Details: (string)null);
+                    return (Cancelled: false, Error: (Exception)null, Details: (string)null, Result: result);
                 }
                 catch (OperationCanceledException) when (cancel.IsCancellationRequested)
                 {
                     AppendLog("Cancelled; the game folder was not changed");
-                    return (Cancelled: true, Error: null, Details: null);
+                    return (Cancelled: true, Error: null, Details: null, Result: null);
                 }
                 catch (InstallerException ex)
                 {
-                    AppendLog("ERROR: " + ex.Message);
-                    return (Cancelled: false, Error: ex, Details: ErrorDialog.Details(ex));
+                    AppendLog("ERROR: " + (ex.LogText ?? ex.Message));
+                    return (Cancelled: false, Error: ex, Details: ErrorDialog.Details(ex), Result: null);
                 }
                 catch (Exception ex)
                 {
                     AppendLog("ERROR: " + ex);
-                    return (Cancelled: false, Error: ex, Details: ErrorDialog.Details(ex));
+                    return (Cancelled: false, Error: ex, Details: ErrorDialog.Details(ex), Result: null);
                 }
             }).ContinueWith(t =>
             {
                 SetBusy(false);
+                _stepRows.Clear();
                 _cancel.Dispose();
                 _cancel = null;
                 if (_closeWhenDone)
@@ -456,17 +561,23 @@ namespace DragNWash.Installer
                     Close();
                     return;
                 }
+                // What was done takes the list's place until the next change in the window.
+                _summary = t.Result.Result;
                 RefreshStatus();
-                if (!t.Result.Cancelled && t.Result.Error == null)
-                {
-                    MessageBox.Show(this, Strings.Get(install ? Strings.Key.Installed : Strings.Key.Uninstalled), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
                 // The progress row says how it ended until the next change in the window.
                 _progressRow.Visible = true;
                 _progress.Style = ProgressBarStyle.Continuous;
                 _progress.Value = 0;
                 _percent.Text = "";
+                if (!t.Result.Cancelled && t.Result.Error == null)
+                {
+                    _progressRow.Visible = install;
+                    _progress.Value = 100;
+                    _percent.Text = "100%";
+                    _progressText.Text = Strings.Get(Strings.Key.Done);
+                    MessageBox.Show(this, Strings.Get(install ? Strings.Key.Installed : Strings.Key.Uninstalled), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
                 if (t.Result.Cancelled)
                 {
                     _progressText.Text = Strings.Get(Strings.Key.Cancelled);
@@ -475,12 +586,87 @@ namespace DragNWash.Installer
                 _progressText.Text = Strings.Get(Strings.Key.Stopped);
                 using (var dialog = new ErrorDialog(Text, t.Result.Error, t.Result.Details + Environment.NewLine + AboutThisRun()))
                 {
-                    if (dialog.ShowDialog(this) == DialogResult.Retry)
+                    switch (dialog.ShowDialog(this))
                     {
-                        Run(install);
+                        case DialogResult.Retry:
+                            Run(install, options);
+                            break;
+                        case DialogResult.OK:
+                            // "Choose zip": that zip instead of the download.
+                            InstallOptions chosen = options.Copy();
+                            chosen.FrameworkZip = dialog.ChosenZip;
+                            chosen.KeepFramework = false;
+                            Run(install, chosen);
+                            break;
+                        case DialogResult.Ignore:
+                            // "Install only the mod": the installed framework stays as it is.
+                            InstallOptions keep = options.Copy();
+                            keep.KeepFramework = true;
+                            keep.FrameworkZip = null;
+                            Run(install, keep);
+                            break;
                     }
                 }
             }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+
+        // The consent window, before the first connection, and only when Install would
+        // download ModFramework. Not remembered: asked every time. False when the player
+        // cancels; "Choose zip" puts the chosen file in options.
+        private bool AskToDownload(string game, InstallOptions options)
+        {
+            FrameworkPlan plan;
+            try
+            {
+                if (!InstallerCore.IsGameFolder(game) || InstallerCore.OtherLoader(game).Found != null)
+                {
+                    // Install stops before any download and says why.
+                    return true;
+                }
+                plan = _core.PlanFramework(game);
+            }
+            catch (Exception)
+            {
+                return true;
+            }
+            if (plan == null || !plan.Download)
+            {
+                return true;
+            }
+            using (var dialog = new ConsentDialog(Text, plan, !InstallerCore.HasBepInEx(game)))
+            {
+                switch (dialog.ShowDialog(this))
+                {
+                    case DialogResult.Yes:
+                        return true;
+                    case DialogResult.OK:
+                        options.FrameworkZip = dialog.ChosenZip;
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        }
+
+        // The approved list becomes the checklist: each line is ticked off as Install gets past it.
+        private void StartChecklist(string game, Dictionary<string, string> choices, InstallOptions options)
+        {
+            List<(InstallStage Stage, string Text)> steps;
+            try
+            {
+                steps = _core.ProgressSteps(game, choices, options);
+            }
+            catch (Exception)
+            {
+                steps = new List<(InstallStage, string)>();
+            }
+            _installWill.Text = Strings.Get(Strings.Key.InstallingNow);
+            _installWill.Visible = true;
+            List<(Label Mark, Label Text)> rows = FillSteps(_installSteps, steps.Select(s => (Mark.Todo, s.Text)).ToList());
+            for (int i = 0; i < rows.Count; i++)
+            {
+                _stepRows.Add(new StepRow { Stage = steps[i].Stage, Mark = rows[i].Mark, Text = rows[i].Text, BaseText = steps[i].Text, Shown = Mark.Todo });
+            }
         }
 
         // The last lines of "Copy details": enough to reproduce a report.
@@ -498,13 +684,33 @@ namespace DragNWash.Installer
             }
             bool known = progress.Downloading && progress.Percent >= 0;
             _progressText.Text = progress.Downloading
-                ? Strings.Get(Strings.Key.Downloading, Paths.BepInExVersion, new Uri(Paths.BepInExUrl).Host)
+                ? Strings.Get(Strings.Key.Downloading, progress.What, progress.Host)
                 : Strings.Get(Strings.Key.Working);
             _progress.Style = known ? ProgressBarStyle.Continuous : ProgressBarStyle.Marquee;
             _progress.Value = known ? progress.Percent : 0;
             _percent.Text = known ? progress.Percent + "%" : "";
-            _close.Enabled = progress.Downloading && !_cancel.IsCancellationRequested;
-            UseWaitCursor = !progress.Downloading;
+            _close.Enabled = progress.CanStop && !_cancel.IsCancellationRequested;
+            UseWaitCursor = !progress.CanStop;
+            if (_modeInstall.Checked)
+            {
+                _hint.Text = Strings.Get(progress.Downloading ? Strings.Key.DownloadHint : _core.FetchesFramework ? Strings.Key.SmartScreenHintFramework : Strings.Key.SmartScreenHint);
+            }
+            foreach (StepRow row in _stepRows)
+            {
+                Mark mark = progress.Stage == InstallStage.Done || row.Stage < progress.Stage ? Mark.Done : row.Stage == progress.Stage ? Mark.Now : Mark.Todo;
+                string text = mark == Mark.Now && progress.Downloading
+                    ? Strings.Get(Strings.Key.StepDownloading, progress.Index, progress.Count, progress.What, (progress.Done + 512) / 1024, (progress.Total + 512) / 1024)
+                    : row.BaseText;
+                if (row.Text.Text != text)
+                {
+                    row.Text.Text = text;
+                }
+                if (row.Shown != mark)
+                {
+                    row.Shown = mark;
+                    SetMark(row.Mark, row.Text, mark);
+                }
+            }
         }
 
         // True when a download was stopped; false when the game folder is being changed and it cannot be.

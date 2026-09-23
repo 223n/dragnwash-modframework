@@ -10,11 +10,14 @@ namespace DragNWash.Installer
 {
     // A failed Install or Uninstall: what went wrong in plain words, chosen by the
     // kind of exception, with the raw exception behind "Show details" for a bug
-    // report. Retry runs the same action again.
+    // report. Retry runs the same action again. When getting ModFramework failed, it
+    // also offers the release page, a zip the player downloaded ("Choose zip", result
+    // OK) and, when the installed framework meets the mod's minimums, installing only
+    // the mod (result Ignore).
     internal sealed class ErrorDialog : Form
     {
         private readonly TableLayoutPanel _layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(20, 18, 20, 10), BackColor = SystemColors.Window };
-        private readonly TableLayoutPanel _buttons = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 4, Padding = new Padding(12, 8, 12, 8), BackColor = SystemColors.Control };
+        private readonly TableLayoutPanel _buttons = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 5, Padding = new Padding(12, 8, 12, 8), BackColor = SystemColors.Control };
         private readonly LinkLabel _toggle = new LinkLabel { AutoSize = true, Margin = new Padding(0, 10, 0, 0) };
         private readonly TextBox _details = new TextBox
         {
@@ -22,9 +25,13 @@ namespace DragNWash.Installer
             Font = new Font(FontFamily.GenericMonospace, 8.25f), Margin = new Padding(0, 6, 0, 0), Visible = false,
         };
 
+        // The zip picked with "Choose zip" when the result is OK.
+        internal string ChosenZip { get; private set; }
+
         // details: from Details below, taken where the error was caught.
         internal ErrorDialog(string title, Exception error, string details)
         {
+            FrameworkHelp framework = (error as InstallerException)?.Framework;
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = Strings.UiFont();
             Text = title;
@@ -34,7 +41,7 @@ namespace DragNWash.Installer
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
             BackColor = SystemColors.Window;
-            ClientSize = new Size(500, 200);
+            ClientSize = new Size(framework == null ? 500 : 600, 200);
 
             var (headline, help) = Describe(error);
             var icon = new PictureBox { Image = SystemIcons.Error.ToBitmap(), SizeMode = PictureBoxSizeMode.AutoSize, Margin = new Padding(0, 0, 14, 0) };
@@ -45,11 +52,26 @@ namespace DragNWash.Installer
             _layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             _layout.Controls.Add(icon, 0, 0);
-            _layout.SetRowSpan(icon, 4);
             _layout.Controls.Add(headlineLabel, 1, 0);
             _layout.Controls.Add(helpLabel, 1, 1);
-            _layout.Controls.Add(_toggle, 1, 2);
-            _layout.Controls.Add(_details, 1, 3);
+            int row = 2;
+            if (framework != null)
+            {
+                // The way by hand: the pinned release's page, and the zip from there checked the same way.
+                _layout.Controls.Add(new Label { AutoSize = true, Dock = DockStyle.Fill, Text = Strings.Get(Strings.Key.FwManualHelp), UseMnemonic = false, Margin = new Padding(0, 6, 0, 0) }, 1, row++);
+                var page = new LinkLabel { AutoSize = true, Text = Strings.Get(Strings.Key.FwReleaseLink, framework.ReleasePage.Substring("https://".Length)), Margin = new Padding(0, 6, 0, 0) };
+                page.LinkClicked += (_, __) => ConsentDialog.OpenPage(framework.ReleasePage);
+                _layout.Controls.Add(page, 1, row++);
+                if (framework.KeepVersion != null)
+                {
+                    var keep = new LinkLabel { AutoSize = true, Text = Strings.Get(Strings.Key.FwKeepLink, framework.KeepVersion), Margin = new Padding(0, 6, 0, 0) };
+                    keep.LinkClicked += (_, __) => DialogResult = DialogResult.Ignore;
+                    _layout.Controls.Add(keep, 1, row++);
+                }
+            }
+            _layout.Controls.Add(_toggle, 1, row++);
+            _layout.Controls.Add(_details, 1, row++);
+            _layout.SetRowSpan(icon, row);
 
             var copy = new Button { AutoSize = true, MinimumSize = new Size(88, 28), Text = Strings.Get(Strings.Key.CopyDetails) };
             var retry = new Button { AutoSize = true, MinimumSize = new Size(88, 28), Text = Strings.Get(Strings.Key.Retry), DialogResult = DialogResult.Retry };
@@ -58,9 +80,24 @@ namespace DragNWash.Installer
             _buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             _buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             _buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            _buttons.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             _buttons.Controls.Add(copy, 0, 0);
-            _buttons.Controls.Add(retry, 2, 0);
-            _buttons.Controls.Add(close, 3, 0);
+            if (framework != null)
+            {
+                var zip = new Button { AutoSize = true, MinimumSize = new Size(88, 28), Text = Strings.Get(Strings.Key.ChooseZip) };
+                zip.Click += (_, __) =>
+                {
+                    string file = ConsentDialog.ChooseZip(this, framework.ZipName);
+                    if (file != null)
+                    {
+                        ChosenZip = file;
+                        DialogResult = DialogResult.OK;
+                    }
+                };
+                _buttons.Controls.Add(zip, 2, 0);
+            }
+            _buttons.Controls.Add(retry, 3, 0);
+            _buttons.Controls.Add(close, 4, 0);
             AcceptButton = retry;
             CancelButton = close;
 
@@ -101,7 +138,9 @@ namespace DragNWash.Installer
             switch (error)
             {
                 case InstallerException known:
-                    return (Strings.Get(known.Key), null);
+                    // What to do is its own when it says, else that of the failure underneath, when there is one.
+                    return (known.Text(), known.HelpKey != null ? Strings.Get(known.HelpKey.Value)
+                        : known.InnerException == null ? null : Describe(known.InnerException).Help);
                 case HttpRequestException _:
                 case WebException _:
                     return (Strings.Get(Strings.Key.DownloadFailed), Strings.Get(Strings.Key.DownloadFailedHelp));
@@ -121,7 +160,7 @@ namespace DragNWash.Installer
         {
             if (error is InstallerException known)
             {
-                return Strings.English(known.Key) + (known.Detail == null ? "" : Environment.NewLine + known.Detail);
+                return known.Text(english: true) + (known.Detail == null ? "" : Environment.NewLine + known.Detail);
             }
             return error.ToString();
         }

@@ -10,20 +10,34 @@
 #
 # What it does:
 #   1. finds Drag'n Wash in your Steam libraries
-#   2. downloads the Linux build of BepInEx 5.4.23.5 if it is missing and
-#      checks its SHA-256
-#   3. sets executable_name="DragNWash" in run_bepinex.sh
-#   4. copies Drag'n Wash ModFramework and its libraries (unless a newer copy
-#      is already installed), then the mod, and applies the mod's choices
-#   5. sets the Steam launch option ./run_bepinex.sh %command%
+#   2. works out what is missing: the Linux build of BepInEx 5.4.23.5, and
+#      Drag'n Wash ModFramework when the mod's zip does not carry it (then the
+#      release the mod names in mod-install.json, and only the libraries the
+#      mod uses)
+#   3. says where it would connect and why, and asks, before the first
+#      connection; nothing is downloaded when everything is there already
+#   4. checks each download's SHA-256 (and ModFramework's size) against the
+#      values in this script and in mod-install.json; until then the game
+#      folder is not changed
+#   5. sets executable_name="DragNWash" in run_bepinex.sh
+#   6. copies ModFramework and its libraries (never over a newer copy), then
+#      the mod, and applies the mod's choices; files it overwrites are saved
+#      in BepInEx/DragNWash.Installer/backup first, and when a step fails
+#      part way everything is put back
+#   7. sets the Steam launch option ./run_bepinex.sh %command%
 #      (Steam has to be closed for that; you are asked first)
 #
 # Options: --install  --uninstall  --choice <id>=<value>  --game-dir <path>
-#          --yes (no questions, use defaults; installs unless --uninstall)
+#          --yes (no questions, use defaults; installs unless --uninstall;
+#          counts as agreeing to the downloads)
 #          --remove-bepinex --remove-data (with --uninstall)
 #          --close-steam (close Steam without asking when the launch option
 #          has to change)  --no-launch-option (leave launch options alone)
 #          --bepinex-zip <file> (use a local BepInEx zip, still checked)
+#          --framework-zip <file> (use a ModFramework zip you downloaded
+#          yourself, still checked against mod-install.json)
+#          --no-download (never connect to the internet; stops when
+#          something would have to be downloaded)
 #          --ui en|ja|zh
 set -euo pipefail
 
@@ -31,9 +45,19 @@ APP_ID=4739660
 GAME_BIN="DragNWash"
 MARKER=".bepinex-installed-by-dragnwash-installer"
 OLD_MARKER=".bepinex-installed-by-dragnwash-localization"
-BEPINEX_URL="https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_linux_x64_5.4.23.5.zip"
+BEPINEX_VERSION="5.4.23.5"
+BEPINEX_URL="https://github.com/BepInEx/BepInEx/releases/download/v$BEPINEX_VERSION/BepInEx_linux_x64_$BEPINEX_VERSION.zip"
 BEPINEX_SHA256="e538560be65739f562519ab518a75f9c65b3f57f87457403ae7cde683c12dab7"
 LAUNCH_OPTION="./run_bepinex.sh %command%"
+# The same version as Install.exe (installer/AssemblyInfo.cs); both send it as
+# their User-Agent, and nothing else about the player.
+INSTALLER_VERSION="1.1.0"
+USER_AGENT="DragNWash.Installer/$INSTALLER_VERSION"
+FRAMEWORK_REPO="TomXV/dragnwash-modframework"
+MAX_DOWNLOAD=$((20 * 1024 * 1024))
+# Where an install keeps its staging folder and the backup of what it
+# overwrote. BepInEx loads nothing from here.
+INST_REL="BepInEx/DragNWash.Installer"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="$HERE/mod-install.json"
@@ -49,8 +73,16 @@ REMOVE_DATA=0
 CLOSE_STEAM=0
 LAUNCH_OPTIONS=1
 LOCAL_ZIP=""
+FRAMEWORK_ZIP=""
+NO_DOWNLOAD=0
 UI=""
 WARNINGS=""
+TX_OPEN=0
+WORK=""
+# Filled in along the way; some messages name them.
+FW_VERSION="" FW_SHA256="" FW_SIZE=0 FW_HAVE="" FW_PAGE="" FW_URL=""
+C_REPOS="" C_FILES="" WAIT_MIN="" CURL_RC="" HTTP_CODE="" BAD_WHAT="" BAD_PART="" ZIP_PATH=""
+TX_UNDONE=0 TX_LEFT=0 TX_REPLACED=0 BACKUP="" BACKUP_REL="" STAGE=""
 declare -A CHOICE=()
 
 while [ $# -gt 0 ]; do
@@ -66,8 +98,10 @@ while [ $# -gt 0 ]; do
         --close-steam) CLOSE_STEAM=1 ;;
         --no-launch-option) LAUNCH_OPTIONS=0 ;;
         --bepinex-zip) LOCAL_ZIP="${2:-}"; shift ;;
+        --framework-zip) FRAMEWORK_ZIP="${2:-}"; shift ;;
+        --no-download) NO_DOWNLOAD=1 ;;
         --ui) UI="${2:-}"; shift ;;
-        -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,/^set -euo pipefail$/{/^#/p}' "$0"; exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 2 ;;
     esac
     shift
@@ -88,6 +122,36 @@ def fail(msg, code=3):
 
 SIMPLE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ \-]{0,99}$")
 ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\-]{0,63}$")
+# schema 2 adds "framework": the ModFramework release the mod is built
+# against, fetched when the mod's zip does not carry it. Its values end up in
+# a URL and in file names, so they are held to digits, dots and hex.
+SCHEMA = 2
+VERSION = re.compile(r"^[0-9]{1,9}(\.[0-9]{1,9}){1,3}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+COMPONENT = re.compile(r"^DragNWash\.ModFramework(\.[A-Za-z0-9]{1,64})?$")
+MAX_SIZE = 20 * 1024 * 1024
+
+def framework(fw):
+    if not isinstance(fw, dict):
+        fail("mod-install.json: \"framework\" must be an object")
+    v = fw.get("version")
+    if not isinstance(v, str) or not VERSION.match(v):
+        fail(f"mod-install.json: framework version \"{v}\" must be digits and dots, like 1.4.3")
+    h = fw.get("sha256")
+    if not isinstance(h, str) or not SHA256.match(h):
+        fail("mod-install.json: framework sha256 must be 64 lowercase hex digits")
+    s = fw.get("size")
+    if type(s) is not int or not 0 < s <= MAX_SIZE:
+        fail(f"mod-install.json: framework size must be a whole number of bytes from 1 to {MAX_SIZE}")
+    needs = fw.get("needs") or {}
+    if not isinstance(needs, dict):
+        fail("mod-install.json: framework \"needs\" must be an object of folder name: minimum version")
+    for k, mv in needs.items():
+        if not COMPONENT.match(k):
+            fail(f"mod-install.json: \"{k}\" in framework needs is not a ModFramework folder name")
+        if not isinstance(mv, str) or not VERSION.match(mv):
+            fail(f"mod-install.json: the minimum for {k} must be digits and dots, like 1.2.0")
+    return {"version": v, "sha256": h, "size": s, "needs": needs}
 
 def config_name(f):
     if not isinstance(f, str) or not SIMPLE.match(f) or ".." in f or not f.lower().endswith((".cfg", ".txt", ".json")) \
@@ -102,8 +166,16 @@ def load():
         fail(f"mod-install.json is not valid JSON: {e}", 4)  # the script says so in the player's language
     except Exception as e:
         fail(f"mod-install.json could not be read: {e}")
-    if m.get("schema") != 1:
-        fail(f"mod-install.json: schema {m.get('schema')} is not supported (this installer reads schema 1)")
+    schema = m.get("schema")
+    if type(schema) is int and schema > SCHEMA:
+        fail(f"mod-install.json: schema {schema} is newer than this installer reads (1 to {SCHEMA}); use the installer from this mod's release", 5)
+    if type(schema) is not int or not 1 <= schema <= SCHEMA:
+        fail(f"mod-install.json: schema {schema} is not supported (this installer reads schema 1 to {SCHEMA})")
+    # schema 1 has no framework block; one there is left alone, as before.
+    if schema >= 2 and m.get("framework") is not None:
+        m["framework"] = framework(m["framework"])
+    else:
+        m.pop("framework", None)
     if not str(m.get("name") or "").strip():
         fail("mod-install.json: \"name\" is required")
     plugins = [p for p in (m.get("plugins") or []) if str(p).strip()]
@@ -189,6 +261,15 @@ elif cmd in ("plugins", "keep", "configFiles"):
 elif cmd == "choices":
     for c in m["choices"]:
         print(c["id"])
+elif cmd == "framework":   # version, sha256 and size, one per line; nothing without the block
+    if m.get("framework"):
+        fw = m["framework"]
+        print(f"{fw['version']}\n{fw['sha256']}\n{fw['size']}")
+elif cmd == "needs":   # <folder>\t<minimum> for each library the mod uses
+    for k, v in ((m.get("framework") or {}).get("needs") or {}).items():
+        print(f"{k}\t{v}")
+elif cmd == "cfgfile":   # cfgfile <id>: the config file a choice writes
+    print(choices[args[0]]["config"]["file"])
 elif cmd == "label":   # label <id> <ui>
     lab = choices[args[0]].get("label") or {}
     print(lab.get(args[1]) or lab.get("en") or args[0])
@@ -422,6 +503,156 @@ Close Steam and continue? (If not, change the launch option by hand.)" ;;
         ja:nothing) echo "Mod は導入されていません。" ;;
         zh:nothing) echo "尚未安装 Mod。" ;;
         *:nothing) echo "The mod is not installed." ;;
+        ja:newschema) echo "この Mod には新しいインストーラーが要ります。この Mod のリリース（Mod が入っていた zip）の install-steamdeck.sh を使ってください。" ;;
+        zh:newschema) echo "此 Mod 需要更新的安装程序。请使用此 Mod 发布版（Mod 所在的 zip）中的 install-steamdeck.sh。" ;;
+        *:newschema) echo "This mod needs a newer installer. Use the install-steamdeck.sh from this mod's release (the zip the mod came in)." ;;
+        # Asking before the first connection: where, why, what is sent, and
+        # how the file is checked. The same points as Install.exe's window.
+        ja:c_head) echo "先にインターネットに接続します。" ;;
+        zh:c_head) echo "将先连接互联网。" ;;
+        *:c_head) echo "It connects to the internet first." ;;
+        ja:c_fw) echo "この Mod には Drag'n Wash ModFramework $FW_VERSION が必要です。" ;;
+        zh:c_fw) echo "此 Mod 需要 Drag'n Wash ModFramework $FW_VERSION。" ;;
+        *:c_fw) echo "This mod needs Drag'n Wash ModFramework $FW_VERSION." ;;
+        ja:c_fw_none) echo "ゲームのフォルダーにはありません。フレームワークの GitHub のリリースから取得します。" ;;
+        zh:c_fw_none) echo "游戏文件夹中没有。将从框架的 GitHub 发布页获取。" ;;
+        *:c_fw_none) echo "The game folder does not have it. It is fetched from the framework's GitHub releases." ;;
+        ja:c_fw_have) echo "ゲームのフォルダーにあるのは $FW_HAVE です。フレームワークの GitHub のリリースから取得します。" ;;
+        zh:c_fw_have) echo "游戏文件夹中是 $FW_HAVE。将从框架的 GitHub 发布页获取。" ;;
+        *:c_fw_have) echo "The game folder has $FW_HAVE. It is fetched from the framework's GitHub releases." ;;
+        ja:c_fw_part) echo "ゲームのフォルダーには $FW_HAVE がありますが、この Mod が使うライブラリが足りないか古いままです。フレームワークの GitHub のリリースから取得します。" ;;
+        zh:c_fw_part) echo "游戏文件夹中有 $FW_HAVE，但此 Mod 使用的库缺失或过旧。将从框架的 GitHub 发布页获取。" ;;
+        *:c_fw_part) echo "The game folder has $FW_HAVE, but a library this mod uses is missing or too old. It is fetched from the framework's GitHub releases." ;;
+        ja:c_bep) echo "Mod を読み込む BepInEx $BEPINEX_VERSION が、ゲームのフォルダーにまだありません。" ;;
+        zh:c_bep) echo "游戏文件夹中还没有用于加载 Mod 的 BepInEx $BEPINEX_VERSION。" ;;
+        *:c_bep) echo "BepInEx $BEPINEX_VERSION, which loads the mods, is not in the game folder yet." ;;
+        ja:c_to) echo "接続先:" ;;
+        zh:c_to) echo "连接到：" ;;
+        *:c_to) echo "Connects to:" ;;
+        ja:c_gh) echo "github.com（$C_REPOS のリリース）" ;;
+        zh:c_gh) echo "github.com（$C_REPOS 的发布页）" ;;
+        *:c_gh) echo "github.com (releases of $C_REPOS)" ;;
+        ja:c_ra) echo "release-assets.githubusercontent.com（GitHub がファイルを置いている場所。github.com から自動で転送されます）" ;;
+        zh:c_ra) echo "release-assets.githubusercontent.com（GitHub 存放文件的地方，由 github.com 自动转到这里）" ;;
+        *:c_ra) echo "release-assets.githubusercontent.com (where GitHub keeps the files; github.com forwards there by itself)" ;;
+        ja:c_what) echo "目的: $C_FILES を 1 回だけ取得します。" ;;
+        zh:c_what) echo "目的：只获取一次 $C_FILES。" ;;
+        *:c_what) echo "Purpose: fetches $C_FILES, once." ;;
+        ja:c_sent) echo "送るもの: 通常の HTTPS のリクエストと User-Agent $USER_AGENT だけです。名前、フォルダーの場所、ログイン情報、Cookie は送りません。どの Web サイトとも同じく、GitHub には IP アドレスが見えます。" ;;
+        zh:c_sent) echo "发送内容：只有普通的 HTTPS 请求和 User-Agent $USER_AGENT。不发送姓名、文件夹位置、登录信息或 Cookie。与任何网站一样，GitHub 能看到你的 IP 地址。" ;;
+        *:c_sent) echo "Sent: a plain HTTPS request and the User-Agent $USER_AGENT, nothing else. No name, folder location, login or cookies. As with any website, GitHub sees your IP address." ;;
+        ja:c_check) echo "確認: SHA-256 がこの Mod のリリースに記録された値と一致したときだけ使います。それまでゲームのフォルダーは変わりません。" ;;
+        zh:c_check) echo "校验：只有 SHA-256 与此 Mod 发布版中记录的值一致时才会使用。在此之前游戏文件夹不会有任何改动。" ;;
+        *:c_check) echo "Check: a file is used only when its SHA-256 matches the value recorded in this mod's release. Until then the game folder is not changed." ;;
+        ja:c_noapi) echo "api.github.com には接続しません。自分でダウンロードした zip を選べば、インターネットは使いません。" ;;
+        zh:c_noapi) echo "不会连接 api.github.com。选择自己下载的 zip 则不使用互联网。" ;;
+        *:c_noapi) echo "api.github.com is not contacted. With a zip you downloaded yourself, the internet is not used." ;;
+        ja:c_page) echo "リリースのページ:" ;;
+        zh:c_page) echo "发布页：" ;;
+        *:c_page) echo "Release page:" ;;
+        ja:c_download) echo "ダウンロードしてインストール" ;;
+        zh:c_download) echo "下载并安装" ;;
+        *:c_download) echo "Download and install" ;;
+        ja:c_zip) echo "zip を選ぶ..." ;;
+        zh:c_zip) echo "选择 zip..." ;;
+        *:c_zip) echo "Choose a zip..." ;;
+        ja:c_cancel) echo "キャンセル" ;;
+        zh:c_cancel) echo "取消" ;;
+        *:c_cancel) echo "Cancel" ;;
+        ja:zip_fw) echo "ModFramework $FW_VERSION の zip（DragNWash.ModFramework-$FW_VERSION.zip）:" ;;
+        zh:zip_fw) echo "ModFramework $FW_VERSION 的 zip（DragNWash.ModFramework-$FW_VERSION.zip）：" ;;
+        *:zip_fw) echo "The ModFramework $FW_VERSION zip (DragNWash.ModFramework-$FW_VERSION.zip):" ;;
+        ja:zip_bep) echo "BepInEx の zip（${BEPINEX_URL##*/}）:" ;;
+        zh:zip_bep) echo "BepInEx 的 zip（${BEPINEX_URL##*/}）：" ;;
+        *:zip_bep) echo "The BepInEx zip (${BEPINEX_URL##*/}):" ;;
+        ja:zip_missing) echo "zip が見つかりません: $ZIP_PATH" ;;
+        zh:zip_missing) echo "找不到 zip：$ZIP_PATH" ;;
+        *:zip_missing) echo "The zip was not found: $ZIP_PATH" ;;
+        ja:fw_get) echo "ModFramework: DragNWash.ModFramework-$FW_VERSION.zip をダウンロード中..." ;;
+        zh:fw_get) echo "ModFramework：正在下载 DragNWash.ModFramework-$FW_VERSION.zip..." ;;
+        *:fw_get) echo "ModFramework: downloading DragNWash.ModFramework-$FW_VERSION.zip ..." ;;
+        ja:fw_ok) echo "ModFramework: $FW_VERSION 検証 OK（SHA-256）" ;;
+        zh:fw_ok) echo "ModFramework：$FW_VERSION 校验通过（SHA-256）" ;;
+        *:fw_ok) echo "ModFramework: $FW_VERSION verified (SHA-256)" ;;
+        ja:fw_have) echo "ModFramework: $FW_HAVE 導入済み（この Mod にはこれで足ります）" ;;
+        zh:fw_have) echo "ModFramework：已安装 $FW_HAVE，满足此 Mod 的需要" ;;
+        *:fw_have) echo "ModFramework: $FW_HAVE installed, enough for this mod" ;;
+        # Why a download failed. Each is followed by "The game folder was not changed."
+        ja:e_offline) echo "インターネットにつながりません。" ;;
+        zh:e_offline) echo "无法连接互联网。" ;;
+        *:e_offline) echo "Could not connect to the internet." ;;
+        ja:e_server) echo "GitHub が応答しませんでした（2 回試しました）。" ;;
+        zh:e_server) echo "GitHub 没有响应（已尝试 2 次）。" ;;
+        *:e_server) echo "GitHub did not answer, also on a second try." ;;
+        ja:e_limit) echo "GitHub の利用制限に達しました。$WAIT_MIN 分後にもう一度試してください。" ;;
+        zh:e_limit) echo "已达到 GitHub 的使用限制。请在 $WAIT_MIN 分钟后重试。" ;;
+        *:e_limit) echo "GitHub's usage limit was reached. Try again in $WAIT_MIN minutes." ;;
+        ja:e_limit_later) echo "GitHub の利用制限に達しました。しばらくしてからもう一度試してください。" ;;
+        zh:e_limit_later) echo "已达到 GitHub 的使用限制。请稍后重试。" ;;
+        *:e_limit_later) echo "GitHub's usage limit was reached. Try again later." ;;
+        ja:e_notfound_fw) echo "ModFramework $FW_VERSION がまだ公開されていません。Mod の作者に知らせてください。" ;;
+        zh:e_notfound_fw) echo "ModFramework $FW_VERSION 尚未发布。请告知 Mod 作者。" ;;
+        *:e_notfound_fw) echo "ModFramework $FW_VERSION has not been published yet. Please tell the mod's author." ;;
+        ja:e_notfound) echo "GitHub にファイルがありません（HTTP 404）。" ;;
+        zh:e_notfound) echo "GitHub 上没有该文件（HTTP 404）。" ;;
+        *:e_notfound) echo "The file is not on GitHub (HTTP 404)." ;;
+        ja:e_tls) echo "安全な接続を確認できませんでした。" ;;
+        zh:e_tls) echo "无法确认安全连接。" ;;
+        *:e_tls) echo "A secure connection could not be confirmed." ;;
+        ja:e_toobig) echo "ファイルが 20 MB を超えているため、使いませんでした。" ;;
+        zh:e_toobig) echo "文件超过 20 MB，未使用。" ;;
+        *:e_toobig) echo "The file is larger than 20 MB, so it was not used." ;;
+        ja:e_other) echo "ダウンロードに失敗しました（curl エラー $CURL_RC、HTTP $HTTP_CODE）。" ;;
+        zh:e_other) echo "下载失败（curl 错误 $CURL_RC，HTTP $HTTP_CODE）。" ;;
+        *:e_other) echo "The download failed (curl error $CURL_RC, HTTP $HTTP_CODE)." ;;
+        ja:bep_fail) echo "BepInEx をダウンロードできませんでした。" ;;
+        zh:bep_fail) echo "无法下载 BepInEx。" ;;
+        *:bep_fail) echo "BepInEx could not be downloaded." ;;
+        ja:fw_bad_dl) echo "ダウンロードした ModFramework $FW_VERSION が、この Mod のリリースに記録されたものと一致しません（$BAD_WHAT）。ファイルは使わずに削除しました。" ;;
+        zh:fw_bad_dl) echo "下载的 ModFramework $FW_VERSION 与此 Mod 发布版中记录的不一致（$BAD_WHAT）。文件未使用，已删除。" ;;
+        *:fw_bad_dl) echo "The downloaded ModFramework $FW_VERSION does not match the one recorded in this mod's release ($BAD_WHAT). The file was deleted without being used." ;;
+        ja:fw_bad_zip) echo "$ZIP_PATH は、この Mod のリリースに記録された ModFramework $FW_VERSION と一致しません（$BAD_WHAT）。使いませんでした。" ;;
+        zh:fw_bad_zip) echo "$ZIP_PATH 与此 Mod 发布版中记录的 ModFramework $FW_VERSION 不一致（$BAD_WHAT）。未使用。" ;;
+        *:fw_bad_zip) echo "$ZIP_PATH is not the ModFramework $FW_VERSION recorded in this mod's release ($BAD_WHAT). It was not used." ;;
+        ja:nodl_fw) echo "この Mod には ModFramework $FW_VERSION が必要ですが、--no-download のため取得しません。" ;;
+        zh:nodl_fw) echo "此 Mod 需要 ModFramework $FW_VERSION，但由于 --no-download 不会获取。" ;;
+        *:nodl_fw) echo "This mod needs ModFramework $FW_VERSION, and --no-download does not allow fetching it." ;;
+        ja:nodl_bep) echo "BepInEx が入っていませんが、--no-download のため取得しません。--bepinex-zip <ファイル> で zip を指定してください。" ;;
+        zh:nodl_bep) echo "尚未安装 BepInEx，但由于 --no-download 不会获取。请用 --bepinex-zip <文件> 指定 zip。" ;;
+        *:nodl_bep) echo "BepInEx is not installed, and --no-download does not allow fetching it. Pass the zip with --bepinex-zip <file>." ;;
+        ja:unchanged) echo "ゲームのフォルダーは何も変わっていません。" ;;
+        zh:unchanged) echo "游戏文件夹没有任何改动。" ;;
+        *:unchanged) echo "The game folder was not changed." ;;
+        ja:fw_manual) echo "リリースのページから zip を自分でダウンロードし、--framework-zip <ファイル> を付けてもう一度実行することもできます。同じように確かめます:" ;;
+        zh:fw_manual) echo "也可以从发布页自行下载 zip，然后加上 --framework-zip <文件> 再次运行。同样会进行校验：" ;;
+        *:fw_manual) echo "You can also download the zip yourself from the release page and run this script again with --framework-zip <file>. It is checked the same way:" ;;
+        ja:fw_keep_ask) echo "ModFramework $FW_HAVE のまま、Mod だけ入れますか？（この Mod の最低条件は満たしています）" ;;
+        zh:fw_keep_ask) echo "保留已安装的 ModFramework $FW_HAVE，只安装 Mod 吗？（它满足此 Mod 的最低要求）" ;;
+        *:fw_keep_ask) echo "Keep the installed ModFramework $FW_HAVE and install only the mod? It meets this mod's minimums." ;;
+        ja:fw_kept_old) echo "ModFramework $FW_VERSION は入れていません。入っている $FW_HAVE のままです（この Mod の最低条件は満たしています）。" ;;
+        zh:fw_kept_old) echo "未安装 ModFramework $FW_VERSION。保留已安装的 $FW_HAVE（满足此 Mod 的最低要求）。" ;;
+        *:fw_kept_old) echo "ModFramework $FW_VERSION was not installed. The installed $FW_HAVE is kept; it meets this mod's minimums." ;;
+        ja:fw_short) echo "ModFramework $FW_VERSION には、この Mod が必要とする版の $BAD_PART がありません。Mod の作者に知らせてください。" ;;
+        zh:fw_short) echo "ModFramework $FW_VERSION 中没有此 Mod 所需版本的 $BAD_PART。请告知 Mod 作者。" ;;
+        *:fw_short) echo "ModFramework $FW_VERSION does not have $BAD_PART in the version this mod needs. Please tell the mod's author." ;;
+        ja:unpack_failed) echo "zip を展開できませんでした: $BAD_PART" ;;
+        zh:unpack_failed) echo "无法解压 zip：$BAD_PART" ;;
+        *:unpack_failed) echo "The zip could not be unpacked: $BAD_PART" ;;
+        ja:copy_failed) echo "コピーの途中で失敗しました（$BAD_PART）。" ;;
+        zh:copy_failed) echo "复制中途失败（$BAD_PART）。" ;;
+        *:copy_failed) echo "Copying failed part way ($BAD_PART)." ;;
+        ja:stopped) echo "インストールが途中で止まりました。" ;;
+        zh:stopped) echo "安装中途停止。" ;;
+        *:stopped) echo "The install stopped part way." ;;
+        ja:rolled_back) echo "すべて元に戻しました（$TX_UNDONE ファイル）。" ;;
+        zh:rolled_back) echo "已全部恢复原状（$TX_UNDONE 个文件）。" ;;
+        *:rolled_back) echo "Everything was put back ($TX_UNDONE files)." ;;
+        ja:rollback_left) echo "$TX_LEFT 個のファイルを戻せませんでした。控えは $BACKUP_REL/files にあります。" ;;
+        zh:rollback_left) echo "有 $TX_LEFT 个文件未能恢复。备份在 $BACKUP_REL/files。" ;;
+        *:rollback_left) echo "$TX_LEFT files could not be put back. Their copies are in $BACKUP_REL/files." ;;
+        ja:backup_done) echo "上書きした $TX_REPLACED ファイルの控え: $BACKUP_REL" ;;
+        zh:backup_done) echo "已覆盖的 $TX_REPLACED 个文件的备份：$BACKUP_REL" ;;
+        *:backup_done) echo "Backup of the $TX_REPLACED files overwritten: $BACKUP_REL" ;;
         *) echo "$key" ;;
     esac
 }
@@ -441,11 +672,35 @@ warn() { say "$*"; WARNINGS="${WARNINGS}${WARNINGS:+
 }$*"; }
 TITLE="Drag'n Wash mod installer"
 fail() {
-    echo "ERROR: $*" >&2
-    log "ERROR: $*"
-    if [ "$GUI" -eq 1 ]; then kdialog --title "$TITLE" --error "$*" >/dev/null 2>&1 || true; fi
+    local msg="$*"
+    # A failure in the middle of an install puts back what it had changed
+    # first, so the message can say how that went.
+    if [ "$TX_OPEN" -eq 1 ]; then
+        tx_rollback
+        msg="$msg
+
+$ROLLBACK_MSG"
+    fi
+    echo "ERROR: $msg" >&2
+    log "ERROR: $msg"
+    if [ "$GUI" -eq 1 ]; then kdialog --title "$TITLE" --error "$msg" >/dev/null 2>&1 || true; fi
     exit 1
 }
+# Anything else that stops the script half way (a command failing under
+# set -e, Ctrl+C) is rolled back here. The download folder always goes.
+on_exit() {
+    if [ "$TX_OPEN" -eq 1 ]; then
+        tx_rollback
+        ROLLBACK_MSG="$(t stopped)
+$ROLLBACK_MSG"
+        echo "ERROR: $ROLLBACK_MSG" >&2
+        log "ERROR: $ROLLBACK_MSG"
+        if [ "$GUI" -eq 1 ]; then kdialog --title "$TITLE" --error "$ROLLBACK_MSG" >/dev/null 2>&1 || true; fi
+    fi
+    if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
+}
+trap on_exit EXIT
+trap 'exit 130' INT TERM HUP
 ask_yes() {  # ask_yes "question" default(1=yes,0=no)
     local q="$1" def="${2:-1}"
     if [ "$ASSUME_YES" -eq 1 ]; then [ "$def" -eq 1 ]; return; fi
@@ -486,6 +741,7 @@ mf_error="$(mf check 2>&1 >/dev/null)" && mf_rc=0 || mf_rc=$?
 if [ "$mf_rc" -ne 0 ]; then
     log "$mf_error"
     [ "$mf_rc" -eq 4 ] && fail "$(t badjson)"
+    [ "$mf_rc" -eq 5 ] && fail "$(t newschema)"
     fail "$(t badmanifest)
 $mf_error"
 fi
@@ -493,6 +749,28 @@ MOD_NAME="$(mf name)"
 MOD_VERSION="$(mf version)"
 mapfile -t PLUGINS < <(mf plugins)
 TITLE="$MOD_NAME $MOD_VERSION (Steam Deck / Linux)"
+
+# The ModFramework release the mod names (schema 2), with the minimum version
+# of each library it uses. Checked again here before any of it goes into a URL.
+mapfile -t fw_info < <(mf framework)
+declare -A NEEDS=()
+NEED_ORDER=()
+if [ "${#fw_info[@]}" -eq 3 ]; then
+    FW_VERSION="${fw_info[0]}" FW_SHA256="${fw_info[1]}" FW_SIZE="${fw_info[2]}"
+    [[ "$FW_VERSION" =~ ^[0-9]{1,9}(\.[0-9]{1,9}){1,3}$ && "$FW_SHA256" =~ ^[0-9a-f]{64}$ &&
+        "$FW_SIZE" =~ ^[1-9][0-9]{0,8}$ ]] && [ "$FW_SIZE" -le "$MAX_DOWNLOAD" ] ||
+        fail "$(t badmanifest)
+framework: version, sha256 or size"
+    while IFS=$'\t' read -r name min; do
+        [[ "$name" =~ ^DragNWash\.ModFramework(\.[A-Za-z0-9]+)?$ && "$min" =~ ^[0-9]{1,9}(\.[0-9]{1,9}){1,3}$ ]] ||
+            fail "$(t badmanifest)
+framework needs: $name"
+        NEEDS[$name]="$min"
+        NEED_ORDER+=("$name")
+    done < <(mf needs)
+    FW_URL="https://github.com/$FRAMEWORK_REPO/releases/download/v$FW_VERSION/DragNWash.ModFramework-$FW_VERSION.zip"
+    FW_PAGE="https://github.com/$FRAMEWORK_REPO/releases/tag/v$FW_VERSION"
+fi
 
 # ------------------------------------------------------------ discovery ----
 steam_roots() {
@@ -712,7 +990,7 @@ with_steam_closed() {  # with_steam_closed set|remove ; returns 0 if applied
 }
 
 # ------------------------------------------------------------------ main ----
-log "---- start: $0 $* (mod=$MOD_NAME $MOD_VERSION, mode=${MODE:-ask}, ui=$UI, gui=$GUI)"
+log "---- start: $0 $* (mod=$MOD_NAME $MOD_VERSION, installer=$INSTALLER_VERSION, mode=${MODE:-ask}, ui=$UI, gui=$GUI)"
 say "== $TITLE"
 
 for p in "${PLUGINS[@]}"; do
@@ -720,6 +998,7 @@ for p in "${PLUGINS[@]}"; do
 done
 
 if [ -z "$GAME_DIR" ]; then GAME_DIR="$(find_game || true)"; fi
+GAME_DIR="${GAME_DIR%/}"
 [ -n "$GAME_DIR" ] && [ -f "$GAME_DIR/$GAME_BIN" ] || fail "$(t nogame)"
 say "Game: $GAME_DIR"
 # Only a game started from this folder counts.
@@ -775,10 +1054,144 @@ if m:
 PY
 }
 
+# Compares two versions part by part, a missing part counting as 0, so 1.4.3
+# and 1.4.3.0 are the same. Prints -1, 0 or 1.
+ver_cmp() {
+    local -a x y
+    local i a b
+    IFS=. read -r -a x <<< "$1"
+    IFS=. read -r -a y <<< "$2"
+    for i in 0 1 2 3; do
+        a="${x[i]:-0}" b="${y[i]:-0}"
+        [[ "$a" =~ ^[0-9]{1,9}$ ]] || a=0
+        [[ "$b" =~ ^[0-9]{1,9}$ ]] || b=0
+        if ((10#$a > 10#$b)); then echo 1; return; fi
+        if ((10#$a < 10#$b)); then echo -1; return; fi
+    done
+    echo 0
+}
+
 # 0 when version $1 is newer than $2.
 version_newer() {
-    [ -n "$1" ] && [ -n "$2" ] && [ "$1" != "$2" ] &&
-        [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]
+    [ -n "$1" ] && [ -n "$2" ] && [ "$(ver_cmp "$1" "$2")" = 1 ]
+}
+
+# ------------------------------------------------------------ transaction --
+# Every change an install makes to the game folder goes through here. A file
+# about to be overwritten or deleted is copied to
+# BepInEx/DragNWash.Installer/backup/<time>/files first, and each step is
+# written down (journal.txt next to it), so a failure part way can put back
+# the old files and delete the new ones. Paths are relative to the game folder.
+JOURNAL=()
+declare -A TX_SEEN=()
+ROLLBACK_MSG=""
+
+tx_note() {  # tx_note new|replaced|dir <path>
+    JOURNAL+=("$1"$'\t'"$2")
+    if [ -n "$BACKUP" ] && [ -d "$BACKUP" ]; then printf '%s\t%s\n' "$1" "$2" >> "$BACKUP/journal.txt"; fi
+}
+
+tx_mkdir() {  # tx_mkdir <folder>: creates it and any missing parent, noting each
+    local rel="$1" missing=()
+    while [ -n "$rel" ] && [ "$rel" != . ] && [ ! -d "$GAME_DIR/$rel" ]; do
+        missing=("$rel" "${missing[@]}")
+        rel="$(dirname "$rel")"
+    done
+    for rel in "${missing[@]}"; do
+        mkdir "$GAME_DIR/$rel" || return 1
+        tx_note dir "$rel"
+    done
+}
+
+tx_begin() {
+    local stamp
+    stamp="$(date '+%Y-%m-%d_%H%M%S')"
+    JOURNAL=() TX_SEEN=() TX_REPLACED=0
+    STAGE="$GAME_DIR/$INST_REL/staging"
+    BACKUP_REL="$INST_REL/backup/$stamp"
+    BACKUP=""
+    rm -rf "$STAGE"   # left behind by a run that was killed
+    TX_OPEN=1
+    tx_mkdir "$INST_REL/staging" && tx_mkdir "$BACKUP_REL/files" || { BAD_PART="$INST_REL"; fail "$(t copy_failed)"; }
+    BACKUP="$GAME_DIR/$BACKUP_REL"
+    printf '%s\n' "${JOURNAL[@]}" > "$BACKUP/journal.txt"
+    log "install started; backup and journal in $BACKUP"
+}
+
+tx_save() {  # tx_save <path>: about to change, replace or delete it; keep a copy first
+    local rel="$1" dst="$GAME_DIR/$1"
+    [ "$TX_OPEN" -eq 1 ] && [ -z "${TX_SEEN[$rel]:-}" ] || return 0
+    TX_SEEN[$rel]=1
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+        mkdir -p "$(dirname "$BACKUP/files/$rel")" && cp -PpT "$dst" "$BACKUP/files/$rel" || return 1
+        tx_note replaced "$rel"
+        TX_REPLACED=$((TX_REPLACED + 1))
+    else
+        tx_mkdir "$(dirname "$rel")" || return 1
+        tx_note new "$rel"
+    fi
+}
+
+tx_copy() {  # tx_copy <source file> <path>: puts one file in place unless it is the same already
+    local dst="$GAME_DIR/$2"
+    if [ -f "$dst" ] && [ ! -L "$dst" ] && cmp -s "$1" "$dst"; then return 0; fi
+    tx_save "$2" && cp -fT "$1" "$dst"
+}
+
+tx_copy_tree() {  # tx_copy_tree <source folder> <folder>: every file under it, over what is there
+    local src="${1%/}" f
+    tx_mkdir "$2" || { BAD_PART="$2"; return 1; }
+    while IFS= read -r -d '' f; do
+        f="${f#"$src"/}"
+        tx_copy "$src/$f" "${2:+$2/}$f" || { BAD_PART="${2:+$2/}$f"; return 1; }
+    done < <(find "$src" -type f -print0 | sort -z)
+}
+
+tx_rollback() {  # puts back everything in the journal; ROLLBACK_MSG says how that went
+    local i kind rel
+    TX_OPEN=0 TX_UNDONE=0 TX_LEFT=0
+    for ((i = ${#JOURNAL[@]} - 1; i >= 0; i--)); do
+        kind="${JOURNAL[i]%%$'\t'*}" rel="${JOURNAL[i]#*$'\t'}"
+        case "$kind" in
+            replaced)
+                if cp -PpfT "$BACKUP/files/$rel" "$GAME_DIR/$rel" 2>/dev/null; then
+                    TX_UNDONE=$((TX_UNDONE + 1))
+                else
+                    TX_LEFT=$((TX_LEFT + 1)); log "rollback: could not put back $rel"
+                fi ;;
+            new)
+                if rm -f "$GAME_DIR/$rel" 2>/dev/null; then
+                    TX_UNDONE=$((TX_UNDONE + 1))
+                else
+                    TX_LEFT=$((TX_LEFT + 1)); log "rollback: could not delete $rel"
+                fi ;;
+        esac
+    done
+    rm -rf "$STAGE"
+    [ "$TX_LEFT" -ne 0 ] || rm -rf "$BACKUP"
+    # Folders this run created, innermost first; only empty ones go.
+    for ((i = ${#JOURNAL[@]} - 1; i >= 0; i--)); do
+        kind="${JOURNAL[i]%%$'\t'*}" rel="${JOURNAL[i]#*$'\t'}"
+        if [ "$kind" = dir ]; then rmdir "$GAME_DIR/$rel" 2>/dev/null || true; fi
+    done
+    log "rollback: $TX_UNDONE files put back or deleted, $TX_LEFT left"
+    if [ "$TX_LEFT" -ne 0 ]; then
+        ROLLBACK_MSG="$(t rollback_left)"
+    elif [ "$TX_UNDONE" -eq 0 ]; then
+        ROLLBACK_MSG="$(t unchanged)"
+    else
+        ROLLBACK_MSG="$(t rolled_back)"
+    fi
+}
+
+tx_commit() {  # the install went through: the staging folder goes, one backup is kept
+    local old
+    rm -rf "$STAGE"
+    for old in "$GAME_DIR/$INST_REL/backup"/*; do
+        [ "$old" = "$BACKUP" ] || rm -rf "$old"
+    done
+    TX_OPEN=0
+    log "install finished; ${#JOURNAL[@]} steps, $TX_REPLACED files backed up in $BACKUP"
 }
 
 # Forgets what the framework recorded about a plugin folder: switched off,
@@ -788,7 +1201,10 @@ forget_folder() {
     for list in $FRAMEWORK_LISTS; do
         f="$GAME_DIR/BepInEx/config/$list"
         [ -f "$f" ] || continue
-        awk -F '\t' -v p="$folder/" -v d="$folder" 'index($1, p) != 1 && $1 != d' "$f" > "$f.tmp" && mv -f "$f.tmp" "$f"
+        awk -F '\t' -v p="$folder/" -v d="$folder" 'index($1, p) != 1 && $1 != d' "$f" > "$f.tmp"
+        if cmp -s "$f" "$f.tmp"; then rm -f "$f.tmp"; continue; fi
+        tx_save "BepInEx/config/$list" || { rm -f "$f.tmp"; BAD_PART="BepInEx/config/$list"; fail "$(t copy_failed)"; }
+        mv -f "$f.tmp" "$f"
     done
 }
 
@@ -796,9 +1212,278 @@ forget_folder() {
 enable_folder() {
     local folder="$1" off
     while IFS= read -r -d '' off; do
-        [ -f "${off%.disabled}" ] && rm -f "$off"
+        if [ -f "${off%.disabled}" ]; then
+            tx_save "${off#"$GAME_DIR"/}" || { BAD_PART="${off#"$GAME_DIR"/}"; fail "$(t copy_failed)"; }
+            rm -f "$off"
+        fi
     done < <(find "$GAME_DIR/BepInEx/plugins/$folder" -name '*.dll.disabled' -print0 2>/dev/null)
     forget_folder "$folder"
+}
+
+# --------------------------------------------------------------- download --
+# Fetches one file from a GitHub release: HTTPS only (redirects too), one
+# retry for a timeout or a server error, nothing over 20 MB, and the
+# installer's User-Agent. On failure FETCH_ERR says why, for the message.
+FETCH_ERR=""
+fetch() {  # fetch <url> <file>
+    local url="$1" out="$2" rc=0 progress=(-sS)
+    [ -t 2 ] && progress=(--progress-bar)   # in a terminal curl draws its own bar
+    HTTP_CODE="$(curl -fL "${progress[@]}" --proto =https --proto-redir =https --retry 1 \
+        --connect-timeout 30 --max-time 600 --max-filesize "$MAX_DOWNLOAD" -A "$USER_AGENT" \
+        -D "$out.headers" -o "$out" -w '%{http_code}' "$url")" || rc=$?
+    [ "$rc" -eq 0 ] && return 0
+    CURL_RC="$rc"
+    case "$rc" in
+        5|6|7) FETCH_ERR=offline ;;
+        28|52|56) FETCH_ERR=server ;;
+        22) case "$HTTP_CODE" in
+                404|410) FETCH_ERR=notfound ;;
+                403|429) FETCH_ERR=limit ;;
+                5??) FETCH_ERR=server ;;
+                *) FETCH_ERR=other ;;
+            esac ;;
+        35|51|53|54|58|59|60|64|66|77|80|82|83|90|91) FETCH_ERR=tls ;;
+        63) FETCH_ERR=toobig ;;
+        *) FETCH_ERR=other ;;
+    esac
+    log "download failed: $url (curl exit $rc, HTTP $HTTP_CODE, $FETCH_ERR)"
+    if [ "$FETCH_ERR" = limit ]; then
+        # GitHub says how long to wait in one of these; minutes, rounded up.
+        local s
+        s="$(tr -d '\r' < "$out.headers" 2>/dev/null | sed -n 's/^retry-after:[[:space:]]*\([0-9]\+\).*/\1/Ip' | tail -1)"
+        if [ -z "$s" ]; then
+            s="$(tr -d '\r' < "$out.headers" 2>/dev/null | sed -n 's/^x-ratelimit-reset:[[:space:]]*\([0-9]\+\).*/\1/Ip' | tail -1)"
+            [ -z "$s" ] || s=$((s - $(date +%s)))
+        fi
+        WAIT_MIN=""
+        if [ -n "$s" ] && [ "$s" -gt 0 ]; then WAIT_MIN=$(((s + 59) / 60)); fi
+    fi
+    return 1
+}
+
+fetch_reason() {  # fetch_reason fw|bep: the sentence for FETCH_ERR
+    case "$FETCH_ERR" in
+        offline) t e_offline ;;
+        server) t e_server ;;
+        limit) if [ -n "$WAIT_MIN" ]; then t e_limit; else t e_limit_later; fi ;;
+        notfound) if [ "$1" = fw ]; then t e_notfound_fw; else t e_notfound; fi ;;
+        tls) t e_tls ;;
+        toobig) t e_toobig ;;
+        *) t e_other ;;
+    esac
+}
+
+# 0 when the file has the given size (when one is given, else at most 20 MB)
+# and SHA-256; BAD_WHAT names what differed.
+check_file() {  # check_file <file> <size or ""> <sha256>
+    local size actual
+    size="$(wc -c < "$1" | tr -d ' ')"
+    if [ -n "$2" ] && [ "$size" != "$2" ]; then
+        BAD_WHAT="size"; log "size $size bytes, expected $2"; return 1
+    fi
+    if [ "$size" -gt "$MAX_DOWNLOAD" ]; then
+        BAD_WHAT="size"; log "size $size bytes, over $MAX_DOWNLOAD"; return 1
+    fi
+    actual="$(sha256sum "$1" | cut -d' ' -f1)"
+    if [ "$actual" != "$3" ]; then
+        BAD_WHAT="SHA-256"; log "SHA-256 mismatch: expected $3, actual $actual, size $size bytes"; return 1
+    fi
+    log "SHA-256 OK (${actual:0:8}...${actual: -5}), $size bytes"
+}
+
+# Unpacks only the named plugin folders and the Preloader from a ModFramework
+# zip into the staging folder. An entry whose path would leave the folder is
+# skipped; a folder the zip does not have is an error (exit 5).
+unpack_framework() {  # unpack_framework <zip> <folder> <plugin folder names...>
+    python3 - "$@" <<'PY'
+import os, shutil, sys, zipfile
+src, dst, names = sys.argv[1], sys.argv[2], sys.argv[3:]
+patcher = "BepInEx/patchers/DragNWash.ModFramework.Preloader.dll"
+wanted = [f"BepInEx/plugins/{n}/" for n in names]
+root = os.path.realpath(dst)
+found = set()
+with zipfile.ZipFile(src) as z:
+    for info in z.infolist():
+        name = info.filename
+        if info.is_dir() or (name != patcher and not any(name.startswith(w) for w in wanted)):
+            continue
+        parts = name.split("/")
+        target = os.path.realpath(os.path.join(root, *parts))
+        if "\\" in name or ":" in name or any(p in ("", ".", "..") for p in parts) \
+                or not target.startswith(root + os.sep):
+            print(f"skipped {name!r}: outside the folder", file=sys.stderr)
+            continue
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with z.open(info) as r, open(target, "wb") as w:
+            shutil.copyfileobj(r, w)
+        found.add(name if name == patcher else "/".join(parts[:3]) + "/")
+missing = [w.split("/")[2] for w in wanted if w not in found] + (["Preloader"] if patcher not in found else [])
+if missing:
+    print("not in the zip: " + ", ".join(missing), file=sys.stderr)
+    sys.exit(5)
+PY
+}
+
+# -------------------------------------------------------------- framework --
+# What the mod needs of ModFramework, against what the game folder has: the
+# core, the Preloader and the libraries named in "needs", nothing else. The
+# release is fetched when the core is missing or older than the release the
+# mod names, or when the Preloader or a library is missing or below its
+# minimum. Otherwise nothing is fetched and nothing connects. FW_MEETS says
+# whether what is there meets every minimum anyway, so a failed download can
+# still leave the choice of installing only the mod.
+FW_BUNDLED=0 FW_FETCH=0 FW_MEETS=1
+FW_PARTS=()
+plan_framework() {
+    local name have min verdict
+    FW_HAVE="$(dll_version "$GAME_DIR/BepInEx/plugins/$FRAMEWORK_PREFIX/$FRAMEWORK_PREFIX.dll")"
+    FW_PARTS=("$FRAMEWORK_PREFIX")
+    for name in "${NEED_ORDER[@]}"; do
+        if [ "$name" != "$FRAMEWORK_PREFIX" ]; then FW_PARTS+=("$name"); fi
+    done
+    for name in "${FW_PARTS[@]}"; do
+        have="$(dll_version "$GAME_DIR/BepInEx/plugins/$name/$name.dll")"
+        min="${NEEDS[$name]:-}"
+        if [ -z "$have" ]; then
+            verdict="missing" FW_FETCH=1 FW_MEETS=0
+        elif [ -n "$min" ] && [ "$(ver_cmp "$have" "$min")" = -1 ]; then
+            verdict="below the minimum" FW_FETCH=1 FW_MEETS=0
+        elif [ "$name" = "$FRAMEWORK_PREFIX" ] && [ "$(ver_cmp "$have" "$FW_VERSION")" = -1 ]; then
+            verdict="update to $FW_VERSION" FW_FETCH=1
+        else
+            verdict="keep"
+        fi
+        log "$name: have ${have:-none}${min:+, needs >= $min} -> $verdict"
+    done
+    if [ ! -f "$GAME_DIR/BepInEx/patchers/$FRAMEWORK_PATCHER" ]; then
+        FW_FETCH=1 FW_MEETS=0
+        log "Preloader: missing"
+    fi
+    if [ "$FW_FETCH" -eq 1 ]; then
+        log "ModFramework $FW_VERSION: needed"
+    else
+        log "ModFramework $FW_VERSION: not needed, nothing is downloaded"
+    fi
+}
+
+# Before the first connection: where to, why, what is sent and how the file is
+# checked, the same points as Install.exe's window. Download, use zips
+# downloaded by hand (then nothing connects), or cancel. --yes counts as
+# agreeing, as it did for BepInEx.
+consent() {
+    local why="" pick text
+    C_REPOS="" C_FILES=""
+    if [ "$NET_FW" -eq 1 ]; then
+        if [ -z "$FW_HAVE" ]; then
+            why="$(t c_fw)
+$(t c_fw_none)"
+        elif [ "$(ver_cmp "$FW_HAVE" "$FW_VERSION")" = -1 ]; then
+            why="$(t c_fw)
+$(t c_fw_have)"
+        else
+            why="$(t c_fw)
+$(t c_fw_part)"
+        fi
+        C_REPOS="$FRAMEWORK_REPO"
+        C_FILES="DragNWash.ModFramework-$FW_VERSION.zip ($(((FW_SIZE + 512) / 1024)) KB)"
+    fi
+    if [ "$NET_BEP" -eq 1 ]; then
+        why="${why:+$why
+}$(t c_bep)"
+        C_REPOS="${C_REPOS:+$C_REPOS, }BepInEx/BepInEx"
+        C_FILES="${C_FILES:+$C_FILES, }${BEPINEX_URL##*/}"
+    fi
+    text="$(t confirm_install)
+$GAME_DIR
+
+$(t c_head)
+$why
+
+$(t c_to)
+  $(t c_gh)
+  $(t c_ra)
+$(t c_what)
+$(t c_sent)
+$(t c_check)
+$(t c_noapi)"
+    if [ "$NET_FW" -eq 1 ]; then text="$text
+$(t c_page) $FW_PAGE"; fi
+    log "asking before connecting: $C_FILES from github.com ($C_REPOS), User-Agent $USER_AGENT"
+    if [ "$ASSUME_YES" -eq 1 ]; then
+        log "consent: download (--yes)"
+        return 0
+    fi
+    if [ "$GUI" -eq 1 ]; then
+        pick=0
+        kdialog --title "$TITLE" --yes-label "$(t c_download)" --no-label "$(t c_zip)" \
+            --cancel-label "$(t c_cancel)" --yesnocancel "$text" >/dev/null 2>&1 || pick=$?
+        case "$pick" in 0) pick=download ;; 1) pick=zip ;; *) pick=cancel ;; esac
+    else
+        echo "$text"
+        echo
+        echo "  1) $(t c_download)"
+        echo "  2) $(t c_zip)"
+        echo "  3) $(t c_cancel)"
+        read -r -p "> " pick || pick=""
+        case "$pick" in 1|"") pick=download ;; 2) pick=zip ;; *) pick=cancel ;; esac
+    fi
+    log "consent: $pick"
+    case "$pick" in
+        download) return 0 ;;
+        cancel) exit 1 ;;
+    esac
+    if [ "$NET_FW" -eq 1 ]; then
+        FRAMEWORK_ZIP="$(ask_file "$(t zip_fw)")" || exit 1
+        NET_FW=0
+    fi
+    if [ "$NET_BEP" -eq 1 ]; then
+        LOCAL_ZIP="$(ask_file "$(t zip_bep)")" || exit 1
+        NET_BEP=0
+    fi
+}
+
+ask_file() {  # ask_file <label>: a zip the player picks
+    local f=""
+    if [ "$GUI" -eq 1 ]; then
+        f="$(kdialog --title "$1" --getopenfilename "$HOME" "*.zip" 2>/dev/null)" || return 1
+    else
+        read -r -p "$1 " f || return 1
+        f="${f/#\~/$HOME}"
+    fi
+    [ -n "$f" ] || return 1
+    echo "$f"
+}
+
+# One ModFramework folder from <root>/BepInEx/plugins, over what is there,
+# unless the installed copy is newer (or, with "same", the same version too).
+# Only the files the new copy has are written; others in the folder stay.
+install_part() {  # install_part <root> <folder> newer|same
+    local src="$1/BepInEx/plugins/$2" have offered c
+    have="$(dll_version "$GAME_DIR/BepInEx/plugins/$2/$2.dll")"
+    offered="$(dll_version "$src/$2.dll")"
+    if [ -n "$have" ] && [ -n "$offered" ]; then
+        c="$(ver_cmp "$have" "$offered")"
+        if [ "$c" = 1 ]; then say "$2: kept $have (newer than $offered)"; return 0; fi
+        if [ "$c" = 0 ] && [ "$3" = same ]; then say "$2: kept $have (same)"; return 0; fi
+    fi
+    tx_copy_tree "$src" "BepInEx/plugins/$2" || fail "$(t copy_failed)"
+    enable_folder "$2"
+    say "$2: ${offered:-ok}"
+}
+
+install_preloader() {  # install_preloader <root> newer|same
+    local rel="BepInEx/patchers/$FRAMEWORK_PATCHER" have offered c
+    have="$(dll_version "$GAME_DIR/$rel")"
+    offered="$(dll_version "$1/$rel")"
+    if [ -n "$have" ] && [ -n "$offered" ]; then
+        c="$(ver_cmp "$have" "$offered")"
+        if [ "$c" = 1 ] || { [ "$c" = 0 ] && [ "$2" = same ]; }; then
+            log "Preloader: kept $have (offered $offered)"
+            return 0
+        fi
+    fi
+    tx_copy "$1/$rel" "$rel" || { BAD_PART="$rel"; fail "$(t copy_failed)"; }
+    log "Preloader: ${offered:-ok}"
 }
 
 other_mods() {
@@ -815,8 +1500,11 @@ other_mods() {
 
 if [ "$MODE" = install ]; then
     # The mod's choices
+    # The ids are read first: a prompt inside a loop fed by mf would read
+    # its answer from mf instead of the keyboard.
     declare -A VALUE=()
-    while IFS= read -r id; do
+    mapfile -t choice_ids < <(mf choices)
+    for id in "${choice_ids[@]}"; do
         [ -n "$id" ] || continue
         if [ -n "${CHOICE[$id]:-}" ]; then
             mf has "$id" "${CHOICE[$id]}" || fail "Unknown value for $id: ${CHOICE[$id]}"
@@ -852,81 +1540,200 @@ if [ "$MODE" = install ]; then
                 VALUE[$id]="$pick"
             fi
         fi
-    done < <(mf choices)
+    done
 
-    ask_yes "$(t confirm_install)
+    # What has to come from where. Nothing in the game folder changes until
+    # every download is in and checked.
+    BEP_FETCH=0
+    if [ ! -f "$GAME_DIR/BepInEx/core/BepInEx.dll" ]; then BEP_FETCH=1; fi
+    for src in "$HERE/BepInEx/plugins/$FRAMEWORK_PREFIX"*/; do
+        if [ -d "$src" ]; then FW_BUNDLED=1; fi
+    done
+    if [ "$FW_BUNDLED" -eq 1 ]; then
+        log "ModFramework: the mod's zip carries it; that copy is used"
+    elif [ -n "$FW_VERSION" ]; then
+        plan_framework
+    fi
+    if [ -n "$FRAMEWORK_ZIP" ] && [ "$FW_FETCH" -eq 0 ]; then
+        log "--framework-zip not used: nothing of ModFramework has to be installed"
+    fi
+    NET_BEP=0 NET_FW=0
+    if [ "$BEP_FETCH" -eq 1 ] && [ -z "$LOCAL_ZIP" ]; then
+        [ "$NO_DOWNLOAD" -eq 0 ] || fail "$(t nodl_bep)"
+        NET_BEP=1
+    fi
+    if [ "$FW_FETCH" -eq 1 ] && [ -z "$FRAMEWORK_ZIP" ] && [ "$NO_DOWNLOAD" -eq 0 ]; then NET_FW=1; fi
+
+    if [ "$NET_BEP" -eq 1 ] || [ "$NET_FW" -eq 1 ]; then
+        consent
+    else
+        ask_yes "$(t confirm_install)
 $GAME_DIR" 1 || exit 1
+    fi
+
+    # Downloads go to a folder only this user can read, and are checked there.
+    WORK="$(mktemp -d)"
+    BEP_FILE=""
+    if [ "$BEP_FETCH" -eq 1 ]; then
+        BEP_FILE="$WORK/bepinex.zip"
+        if [ -n "$LOCAL_ZIP" ]; then
+            ZIP_PATH="$LOCAL_ZIP"
+            [ -f "$LOCAL_ZIP" ] || fail "$(t zip_missing)"
+            cp -f "$LOCAL_ZIP" "$BEP_FILE"
+        else
+            say "$(t bep_get)"
+            fetch "$BEPINEX_URL" "$BEP_FILE" || fail "$(t bep_fail) $(fetch_reason bep)
+$(t unchanged)"
+        fi
+        check_file "$BEP_FILE" "" "$BEPINEX_SHA256" || fail "$(t bep_bad)
+$(t unchanged)"
+    fi
+
+    FW_FILE=""
+    if [ "$FW_FETCH" -eq 1 ]; then
+        FW_FILE="$WORK/framework.zip"
+        fw_msg=""
+        if [ -n "$FRAMEWORK_ZIP" ]; then
+            ZIP_PATH="$FRAMEWORK_ZIP"
+            log "ModFramework: using $FRAMEWORK_ZIP"
+            if [ ! -f "$FRAMEWORK_ZIP" ]; then
+                fw_msg="$(t zip_missing)"
+            elif [ "$(wc -c < "$FRAMEWORK_ZIP" | tr -d ' ')" != "$FW_SIZE" ]; then
+                BAD_WHAT="size"
+                log "size $(wc -c < "$FRAMEWORK_ZIP" | tr -d ' ') bytes, expected $FW_SIZE"
+                fw_msg="$(t fw_bad_zip)"
+            else
+                cp -f "$FRAMEWORK_ZIP" "$FW_FILE"
+                check_file "$FW_FILE" "$FW_SIZE" "$FW_SHA256" || fw_msg="$(t fw_bad_zip)"
+            fi
+        elif [ "$NO_DOWNLOAD" -eq 1 ]; then
+            fw_msg="$(t nodl_fw)"
+        else
+            say "$(t fw_get)"
+            log "ModFramework: downloading $FW_URL"
+            if ! fetch "$FW_URL" "$FW_FILE"; then
+                fw_msg="$(fetch_reason fw)"
+            elif ! check_file "$FW_FILE" "$FW_SIZE" "$FW_SHA256"; then
+                fw_msg="$(t fw_bad_dl)"
+            fi
+        fi
+        if [ -n "$fw_msg" ]; then
+            rm -f "$FW_FILE"
+            FW_FILE=""
+            fw_msg="$fw_msg
+$(t unchanged)"
+            # No way around a failed secure connection is offered.
+            if [ "$FETCH_ERR" != tls ]; then
+                fw_msg="$fw_msg
+
+$(t fw_manual)
+$FW_PAGE"
+            fi
+            if [ "$FW_MEETS" -eq 1 ] && ask_yes "$fw_msg
+
+$(t fw_keep_ask)" 1; then
+                warn "$(t fw_kept_old)"
+            else
+                fail "$fw_msg"
+            fi
+        else
+            say "$(t fw_ok)"
+        fi
+    fi
+
+    # From here on every change is backed up and written down, and put back
+    # if anything fails.
+    tx_begin
+
+    # ModFramework: only the folders this mod needs, out of the checked zip.
+    if [ -n "$FW_FILE" ]; then
+        unpack_rc=0
+        unpack_framework "$FW_FILE" "$STAGE/framework" "${FW_PARTS[@]}" 2> "$WORK/unpack.log" || unpack_rc=$?
+        if [ -s "$WORK/unpack.log" ]; then log "unpack: $(tr '\n' ' ' < "$WORK/unpack.log")"; fi
+        if [ "$unpack_rc" -eq 5 ]; then
+            BAD_PART="$(sed -n 's/^not in the zip: //p' "$WORK/unpack.log")"
+            fail "$(t fw_short)"
+        elif [ "$unpack_rc" -ne 0 ]; then
+            BAD_PART="DragNWash.ModFramework-$FW_VERSION.zip"
+            fail "$(t unpack_failed)"
+        fi
+        for name in "${FW_PARTS[@]}"; do
+            offered="$(dll_version "$STAGE/framework/BepInEx/plugins/$name/$name.dll")"
+            min="${NEEDS[$name]:-}"
+            if [ -z "$offered" ] || { [ -n "$min" ] && [ "$(ver_cmp "$offered" "$min")" = -1 ]; }; then
+                BAD_PART="$name${min:+ $min}"
+                fail "$(t fw_short)"
+            fi
+        done
+    fi
 
     # BepInEx
-    if [ -f "$GAME_DIR/BepInEx/core/BepInEx.dll" ]; then
-        say "$(t bep_have)"
-    else
-        say "$(t bep_get)"
-        tmp="$(mktemp -d)"
-        trap 'rm -rf "$tmp"' EXIT
-        if [ -n "$LOCAL_ZIP" ]; then
-            cp -f "$LOCAL_ZIP" "$tmp/bepinex.zip"
-        elif [ -t 2 ]; then
-            # In a terminal, curl draws its own progress bar.
-            curl -fL --progress-bar -o "$tmp/bepinex.zip" "$BEPINEX_URL"
-        else
-            # Started from the desktop there is nowhere to draw it; the log has the line above.
-            curl -fsSL -o "$tmp/bepinex.zip" "$BEPINEX_URL"
-        fi
-        actual="$(sha256sum "$tmp/bepinex.zip" | cut -d' ' -f1)"
-        [ "$actual" = "$BEPINEX_SHA256" ] || fail "$(t bep_bad)"
-        unzip -oq "$tmp/bepinex.zip" -d "$GAME_DIR"
+    if [ -n "$BEP_FILE" ]; then
+        unzip -q "$BEP_FILE" -d "$STAGE/bepinex" || { BAD_PART="${BEPINEX_URL##*/}"; fail "$(t unpack_failed)"; }
+        tx_copy_tree "$STAGE/bepinex" "" || fail "$(t copy_failed)"
+        tx_save "BepInEx/$MARKER" || { BAD_PART="BepInEx/$MARKER"; fail "$(t copy_failed)"; }
         echo "BepInEx was added by the Drag'n Wash mod installer." > "$GAME_DIR/BepInEx/$MARKER"
         say "$(t bep_ok)"
+    else
+        say "$(t bep_have)"
     fi
 
     # run_bepinex.sh
     if [ -f "$GAME_DIR/run_bepinex.sh" ]; then
-        sed -i 's/^executable_name=.*/executable_name="'"$GAME_BIN"'"/' "$GAME_DIR/run_bepinex.sh"
+        if ! grep -qx "executable_name=\"$GAME_BIN\"" "$GAME_DIR/run_bepinex.sh"; then
+            tx_save run_bepinex.sh || { BAD_PART=run_bepinex.sh; fail "$(t copy_failed)"; }
+            sed -i 's/^executable_name=.*/executable_name="'"$GAME_BIN"'"/' "$GAME_DIR/run_bepinex.sh"
+        fi
         chmod +x "$GAME_DIR/run_bepinex.sh"
         say "run_bepinex.sh: executable_name=\"$GAME_BIN\""
     fi
 
     # Drag'n Wash ModFramework and its libraries, each in its own folder;
-    # never replaced by an older copy.
-    mkdir -p "$GAME_DIR/BepInEx/plugins"
-    for src in "$HERE/BepInEx/plugins/$FRAMEWORK_PREFIX"*/; do
-        [ -d "$src" ] || continue
-        name="$(basename "$src")"
-        dst="$GAME_DIR/BepInEx/plugins/$name"
-        have="$(dll_version "$dst/$name.dll")"
-        offered="$(dll_version "$src/$name.dll")"
-        if version_newer "$have" "$offered"; then
-            say "$name: kept $have (newer than $offered)"
-            continue
-        fi
-        mkdir -p "$dst"
-        cp -rf "$src." "$dst/"
-        enable_folder "$name"
-        say "$name: ${offered:-ok}"
-    done
-    if [ -f "$HERE/BepInEx/patchers/$FRAMEWORK_PATCHER" ]; then
-        have="$(dll_version "$GAME_DIR/BepInEx/patchers/$FRAMEWORK_PATCHER")"
-        offered="$(dll_version "$HERE/BepInEx/patchers/$FRAMEWORK_PATCHER")"
-        if ! version_newer "$have" "$offered"; then
-            mkdir -p "$GAME_DIR/BepInEx/patchers"
-            cp -f "$HERE/BepInEx/patchers/$FRAMEWORK_PATCHER" "$GAME_DIR/BepInEx/patchers/"
-        fi
+    # never replaced by an older copy. A copy the mod's zip carries goes over
+    # the same version, as before; one from a release zip leaves it alone.
+    if [ "$FW_BUNDLED" -eq 1 ]; then
+        for src in "$HERE/BepInEx/plugins/$FRAMEWORK_PREFIX"*/; do
+            if [ -d "$src" ]; then install_part "$HERE" "$(basename "$src")" newer; fi
+        done
+        if [ -f "$HERE/BepInEx/patchers/$FRAMEWORK_PATCHER" ]; then install_preloader "$HERE" newer; fi
+    elif [ -n "$FW_FILE" ]; then
+        for name in "${FW_PARTS[@]}"; do install_part "$STAGE/framework" "$name" same; done
+        install_preloader "$STAGE/framework" same
+    elif [ -n "$FW_VERSION" ] && [ "$FW_FETCH" -eq 0 ]; then
+        say "$(t fw_have)"
     fi
 
     # The mod, copied over what is there: files the player added are kept.
     for p in "${PLUGINS[@]}"; do
-        mkdir -p "$GAME_DIR/BepInEx/plugins/$p"
-        cp -rf "$HERE/BepInEx/plugins/$p/." "$GAME_DIR/BepInEx/plugins/$p/"
+        tx_copy_tree "$HERE/BepInEx/plugins/$p" "BepInEx/plugins/$p" || fail "$(t copy_failed)"
         enable_folder "$p"
         say "$p: $(t mod_ok)"
     done
-    mf copy "$GAME_DIR/BepInEx/plugins/${PLUGINS[0]}/mod-install.json"
+    # The manifest copy and the choices are written in the download folder
+    # first, so a file that comes out the same is not touched.
+    rel="BepInEx/plugins/${PLUGINS[0]}/mod-install.json"
+    BAD_PART="$rel"
+    mf copy "$WORK/mod-install.json" && tx_copy "$WORK/mod-install.json" "$rel" || fail "$(t copy_failed)"
 
+    cfgs=()
     for id in "${!VALUE[@]}"; do
-        mf apply "$id" "$GAME_DIR" "${VALUE[$id]}"
+        rel="BepInEx/config/$(mf cfgfile "$id")"
+        BAD_PART="$rel"
+        if [ ! -f "$WORK/cfg/$rel" ]; then
+            mkdir -p "$WORK/cfg/BepInEx/config"
+            if [ -f "$GAME_DIR/$rel" ]; then cp -f "$GAME_DIR/$rel" "$WORK/cfg/$rel"; fi
+            cfgs+=("$rel")
+        fi
+        mf apply "$id" "$WORK/cfg" "${VALUE[$id]}" || fail "$(t copy_failed)"
         say "$id: ${VALUE[$id]}"
     done
+    for rel in "${cfgs[@]}"; do
+        BAD_PART="$rel"
+        tx_copy "$WORK/cfg/$rel" "$rel" || fail "$(t copy_failed)"
+    done
+
+    tx_commit
+    if [ "$TX_REPLACED" -gt 0 ]; then say "$(t backup_done)"; fi
 
     # Steam launch option
     if [ "$LAUNCH_OPTIONS" -eq 0 ]; then
@@ -978,6 +1785,8 @@ $GAME_DIR" 1 || exit 1
     while IFS= read -r f; do
         [ -n "$f" ] && rm -f "$GAME_DIR/BepInEx/config/$f"
     done < <(mf configFiles)
+    # The installer's staging folder and the backup of the last install.
+    rm -rf "${GAME_DIR:?}/$INST_REL"
 
     # The framework stays while any other mod is installed.
     if [ -n "$(other_mods)" ]; then

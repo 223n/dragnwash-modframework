@@ -5,7 +5,7 @@ name: No game files
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   check:

@@ -4,13 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Win32;
 
 namespace DragNWash.Installer
@@ -26,11 +22,35 @@ namespace DragNWash.Installer
         internal const string BepInExVersion = "5.4.23.5";
         internal const string BepInExUrl = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/BepInEx_win_x64_5.4.23.5.zip";
         internal const string BepInExSha256 = "82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4";
+        internal const long BepInExSize = 639118;
+
+        // Where a mod's pinned ModFramework comes from (manifest schema 2). The address is
+        // built here from the version alone; github.com sends the download on to
+        // release-assets.githubusercontent.com. api.github.com is never asked.
+        internal const string FrameworkRepo = "TomXV/dragnwash-modframework";
+        internal const string BepInExRepo = "BepInEx/BepInEx";
+        internal const string ReleaseAssetsHost = "release-assets.githubusercontent.com";
+
+        internal static string FrameworkUrl(string version) => $"https://github.com/{FrameworkRepo}/releases/download/v{version}/DragNWash.ModFramework-{version}.zip";
+
+        internal static string FrameworkReleasePage(string version) => $"https://github.com/{FrameworkRepo}/releases/tag/v{version}";
 
         // Left in BepInEx/ when an installer added BepInEx. The second name is the one
         // Drag'n Wash Localization's own installers used before this installer existed.
         internal const string Marker = ".bepinex-installed-by-dragnwash-installer";
         internal const string OldMarker = ".bepinex-installed-by-dragnwash-localization";
+
+        // In BepInEx/: the installer's staging folder and the backup of the files the
+        // last install replaced. BepInEx loads nothing from it.
+        internal const string InstallerFolder = "DragNWash.Installer";
+
+        // What Doorstop (winhttp.dll) starts for BepInEx 5, relative to the game folder.
+        internal const string BepInExPreloader = @"BepInEx\core\BepInEx.Preloader.dll";
+
+        // The other Drag'n Wash loader, KrazenLabs/dnw-modloader: Doorstop too, with its
+        // own files in this folder next to the game.
+        internal const string DnwModLoaderFolder = "DnWModLoader";
+        internal const string DnwModLoaderName = "dnw-modloader";
 
         // Files of the framework's Mods screen that name plugins by path.
         internal static readonly string[] FrameworkLists =
@@ -164,6 +184,79 @@ namespace DragNWash.Installer
             return File.Exists(Path.Combine(game, "BepInEx", "core", "BepInEx.dll"));
         }
 
+        // Another mod loader in the game folder, which unpacking BepInEx would break by
+        // replacing its winhttp.dll and doorstop_config.ini. Found says what gave it
+        // away (English, for the log) and is null when there is none; Name is the
+        // loader's name when it is one this installer knows.
+        internal static (string Name, string Found) OtherLoader(string game)
+        {
+            string folder = Path.Combine(game, Paths.DnwModLoaderFolder);
+            if (Directory.Exists(folder))
+            {
+                return (Paths.DnwModLoaderName, $"{Paths.DnwModLoaderFolder}\\ is in the game folder");
+            }
+            bool config = File.Exists(Path.Combine(game, "doorstop_config.ini"));
+            if (config && !DoorstopStartsBepInEx(game, out string target))
+            {
+                string name = target != null && target.IndexOf(Paths.DnwModLoaderFolder, StringComparison.OrdinalIgnoreCase) >= 0 ? Paths.DnwModLoaderName : null;
+                return (name, $"doorstop_config.ini starts {target ?? "nothing it names"}, not {Paths.BepInExPreloader}");
+            }
+            // A winhttp.dll whose config starts BepInEx is what is left of BepInEx, and
+            // unpacking BepInEx again mends it.
+            if (!config && File.Exists(Path.Combine(game, "winhttp.dll")) && !HasBepInEx(game))
+            {
+                return (null, "winhttp.dll is in the game folder without BepInEx\\core\\BepInEx.dll or a doorstop_config.ini");
+            }
+            return (null, null);
+        }
+
+        // Whether doorstop_config.ini names BepInEx's preloader as the assembly to start.
+        // Doorstop 4 (BepInEx 5.4.22 on) calls the key target_assembly, Doorstop 3
+        // targetAssembly; the path may be relative to the game folder or absolute.
+        private static bool DoorstopStartsBepInEx(string game, out string target)
+        {
+            target = null;
+            foreach (string raw in File.ReadAllLines(Path.Combine(game, "doorstop_config.ini")))
+            {
+                string line = raw.Trim();
+                int eq = line.IndexOf('=');
+                if (line.StartsWith("#", StringComparison.Ordinal) || line.StartsWith(";", StringComparison.Ordinal) || eq <= 0)
+                {
+                    continue;
+                }
+                string key = line.Substring(0, eq).Trim();
+                if (string.Equals(key, "target_assembly", StringComparison.OrdinalIgnoreCase) || string.Equals(key, "targetAssembly", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = line.Substring(eq + 1).Trim().Trim('"');
+                    break;
+                }
+            }
+            if (string.IsNullOrEmpty(target))
+            {
+                target = null;
+                return false;
+            }
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(Path.Combine(game, target.Replace('/', '\\'))),
+                    Path.GetFullPath(Path.Combine(game, Paths.BepInExPreloader)),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception)
+            {
+                // Not a path at all.
+                return false;
+            }
+        }
+
+        private static InstallerException OtherLoaderError(string name, string found)
+        {
+            return name == null
+                ? new InstallerException(Strings.Key.OtherLoader, found)
+                : new InstallerException(Strings.Key.OtherLoaderNamed, found, name);
+        }
+
         // The installed version of the mod: its manifest copy, or its first DLL.
         internal string InstalledVersion(string game)
         {
@@ -207,11 +300,13 @@ namespace DragNWash.Installer
 
         // ---- install ----
 
-        // progress hears how far the BepInEx download is, then once that the game folder
-        // is being changed. cancel stops the download; after that it is too late.
-        internal void Install(string game, IDictionary<string, string> choices, string bepInExZip = null,
+        // progress hears which step Install is on and how far a download is. cancel stops
+        // it while it downloads and checks; once the game folder is being changed it is
+        // too late. The result says what was done, for the window's summary.
+        internal InstallResult Install(string game, IDictionary<string, string> choices, InstallOptions options = null,
             IProgress<InstallProgress> progress = null, CancellationToken cancel = default)
         {
+            options = options ?? new InstallOptions();
             CheckReady(game);
             string payloadPlugins = Path.Combine(_payload, "BepInEx", "plugins");
             foreach (string plugin in _manifest.Plugins)
@@ -222,151 +317,236 @@ namespace DragNWash.Installer
                 }
             }
             _log($"Game: {game}");
+            // Before anything is downloaded or changed: one loader per game folder.
+            var (loader, found) = OtherLoader(game);
+            if (found != null)
+            {
+                _log($"Loader: another mod loader{(loader == null ? "" : " (" + loader + ")")}: {found}; nothing was changed");
+                throw OtherLoaderError(loader, found);
+            }
+            _log(HasBepInEx(game)
+                ? $"Loader: BepInEx {DllVersion(Path.Combine(game, "BepInEx", "core", "BepInEx.dll"))}, no other loader found"
+                : "Loader: none yet, no other loader found");
+            progress?.Report(InstallProgress.At(InstallStage.Check));
 
-            string zip = HasBepInEx(game) ? null : bepInExZip ?? DownloadBepInEx(progress, cancel);
+            var result = new InstallResult
+            {
+                OldMod = InstalledVersion(game),
+                OldFramework = InstalledFramework(game),
+                OtherMods = OtherMods(game).Count(n => Directory.Exists(Path.Combine(game, "BepInEx", "plugins", n))),
+            };
+            FrameworkPlan framework = PlanFramework(game);
+            if (framework == null && options.FrameworkZip != null)
+            {
+                _log("ModFramework: --framework-zip not used, this mod's zip brings its own framework or needs none");
+            }
+            bool bepInEx = !HasBepInEx(game);
+            bool fetchFramework = framework != null && framework.Download && !(options.KeepFramework && framework.MinimumsMet);
+            bool downloadFramework = fetchFramework && options.FrameworkZip == null;
+            bool downloadBepInEx = bepInEx && options.BepInExZip == null;
+            // --no-download: stop before the first connection, not halfway.
+            if (options.NoDownload && downloadFramework)
+            {
+                throw new InstallerException(Strings.Key.FwNoDownload, (string)null, framework.Pin.Version)
+                {
+                    LogText = $"ModFramework: {framework.Pin.Version} has to be downloaded, but --no-download is set; nothing was changed",
+                };
+            }
+            if (options.NoDownload && downloadBepInEx)
+            {
+                throw new InstallerException(Strings.Key.BepInExNoDownload, (string)null, Paths.BepInExVersion)
+                {
+                    LogText = $"BepInEx: {Paths.BepInExVersion} has to be downloaded, but --no-download is set; nothing was changed",
+                };
+            }
+
+            string temp = null;
+            string Temp()
+            {
+                if (temp == null)
+                {
+                    // A folder of this run's own, so nothing else in %TEMP% is read or replaced.
+                    temp = Path.Combine(Path.GetTempPath(), Paths.InstallerFolder, Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(temp);
+                }
+                return temp;
+            }
             try
             {
+                int downloads = (downloadFramework ? 1 : 0) + (downloadBepInEx ? 1 : 0);
+                string frameworkZip = framework == null ? null : FetchFramework(framework, options, Temp, downloads, progress, cancel, result);
+                string bepInExZip = !bepInEx ? null : options.BepInExZip ?? DownloadBepInEx(Temp(), downloads, progress, cancel);
+                progress?.Report(InstallProgress.At(InstallStage.Verify));
+                if (bepInExZip != null)
+                {
+                    CheckBepInEx(bepInExZip);
+                }
                 // Nothing in the game folder has changed up to here, so stopping is
-                // still clean. From here on it would leave the folder half done.
+                // still clean. From here on a failure is undone from the journal.
                 cancel.ThrowIfCancellationRequested();
-                progress?.Report(InstallProgress.Changing);
-                if (zip == null)
+                progress?.Report(InstallProgress.At(InstallStage.Backup));
+                var journal = new InstallJournal(game);
+                try
                 {
-                    _log("BepInEx: already present");
+                    Put(journal, game, choices, bepInExZip, framework, frameworkZip, result, progress);
                 }
-                else
+                catch (Exception ex)
                 {
-                    InstallBepInEx(game, zip);
+                    _log($"Copying failed, putting everything back: {ex.Message}");
+                    int undone = journal.RollBack(_log, out int failed);
+                    if (failed > 0)
+                    {
+                        throw new InstallerException(Strings.Key.RolledBackPartly, ex, failed, journal.BackupShown);
+                    }
+                    if (undone > 0)
+                    {
+                        throw new InstallerException(Strings.Key.RolledBack, ex, undone);
+                    }
+                    throw;
                 }
+                journal.Commit(_log);
+                result.Replaced = journal.Replaced;
+                result.Backup = journal.BackupShown;
+                result.BepInEx = bepInExZip != null;
             }
             finally
             {
-                if (zip != null && zip != bepInExZip)
+                if (temp != null)
                 {
-                    TryDelete(zip);
+                    try
+                    {
+                        InstallJournal.DeleteTree(temp);
+                        Directory.Delete(Path.GetDirectoryName(temp)); // only when no other run's folder is in it
+                    }
+                    catch (Exception)
+                    {
+                    }
                 }
             }
-            InstallFramework(game);
+            result.NewFramework = InstalledFramework(game);
+            result.Choices = choices == null ? new Dictionary<string, string>() : new Dictionary<string, string>(choices);
+            _log($"{_manifest.Name} {_manifest.Version}: installed");
+            progress?.Report(InstallProgress.At(InstallStage.Done));
+            return result;
+        }
 
+        // Every change Install makes in the game folder, each through the journal.
+        private void Put(InstallJournal journal, string game, IDictionary<string, string> choices, string bepInExZip,
+            FrameworkPlan framework, string frameworkZip, InstallResult result, IProgress<InstallProgress> progress)
+        {
+            // Unpacked and checked first, so a zip that lacks a part stops before BepInEx is put in place.
+            string staged = frameworkZip == null ? null : StageFramework(journal, framework, frameworkZip, result);
+            if (bepInExZip == null)
+            {
+                _log("BepInEx: already present");
+            }
+            else
+            {
+                InstallBepInEx(journal, game, bepInExZip);
+            }
+            if (staged != null)
+            {
+                PutFramework(journal, game, framework, staged, result);
+            }
+            else if (framework == null)
+            {
+                InstallFramework(journal, game, result);
+            }
+
+            progress?.Report(InstallProgress.At(InstallStage.Put));
+            string payloadPlugins = Path.Combine(_payload, "BepInEx", "plugins");
             string plugins = Path.Combine(game, "BepInEx", "plugins");
             foreach (string plugin in _manifest.Plugins)
             {
                 // Copied over what is there: files the player added (their own
                 // translations, working files) are never deleted by an update.
-                CopyTree(Path.Combine(payloadPlugins, plugin), Path.Combine(plugins, plugin));
-                EnableFiles(game, plugin);
+                journal.CopyTree(Path.Combine(payloadPlugins, plugin), Path.Combine(plugins, plugin));
+                EnableFiles(game, plugin, journal);
                 _log($"{plugin}: copied");
             }
             // Lets the Mods screen and later installers know what belongs to the mod.
-            File.WriteAllText(Path.Combine(plugins, _manifest.Plugins[0], ModManifest.FileName), _manifest.ToJson(), new UTF8Encoding(false));
+            journal.WriteAllText(Path.Combine(plugins, _manifest.Plugins[0], ModManifest.FileName), _manifest.ToJson());
 
+            progress?.Report(InstallProgress.At(InstallStage.Settings));
             foreach (ModChoice choice in _manifest.Choices)
             {
                 if (choices != null && choices.TryGetValue(choice.Id, out string value) && choice.Options.Any(o => o.Value == value))
                 {
-                    ConfigFile.Set(Path.Combine(game, "BepInEx", "config", choice.Config.File), choice.Config.Section, choice.Config.Key, value);
+                    string config = Path.Combine(game, "BepInEx", "config", choice.Config.File);
+                    journal.Change(config);
+                    ConfigFile.Set(config, choice.Config.Section, choice.Config.Key, value);
                     _log($"{choice.Id}: {value}");
                 }
             }
-            _log($"{_manifest.Name} {_manifest.Version}: installed");
         }
 
-        // Into the temp folder, so a download that fails or is stopped leaves the
+        // Into the run's temp folder, so a download that fails or is stopped leaves the
         // game folder as it was.
-        private string DownloadBepInEx(IProgress<InstallProgress> progress, CancellationToken cancel)
+        private string DownloadBepInEx(string temp, int downloads, IProgress<InstallProgress> progress, CancellationToken cancel)
         {
-            string zip = Path.Combine(Path.GetTempPath(), Path.GetFileName(new Uri(Paths.BepInExUrl).AbsolutePath));
+            string zip = Path.Combine(temp, Path.GetFileName(new Uri(Paths.BepInExUrl).AbsolutePath));
             _log($"BepInEx: downloading {Paths.BepInExUrl}");
-            progress?.Report(InstallProgress.Downloaded(0));
             try
             {
-                Download(Paths.BepInExUrl, zip, progress, cancel);
+                Download(InstallStage.DownloadBepInEx, "BepInEx " + Paths.BepInExVersion, Paths.BepInExUrl, zip, Paths.BepInExSize, downloads, progress, cancel);
             }
-            catch (Exception)
+            catch (DownloadFailure ex)
             {
-                TryDelete(zip);
-                throw;
+                throw DownloadError(ex, "BepInEx", Paths.BepInExUrl, null);
             }
             return zip;
         }
 
-        private static void Download(string url, string file, IProgress<InstallProgress> progress, CancellationToken cancel)
+        private void Download(InstallStage stage, string what, string url, string file, long size, int downloads,
+            IProgress<InstallProgress> progress, CancellationToken cancel)
         {
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-            using (var client = new HttpClient())
+            int index = stage == InstallStage.DownloadBepInEx ? downloads : 1;
+            int shown = -1;
+            progress?.Report(InstallProgress.Downloaded(stage, what, new Uri(url).Host, index, downloads, 0, size));
+            Downloader.Fetch(url, file, size, done =>
             {
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("DragNWash.Installer");
-                HttpResponseMessage response;
-                try
+                int percent = (int)(done * 100 / size);
+                if (percent != shown)
                 {
-                    response = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancel).GetAwaiter().GetResult();
+                    shown = percent;
+                    progress?.Report(InstallProgress.Downloaded(stage, what, new Uri(url).Host, index, downloads, done, size));
                 }
-                catch (TaskCanceledException ex) when (!cancel.IsCancellationRequested)
-                {
-                    // HttpClient reports its own time-out as a cancellation.
-                    throw new HttpRequestException("The server did not answer in time.", ex);
-                }
-                using (response)
-                {
-                    response.EnsureSuccessStatusCode();
-                    long total = response.Content.Headers.ContentLength ?? -1;
-                    using (Stream from = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                    using (cancel.Register(from.Dispose)) // a read that waits on the network ends at once
-                    using (FileStream to = File.Create(file))
-                    {
-                        var buffer = new byte[81920];
-                        long done = 0;
-                        int shown = 0;
-                        while (true)
-                        {
-                            int read;
-                            try
-                            {
-                                read = from.Read(buffer, 0, buffer.Length);
-                            }
-                            catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException || ex is WebException)
-                            {
-                                cancel.ThrowIfCancellationRequested();
-                                throw new HttpRequestException("The download broke off: " + ex.Message, ex);
-                            }
-                            if (read == 0)
-                            {
-                                break;
-                            }
-                            to.Write(buffer, 0, read);
-                            done += read;
-                            int percent = total > 0 ? (int)Math.Min(100, done * 100 / total) : -1;
-                            if (percent != shown)
-                            {
-                                shown = percent;
-                                progress?.Report(InstallProgress.Downloaded(percent));
-                            }
-                        }
-                    }
-                }
-            }
+            }, _log, what.Split(' ')[0], cancel);
         }
 
-        private void InstallBepInEx(string game, string zip)
+        // Before the game folder is touched: the zip must be the pinned release.
+        private void CheckBepInEx(string zip)
         {
-            string hash;
-            using (var sha = SHA256.Create())
-            using (var stream = File.OpenRead(zip))
-            {
-                hash = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-            }
+            string hash = Downloader.Sha256Of(zip);
             if (hash != Paths.BepInExSha256)
             {
                 throw new InstallerException(Strings.Key.BepInExHash, hash);
             }
             _log("BepInEx: SHA-256 OK, unpacking");
-            string root = Path.GetFullPath(game).TrimEnd('\\') + "\\";
+        }
+
+        // Unpacked into the staging folder first, so a zip that breaks off halfway
+        // has not touched the game's own files, then copied into place.
+        private void InstallBepInEx(InstallJournal journal, string game, string zip)
+        {
+            string staging = journal.Staging(Path.GetFileNameWithoutExtension(new Uri(Paths.BepInExUrl).AbsolutePath));
+            Unpack(zip, staging, _ => true);
+            journal.CopyTree(staging, game);
+            journal.WriteAllText(Path.Combine(game, "BepInEx", Paths.Marker), "BepInEx was added by the Drag'n Wash mod installer.\r\n");
+            _log("BepInEx: installed");
+        }
+
+        // The entries of zip that take accepts (by their name in the zip, with '/'),
+        // unpacked under dir. An entry that would land outside dir is skipped.
+        private static void Unpack(string zip, string dir, Func<string, bool> take)
+        {
+            string root = Path.GetFullPath(dir).TrimEnd('\\') + "\\";
             using (ZipArchive archive = ZipFile.OpenRead(zip))
             {
                 foreach (ZipArchiveEntry entry in archive.Entries)
                 {
                     string target = Path.GetFullPath(Path.Combine(root, entry.FullName));
-                    if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase) || !take(entry.FullName))
                     {
                         continue;
                     }
@@ -379,17 +559,16 @@ namespace DragNWash.Installer
                     entry.ExtractToFile(target, true);
                 }
             }
-            File.WriteAllText(Path.Combine(game, "BepInEx", Paths.Marker), "BepInEx was added by the Drag'n Wash mod installer.\r\n");
-            _log("BepInEx: installed");
         }
 
-        // The framework and its libraries: another mod may have brought a newer
-        // version already, and an older one must never replace it.
-        private void InstallFramework(string game)
+        // The framework and its libraries from this mod's own zip (schema 1): another
+        // mod may have brought a newer version already, and an older one must never
+        // replace it.
+        private void InstallFramework(InstallJournal journal, string game, InstallResult result)
         {
             string source = Path.Combine(_payload, "BepInEx", "plugins");
             string plugins = Path.Combine(game, "BepInEx", "plugins");
-            Directory.CreateDirectory(plugins);
+            journal.CreateDirectory(plugins);
             foreach (string folder in Directory.Exists(source) ? Directory.GetDirectories(source) : new string[0])
             {
                 string name = Path.GetFileName(folder);
@@ -398,14 +577,20 @@ namespace DragNWash.Installer
                     continue;
                 }
                 Version offered = DllVersion(Path.Combine(folder, name + ".dll"));
+                if (name.Equals(Paths.FrameworkPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Offered = ShortVersion(offered);
+                }
                 Version have = DllVersion(Path.Combine(plugins, name, name + ".dll"));
                 if (have != null && offered != null && have > offered)
                 {
                     _log($"{name}: kept {have} (newer than {offered})");
+                    result.Kept.Add((FrameworkPart.ShortName(name), have, true));
                     continue;
                 }
-                CopyTree(folder, Path.Combine(plugins, name));
-                EnableFiles(game, name);
+                journal.CopyTree(folder, Path.Combine(plugins, name));
+                EnableFiles(game, name, journal);
+                result.Updated.Add(FrameworkPart.ShortName(name));
                 _log($"{name}: {offered}");
             }
 
@@ -417,30 +602,279 @@ namespace DragNWash.Installer
                 Version have = DllVersion(Path.Combine(patchers, Paths.FrameworkPatcher));
                 if (!(have != null && offered != null && have > offered))
                 {
-                    Directory.CreateDirectory(patchers);
-                    File.Copy(patcher, Path.Combine(patchers, Paths.FrameworkPatcher), true);
+                    journal.CopyFile(patcher, Path.Combine(patchers, Paths.FrameworkPatcher));
+                    result.Updated.Add(FrameworkPart.PreloaderName);
                 }
             }
+        }
+
+        // ---- the framework from its GitHub release (schema 2) ----
+
+        // Whether this installer may fetch the framework from the internet: the manifest
+        // pins one and this mod's zip does not bring its own.
+        internal bool FetchesFramework
+        {
+            get
+            {
+                string payloadPlugins = Path.Combine(_payload, "BepInEx", "plugins");
+                return _manifest.Framework != null && !(Directory.Exists(payloadPlugins) && Directory.EnumerateDirectories(payloadPlugins, Paths.FrameworkPrefix + "*").Any());
+            }
+        }
+
+        // What the framework needs in this game folder, from what is installed there:
+        // null when this mod's zip brings the framework itself (schema 1) or the
+        // manifest pins none. Reads the folder only.
+        internal FrameworkPlan PlanFramework(string game)
+        {
+            FrameworkPin pin = _manifest.Framework;
+            if (!FetchesFramework)
+            {
+                return null;
+            }
+            string plugins = Path.Combine(game, "BepInEx", "plugins");
+            var parts = new List<FrameworkPart>();
+            foreach (string name in new[] { Paths.FrameworkPrefix }.Concat(pin.Libraries()))
+            {
+                bool named = pin.Needs.Keys.Contains(name, StringComparer.OrdinalIgnoreCase);
+                parts.Add(new FrameworkPart(name, false, DllVersion(Path.Combine(plugins, name, name + ".dll")), named ? pin.Minimum(name) : null));
+            }
+            parts.Add(new FrameworkPart(Path.GetFileNameWithoutExtension(Paths.FrameworkPatcher), true,
+                DllVersion(Path.Combine(game, "BepInEx", "patchers", Paths.FrameworkPatcher)), null));
+            return new FrameworkPlan(pin, parts);
+        }
+
+        // The zip the framework's parts come from, checked against the manifest; null
+        // when nothing is to be fetched (everything is there, or the installed
+        // framework is kept on purpose). The game folder is not touched here.
+        private string FetchFramework(FrameworkPlan plan, InstallOptions options, Func<string> temp, int downloads,
+            IProgress<InstallProgress> progress, CancellationToken cancel, InstallResult result)
+        {
+            FrameworkPin pin = plan.Pin;
+            if (!plan.Download)
+            {
+                foreach (FrameworkPart part in plan.Parts)
+                {
+                    _log(part.Describe(pin, null) + " -> keep");
+                }
+                _log("ModFramework: everything this mod needs is installed; nothing is downloaded, no connection is made");
+                if (options.FrameworkZip != null)
+                {
+                    _log("ModFramework: --framework-zip not used");
+                }
+                result.FrameworkSatisfied = true;
+                return null;
+            }
+            if (options.KeepFramework)
+            {
+                if (!plan.MinimumsMet)
+                {
+                    throw new InstallerException(Strings.Key.FwKeepNotMet, (string)null, pin.Version);
+                }
+                _log($"ModFramework: kept the installed {ShortVersion(plan.Core)}, which meets this mod's minimums; {pin.Version} is not downloaded");
+                result.FrameworkKept = true;
+                return null;
+            }
+            _log($"ModFramework: {pin.Version} is needed ({string.Join("; ", plan.Parts.Where(p => p.Fetch(pin)).Select(p => p.Describe(pin, null)))})");
+            if (options.FrameworkZip != null)
+            {
+                _log($"ModFramework: using {options.FrameworkZip}, nothing is downloaded");
+                CheckFramework(plan, options.FrameworkZip, true);
+                return options.FrameworkZip;
+            }
+            // Built here from the pinned version, never taken from the manifest.
+            string url = Paths.FrameworkUrl(pin.Version);
+            string zip = Path.Combine(temp(), pin.ZipName);
+            _log($"ModFramework: downloading {url}");
+            try
+            {
+                Download(InstallStage.DownloadFramework, "ModFramework " + pin.Version, url, zip, pin.Size, downloads, progress, cancel);
+            }
+            catch (DownloadFailure ex)
+            {
+                throw DownloadError(ex, "ModFramework", url, plan);
+            }
+            CheckFramework(plan, zip, false);
+            return zip;
+        }
+
+        // The zip must be the pinned release, byte for byte, before anything is taken from it.
+        private void CheckFramework(FrameworkPlan plan, string zip, bool chosen)
+        {
+            FrameworkPin pin = plan.Pin;
+            long size = new FileInfo(zip).Length;
+            string hash = size <= FrameworkPin.MaxSize ? Downloader.Sha256Of(zip) : null;
+            if (size == pin.Size && hash == pin.Sha256)
+            {
+                _log($"ModFramework: SHA-256 OK ({pin.Sha256.Substring(0, 8)}...{pin.Sha256.Substring(59)})");
+                return;
+            }
+            string what = size != pin.Size ? "size" : "SHA-256";
+            string detail = $"ModFramework {(chosen ? "zip" : "download")}: {what} mismatch" + Environment.NewLine +
+                            $"expected {pin.Sha256}" + Environment.NewLine +
+                            $"actual   {hash ?? "(not read, over 20 MB)"}" + Environment.NewLine +
+                            $"size     {size} bytes (expected {pin.Size})";
+            if (chosen)
+            {
+                throw new InstallerException(Strings.Key.FwLocalMismatch, detail, pin.Version)
+                {
+                    HelpKey = Strings.Key.FwNotUsedHelp,
+                    Framework = FrameworkHelp.For(plan),
+                    LogText = $"ModFramework: {zip} is not the pinned {pin.Version} ({what} mismatch); not used, the game folder was not changed",
+                };
+            }
+            TryDelete(zip);
+            throw new InstallerException(what == "size" ? Strings.Key.FwSize : Strings.Key.FwHash, detail, pin.Version)
+            {
+                HelpKey = Strings.Key.FwDeletedHelp,
+                Framework = FrameworkHelp.For(plan),
+                LogText = $"ModFramework: {what} mismatch, file deleted; the game folder was not changed",
+            };
+        }
+
+        // A download that did not give the file, as the failure window explains it.
+        // plan: null for BepInEx, whose window offers no release page or zip to choose.
+        private static InstallerException DownloadError(DownloadFailure failure, string name, string url, FrameworkPlan plan)
+        {
+            string version = plan?.Pin.Version;
+            Strings.Key key;
+            object[] args = { version };
+            Strings.Key help = Strings.Key.NothingChanged;
+            switch (failure.Problem)
+            {
+                case DownloadProblem.Offline:
+                    key = Strings.Key.NetOffline;
+                    help = Strings.Key.DownloadFailedHelp;
+                    break;
+                case DownloadProblem.Busy:
+                    key = Strings.Key.NetBusy;
+                    break;
+                case DownloadProblem.Limited:
+                    key = failure.Minutes > 0 ? Strings.Key.NetLimited : Strings.Key.NetLimitedLater;
+                    args = new object[] { failure.Minutes };
+                    break;
+                case DownloadProblem.Tls:
+                    key = Strings.Key.NetTls;
+                    break;
+                case DownloadProblem.NotFound:
+                    key = plan != null ? Strings.Key.FwNotPublished : Strings.Key.DownloadFailed;
+                    break;
+                case DownloadProblem.Size:
+                    key = plan != null ? Strings.Key.FwSize : Strings.Key.BepInExHash;
+                    help = Strings.Key.FwDeletedHelp;
+                    break;
+                default:
+                    key = plan != null ? Strings.Key.FwDownloadFailed : Strings.Key.DownloadFailed;
+                    break;
+            }
+            return new InstallerException(key, $"{name} download: {failure.Message}" + Environment.NewLine + $"from {url}", args)
+            {
+                HelpKey = help,
+                Framework = plan == null ? null : FrameworkHelp.For(plan),
+                LogText = $"{name}: {failure.Message}; {(failure.Problem == DownloadProblem.Size ? "file deleted; " : "")}the game folder was not changed",
+            };
+        }
+
+        // The parts the mod needs, unpacked from the checked zip into the staging folder;
+        // the rest of the zip is not unpacked. Every part must be there, at least at the
+        // mod's minimum. Returns the staging folder.
+        private string StageFramework(InstallJournal journal, FrameworkPlan plan, string zip, InstallResult result)
+        {
+            FrameworkPin pin = plan.Pin;
+            string staging = journal.Staging(Path.GetFileNameWithoutExtension(pin.ZipName));
+            var wanted = new HashSet<string>(plan.Parts.Where(p => !p.Patcher).Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+            var others = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            Unpack(zip, staging, name =>
+            {
+                string[] path = name.Split('/');
+                if (path.Any(p => p == ".." || p == "."))
+                {
+                    return false;
+                }
+                if (path.Length >= 4 && path[0] == "BepInEx" && path[1] == "plugins" && path[2].StartsWith(Paths.FrameworkPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (wanted.Contains(path[2]))
+                    {
+                        return true;
+                    }
+                    others.Add(path[2]);
+                    return false;
+                }
+                return name == "BepInEx/patchers/" + Paths.FrameworkPatcher;
+            });
+            result.NotInstalled = others.Select(FrameworkPart.ShortName).ToList();
+            foreach (FrameworkPart part in plan.Parts)
+            {
+                part.Offered = DllVersion(part.Dll(staging));
+                if (part.Offered == null)
+                {
+                    throw new InstallerException(Strings.Key.FwZipLacks, $"{pin.ZipName} has no {part.Name}", pin.Version, part.Name);
+                }
+                if (part.Min != null && part.Offered < part.Min)
+                {
+                    throw new InstallerException(Strings.Key.FwZipTooOld, $"{pin.ZipName} has {part.Name} {part.Offered}, this mod needs {part.Min}",
+                        pin.Version, part.Name, ShortVersion(part.Offered), ShortVersion(part.Min));
+                }
+            }
+            return staging;
+        }
+
+        // Each part from the staging folder unless the installed one is the same or
+        // newer: never older over newer. Within a part's folder only the files the zip
+        // has are written; files another mod or the player added there stay.
+        private void PutFramework(InstallJournal journal, string game, FrameworkPlan plan, string staging, InstallResult result)
+        {
+            journal.CreateDirectory(Path.Combine(game, "BepInEx", "plugins"));
+            foreach (FrameworkPart part in plan.Parts)
+            {
+                bool keep = part.Have != null && part.Have >= part.Offered;
+                _log(part.Describe(plan.Pin, part.Offered) + (keep ? " -> keep" : part.Have == null ? " -> install" : " -> update"));
+                if (keep)
+                {
+                    bool newer = part.Have > part.Offered;
+                    _log($"{part.Name}: kept {ShortVersion(part.Have)} ({(newer ? "newer than " + ShortVersion(part.Offered) : "same")})");
+                    result.Kept.Add((part.Short, part.Have, newer));
+                    continue;
+                }
+                if (part.Patcher)
+                {
+                    journal.CopyFile(part.Dll(staging), Path.Combine(game, "BepInEx", "patchers", Paths.FrameworkPatcher));
+                }
+                else
+                {
+                    journal.CopyTree(Path.Combine(staging, "BepInEx", "plugins", part.Name), Path.Combine(game, "BepInEx", "plugins", part.Name));
+                    EnableFiles(game, part.Name, journal);
+                }
+                result.Updated.Add(part.Short);
+                _log($"{part.Name}: {ShortVersion(part.Offered)}");
+            }
+            result.Checked = true;
+            result.Offered = plan.Pin.Version;
+        }
+
+        internal static Version InstalledFramework(string game)
+        {
+            return DllVersion(Path.Combine(game, "BepInEx", "plugins", Paths.FrameworkPrefix, Paths.FrameworkPrefix + ".dll"));
         }
 
         // A DLL the player switched off on the Mods screen was renamed to
         // .dll.disabled. Installing means wanting the mod: drop the switched-off
         // copies and the framework's records of them, including a pending
         // uninstall from the Mods screen.
-        private static void EnableFiles(string game, string folder)
+        private static void EnableFiles(string game, string folder, InstallJournal journal)
         {
             string dir = Path.Combine(game, "BepInEx", "plugins", folder);
             foreach (string off in Directory.GetFiles(dir, "*.dll.disabled", SearchOption.AllDirectories))
             {
                 if (File.Exists(off.Substring(0, off.Length - ".disabled".Length)))
                 {
-                    TryDelete(off);
+                    journal.Delete(off);
                 }
             }
-            RemoveFromFrameworkLists(game, folder);
+            RemoveFromFrameworkLists(game, folder, journal);
         }
 
-        private static void RemoveFromFrameworkLists(string game, string folder)
+        // journal: null when uninstalling, which has nothing to undo.
+        private static void RemoveFromFrameworkLists(string game, string folder, InstallJournal journal = null)
         {
             foreach (string name in Paths.FrameworkLists)
             {
@@ -458,6 +892,7 @@ namespace DragNWash.Installer
                 }).ToArray();
                 if (kept.Length != lines.Length)
                 {
+                    journal?.Change(list);
                     File.WriteAllLines(list, kept, new UTF8Encoding(false));
                 }
             }
@@ -500,6 +935,14 @@ namespace DragNWash.Installer
                 {
                     _log($"{file}: removed");
                 }
+            }
+
+            // The staging folder and the backup of the last install go with any mod's uninstall.
+            string installer = Path.Combine(game, "BepInEx", Paths.InstallerFolder);
+            if (Directory.Exists(installer))
+            {
+                InstallJournal.DeleteTree(installer);
+                _log($"BepInEx\\{Paths.InstallerFolder}: removed");
             }
 
             bool othersLeft = OtherMods(game).Any();
@@ -574,9 +1017,20 @@ namespace DragNWash.Installer
         private void RemoveBepInEx(string game, bool keepData)
         {
             bool ours = File.Exists(Path.Combine(game, "BepInEx", Paths.Marker)) || File.Exists(Path.Combine(game, "BepInEx", Paths.OldMarker));
-            foreach (string file in new[] { "winhttp.dll", "doorstop_config.ini", ".doorstop_version" })
+            // Doorstop's files at the top of the game folder go only when they start
+            // BepInEx: with another loader there, they are that loader's.
+            bool config = File.Exists(Path.Combine(game, "doorstop_config.ini"));
+            if (config ? DoorstopStartsBepInEx(game, out _) : !Directory.Exists(Path.Combine(game, Paths.DnwModLoaderFolder)))
             {
-                TryDelete(Path.Combine(game, file));
+                foreach (string file in new[] { "winhttp.dll", "doorstop_config.ini", ".doorstop_version" })
+                {
+                    TryDelete(Path.Combine(game, file));
+                }
+            }
+            else
+            {
+                var (loader, found) = OtherLoader(game);
+                _log($"winhttp.dll, doorstop_config.ini: kept, they belong to another mod loader{(loader == null ? "" : " (" + loader + ")")}: {found}");
             }
             string changelog = Path.Combine(game, "changelog.txt");
             if (File.Exists(changelog) && Regex.IsMatch(File.ReadAllText(changelog), "BepInEx|Doorstop|commits since v5"))
@@ -649,25 +1103,55 @@ namespace DragNWash.Installer
         // installer's language, for the window to show before anything runs.
         internal List<string> InstallPlan(string game, IDictionary<string, string> choices)
         {
+            var (loader, found) = OtherLoader(game);
+            if (found != null)
+            {
+                // Install stops before it changes anything; that is the whole plan.
+                return new List<string> { loader == null ? Strings.Get(Strings.Key.PlanOtherLoader) : Strings.Get(Strings.Key.PlanOtherLoaderNamed, loader) };
+            }
+            string host = new Uri(Paths.BepInExUrl).Host;
             var steps = new List<string>
             {
                 HasBepInEx(game)
                     ? Strings.Get(Strings.Key.PlanHaveBepInEx)
-                    : Strings.Get(Strings.Key.PlanDownloadBepInEx, Paths.BepInExVersion, new Uri(Paths.BepInExUrl).Host),
+                    : Strings.Get(Strings.Key.PlanDownloadBepInEx, Paths.BepInExVersion, host, Paths.ReleaseAssetsHost),
             };
-            string core = Path.Combine("BepInEx", "plugins", Paths.FrameworkPrefix, Paths.FrameworkPrefix + ".dll");
-            Version offered = DllVersion(Path.Combine(_payload, core));
-            Version have = DllVersion(Path.Combine(game, core));
-            if (offered != null && have != null && have > offered)
+            FrameworkPlan framework = PlanFramework(game);
+            if (framework != null)
             {
+                // Schema 2: the framework comes from its own release, and only when something is missing or older.
+                FrameworkPin pin = framework.Pin;
+                if (framework.Download)
+                {
+                    int libraries = pin.Libraries().Count;
+                    steps.Add(Strings.Get(Strings.Key.PlanDownloadFramework, pin.Version, host, Paths.ReleaseAssetsHost));
+                    steps.Add(Strings.Get(libraries == 0 ? Strings.Key.PlanFrameworkBringCore : libraries == 1 ? Strings.Key.PlanFrameworkBringOne : Strings.Key.PlanFrameworkBring,
+                        libraries, pin.Version));
+                }
+                else
+                {
+                    steps.Add(Strings.Get(Strings.Key.PlanFrameworkSatisfied, ShortVersion(framework.Core)));
+                }
+                steps.Add(Strings.Get(Strings.Key.PlanBackup));
                 steps.Add(Strings.Get(Strings.Key.PlanMod, _manifest.Name));
-                steps.Add(Strings.Get(Strings.Key.PlanKeepNewerFramework, ShortVersion(have)));
             }
             else
             {
-                steps.Add(offered != null
-                    ? Strings.Get(Strings.Key.PlanFrameworkAndMod, ShortVersion(offered), _manifest.Name)
-                    : Strings.Get(Strings.Key.PlanMod, _manifest.Name));
+                steps.Add(Strings.Get(Strings.Key.PlanBackup));
+                string core = Path.Combine("BepInEx", "plugins", Paths.FrameworkPrefix, Paths.FrameworkPrefix + ".dll");
+                Version offered = DllVersion(Path.Combine(_payload, core));
+                Version have = DllVersion(Path.Combine(game, core));
+                if (offered != null && have != null && have > offered)
+                {
+                    steps.Add(Strings.Get(Strings.Key.PlanMod, _manifest.Name));
+                    steps.Add(Strings.Get(Strings.Key.PlanKeepNewerFramework, ShortVersion(have)));
+                }
+                else
+                {
+                    steps.Add(offered != null
+                        ? Strings.Get(Strings.Key.PlanFrameworkAndMod, ShortVersion(offered), _manifest.Name)
+                        : Strings.Get(Strings.Key.PlanMod, _manifest.Name));
+                }
             }
             foreach (ModChoice choice in _manifest.Choices)
             {
@@ -679,6 +1163,116 @@ namespace DragNWash.Installer
             }
             steps.Add(Strings.Get(Strings.Key.PlanNothingElse));
             return steps;
+        }
+
+        // The window's checklist while Install runs: each line with the stage that does
+        // it, in the order Install goes through them.
+        internal List<(InstallStage Stage, string Text)> ProgressSteps(string game, IDictionary<string, string> choices, InstallOptions options)
+        {
+            options = options ?? new InstallOptions();
+            string host = new Uri(Paths.BepInExUrl).Host;
+            bool bepInEx = !HasBepInEx(game);
+            Version framework = InstalledFramework(game);
+            string no = Strings.Get(Strings.Key.No);
+            var steps = new List<(InstallStage, string)>
+            {
+                (InstallStage.Check, Strings.Get(Strings.Key.StepChecked, framework == null ? no : ShortVersion(framework),
+                    bepInEx ? no : DllVersion(Path.Combine(game, "BepInEx", "core", "BepInEx.dll"))?.ToString())),
+            };
+            FrameworkPlan plan = PlanFramework(game);
+            bool fetch = plan != null && plan.Download && !(options.KeepFramework && plan.MinimumsMet);
+            int files = (fetch ? 1 : 0) + (bepInEx ? 1 : 0);
+            if (fetch && options.FrameworkZip == null)
+            {
+                steps.Add((InstallStage.DownloadFramework, Strings.Get(Strings.Key.StepDownload, "ModFramework " + plan.Pin.Version, host)));
+            }
+            if (bepInEx && options.BepInExZip == null)
+            {
+                steps.Add((InstallStage.DownloadBepInEx, Strings.Get(Strings.Key.StepDownload, "BepInEx " + Paths.BepInExVersion, host)));
+            }
+            if (files > 0)
+            {
+                steps.Add((InstallStage.Verify, Strings.Get(files > 1 ? Strings.Key.StepHashBoth : Strings.Key.StepHash)));
+            }
+            steps.Add((InstallStage.Backup, Strings.Get(Strings.Key.StepBackup)));
+            if (bepInEx)
+            {
+                steps.Add((InstallStage.Backup, Strings.Get(Strings.Key.StepPutBepInEx, Paths.BepInExVersion)));
+            }
+            string payloadCore = Path.Combine(_payload, "BepInEx", "plugins", Paths.FrameworkPrefix);
+            bool frameworkToo = fetch || plan == null && Directory.Exists(payloadCore);
+            steps.Add((InstallStage.Put, Strings.Get(frameworkToo ? Strings.Key.StepPutBoth : Strings.Key.StepPut, _manifest.Name)));
+            foreach (ModChoice choice in _manifest.Choices)
+            {
+                ModChoiceOption option = choices != null && choices.TryGetValue(choice.Id, out string value) ? choice.Options.FirstOrDefault(o => o.Value == value) : null;
+                if (option != null)
+                {
+                    steps.Add((InstallStage.Settings, Strings.Get(Strings.Key.StepSet, choice.LabelFor(Strings.Current), option.Name ?? option.Value)));
+                }
+            }
+            return steps;
+        }
+
+        // What Install did, as the window lists it afterwards: each line with whether it
+        // was done (true) or something was left as it was (false).
+        internal List<(bool Done, string Text)> Summary(InstallResult result)
+        {
+            var lines = new List<(bool, string)>();
+            if (result.BepInEx)
+            {
+                lines.Add((true, Strings.Get(Strings.Key.DoneBepInEx, Paths.BepInExVersion)));
+            }
+            if (result.Updated.Count > 0)
+            {
+                Version from = result.OldFramework, to = result.NewFramework;
+                string versions = from != null && to != null && from != to ? $"{ShortVersion(from)} → {ShortVersion(to)}" : to == null ? "" : ShortVersion(to);
+                string parts = JoinList(result.Updated.Select(p => p == FrameworkPart.PreloaderName ? Strings.Get(Strings.Key.PartPreloader) : p));
+                lines.Add((true, Strings.Get(Strings.Key.DoneFramework, versions, parts) + (result.Checked ? Strings.Get(Strings.Key.DoneChecked) : "")));
+            }
+            List<string> same = result.Kept.Where(k => !k.Newer).Select(k => k.Part + " " + ShortVersion(k.Have)).ToList();
+            List<string> newer = result.Kept.Where(k => k.Newer).Select(k => k.Part + " " + ShortVersion(k.Have)).ToList();
+            if (same.Count > 0)
+            {
+                lines.Add((false, Strings.Get(Strings.Key.DoneKeptSame, JoinList(same))));
+            }
+            if (newer.Count > 0)
+            {
+                lines.Add((false, Strings.Get(Strings.Key.DoneKeptNewer, JoinList(newer), result.Offered)));
+            }
+            if (result.FrameworkSatisfied)
+            {
+                lines.Add((false, Strings.Get(Strings.Key.DoneFrameworkSatisfied, ShortVersion(result.NewFramework))));
+            }
+            if (result.FrameworkKept)
+            {
+                lines.Add((false, Strings.Get(Strings.Key.DoneKeptFramework, ShortVersion(result.NewFramework))));
+            }
+            if (result.NotInstalled.Count > 0)
+            {
+                lines.Add((false, Strings.Get(Strings.Key.DoneNotInstalled, JoinList(result.NotInstalled))));
+            }
+            var mod = new List<string>
+            {
+                _manifest.Name + " " + (result.OldMod != null && result.OldMod != _manifest.Version ? result.OldMod + " → " + _manifest.Version : _manifest.Version),
+            };
+            foreach (ModChoice choice in _manifest.Choices)
+            {
+                ModChoiceOption option = result.Choices.TryGetValue(choice.Id, out string value) ? choice.Options.FirstOrDefault(o => o.Value == value) : null;
+                if (option != null)
+                {
+                    mod.Add(Strings.Get(Strings.Key.DoneSetting, choice.LabelFor(Strings.Current), option.Name ?? option.Value));
+                }
+            }
+            lines.Add((true, string.Join(Strings.Get(Strings.Key.ListComma), mod)));
+            if (result.OtherMods > 0)
+            {
+                lines.Add((true, result.OtherMods == 1 ? Strings.Get(Strings.Key.DoneOtherModsOne) : Strings.Get(Strings.Key.DoneOtherMods, result.OtherMods)));
+            }
+            if (result.Replaced > 0)
+            {
+                lines.Add((true, Strings.Get(result.Replaced == 1 ? Strings.Key.DoneBackupOne : Strings.Key.DoneBackup, result.Replaced, result.Backup)));
+            }
+            return lines;
         }
 
         // The same decisions Uninstall makes below, taken from the folder as it is now.
@@ -709,6 +1303,11 @@ namespace DragNWash.Installer
                 {
                     steps.Add(Strings.Get(Strings.Key.PlanRemoveConfig, file));
                 }
+            }
+
+            if (Directory.Exists(Path.Combine(game, "BepInEx", Paths.InstallerFolder)))
+            {
+                steps.Add(Strings.Get(Strings.Key.PlanRemoveInstallerFolder));
             }
 
             List<string> others = OtherMods(game).ToList();
@@ -754,9 +1353,9 @@ namespace DragNWash.Installer
             return steps;
         }
 
-        private static string ShortVersion(Version v)
+        internal static string ShortVersion(Version v)
         {
-            return v.Build >= 0 ? v.ToString(3) : v.ToString();
+            return v == null ? "" : v.Build >= 0 ? v.ToString(3) : v.ToString();
         }
 
         // "a", "a and b", "a, b and c", in the installer's language.
@@ -779,19 +1378,6 @@ namespace DragNWash.Installer
                 return null;
             }
             return Version.TryParse(FileVersionInfo.GetVersionInfo(path).FileVersion ?? "", out Version v) ? v : new Version(0, 0);
-        }
-
-        private static void CopyTree(string from, string to)
-        {
-            Directory.CreateDirectory(to);
-            foreach (string file in Directory.GetFiles(from))
-            {
-                File.Copy(file, Path.Combine(to, Path.GetFileName(file)), true);
-            }
-            foreach (string dir in Directory.GetDirectories(from))
-            {
-                CopyTree(dir, Path.Combine(to, Path.GetFileName(dir)));
-            }
         }
 
         private static void DeletePath(string path)
@@ -889,25 +1475,219 @@ namespace DragNWash.Installer
         }
     }
 
+    // How Install may get what it needs. From the command line, --install is the
+    // player's consent to download; the window asks first (ConsentDialog).
+    internal sealed class InstallOptions
+    {
+        // A BepInEx or ModFramework zip on disk instead of the download, checked the same way.
+        internal string BepInExZip;
+        internal string FrameworkZip;
+
+        // Never go online: stop, before anything changes, when something would have to be downloaded.
+        internal bool NoDownload;
+
+        // Leave the installed framework as it is when it meets the mod's minimums, and
+        // install only the mod (offered when the pinned release cannot be had).
+        internal bool KeepFramework;
+
+        internal InstallOptions Copy()
+        {
+            return (InstallOptions)MemberwiseClone();
+        }
+    }
+
+    // The steps of an install as the window lists them while it runs, in their order.
+    internal enum InstallStage
+    {
+        Check,
+        DownloadFramework,
+        DownloadBepInEx,
+        Verify,
+        Backup,
+        Put,
+        Settings,
+        Done,
+    }
+
     // How far Install has got, for the window to show.
     internal readonly struct InstallProgress
     {
-        // True while BepInEx is downloading: the game folder is untouched and
-        // Install can still be stopped.
-        internal readonly bool Downloading;
+        internal readonly InstallStage Stage;
 
-        // Of the download; -1 when the server does not say how big it is.
-        internal readonly int Percent;
+        // While downloading: what ("ModFramework 1.4.3"), from which host, which of
+        // how many downloads, and how many bytes of how many.
+        internal readonly string What;
+        internal readonly string Host;
+        internal readonly int Index;
+        internal readonly int Count;
+        internal readonly long Done;
+        internal readonly long Total;
 
-        private InstallProgress(bool downloading, int percent)
+        private InstallProgress(InstallStage stage, string what, string host, int index, int count, long done, long total)
         {
-            Downloading = downloading;
-            Percent = percent;
+            Stage = stage;
+            What = what;
+            Host = host;
+            Index = index;
+            Count = count;
+            Done = done;
+            Total = total;
         }
 
-        internal static InstallProgress Downloaded(int percent) => new InstallProgress(true, percent);
+        internal bool Downloading => Stage == InstallStage.DownloadFramework || Stage == InstallStage.DownloadBepInEx;
 
-        internal static readonly InstallProgress Changing = new InstallProgress(false, -1);
+        // Nothing in the game folder has changed yet, so Install can still be stopped.
+        internal bool CanStop => Stage < InstallStage.Backup;
+
+        // Of the download; -1 when it is not known.
+        internal int Percent => Total > 0 ? (int)Math.Min(100, Done * 100 / Total) : -1;
+
+        internal static InstallProgress At(InstallStage stage) => new InstallProgress(stage, null, null, 0, 0, 0, 0);
+
+        internal static InstallProgress Downloaded(InstallStage stage, string what, string host, int index, int count, long done, long total) =>
+            new InstallProgress(stage, what, host, index, count, done, total);
+    }
+
+    // What an install did, for the summary the window shows afterwards.
+    internal sealed class InstallResult
+    {
+        internal string OldMod;
+        internal Version OldFramework;
+        internal Version NewFramework;
+
+        // Framework parts put in place ("core", "Text", ..., FrameworkPart.PreloaderName),
+        // and those kept because the installed one is the same or newer.
+        internal readonly List<string> Updated = new List<string>();
+        internal readonly List<(string Part, Version Have, bool Newer)> Kept = new List<(string, Version, bool)>();
+
+        // The framework version the parts were offered from: the pinned release, or the one in this mod's zip.
+        internal string Offered;
+
+        // Libraries in the pinned release that this mod does not use.
+        internal List<string> NotInstalled = new List<string>();
+
+        // The parts came from a zip whose SHA-256 was checked against the manifest.
+        internal bool Checked;
+
+        // Nothing had to be fetched; or the installed framework was kept on purpose.
+        internal bool FrameworkSatisfied;
+        internal bool FrameworkKept;
+
+        internal bool BepInEx;
+        internal int OtherMods;
+        internal int Replaced;
+        internal string Backup;
+        internal Dictionary<string, string> Choices = new Dictionary<string, string>();
+    }
+
+    // Which parts of the pinned framework an install needs, from the game folder
+    // before anything is downloaded. A part is fetched when it is missing, when it is
+    // older than the mod's minimum, or when the core or the preloader is older than
+    // the pinned release. A library's own version in that release is known only once
+    // the zip is read; then it is updated when older and kept when the same or newer.
+    internal sealed class FrameworkPlan
+    {
+        internal readonly FrameworkPin Pin;
+
+        // The core first, then the needed libraries, then the preloader.
+        internal readonly List<FrameworkPart> Parts;
+
+        internal FrameworkPlan(FrameworkPin pin, List<FrameworkPart> parts)
+        {
+            Pin = pin;
+            Parts = parts;
+        }
+
+        // The installed core's version, or null.
+        internal Version Core => Parts[0].Have;
+
+        internal bool Download => Parts.Any(p => p.Fetch(Pin));
+
+        // Whether the mod can run on what is installed, without the pinned release.
+        internal bool MinimumsMet => Parts.Where(p => !p.Patcher).All(p => p.Have != null && (p.Min == null || p.Have >= p.Min));
+    }
+
+    internal sealed class FrameworkPart
+    {
+        internal const string PreloaderName = "Preloader";
+
+        // The plugin folder (and DLL) name, or the preloader's DLL name without .dll.
+        internal readonly string Name;
+        internal readonly bool Patcher;
+        internal readonly Version Have;
+
+        // The mod's minimum; null when the manifest does not name the part.
+        internal readonly Version Min;
+
+        // In the pinned zip, once it is unpacked.
+        internal Version Offered;
+
+        internal FrameworkPart(string name, bool patcher, Version have, Version min)
+        {
+            Name = name;
+            Patcher = patcher;
+            Have = have;
+            Min = min;
+        }
+
+        // "core", "Text", "Preloader": how the summary names it.
+        internal string Short => Patcher ? PreloaderName : ShortName(Name);
+
+        internal static string ShortName(string folder)
+        {
+            return string.Equals(folder, Paths.FrameworkPrefix, StringComparison.OrdinalIgnoreCase) ? "core"
+                : folder.StartsWith(Paths.FrameworkPrefix + ".", StringComparison.OrdinalIgnoreCase) ? folder.Substring(Paths.FrameworkPrefix.Length + 1)
+                : folder;
+        }
+
+        // The core and the preloader carry the release's own version; a library has its own.
+        private bool Released => Patcher || string.Equals(Name, Paths.FrameworkPrefix, StringComparison.OrdinalIgnoreCase);
+
+        internal bool Fetch(FrameworkPin pin)
+        {
+            return Have == null || Min != null && Have < Min || Released && Have < pin.Pinned;
+        }
+
+        // The DLL under a folder laid out like BepInEx's (the game, or the staging folder).
+        internal string Dll(string root)
+        {
+            return Patcher
+                ? Path.Combine(root, "BepInEx", "patchers", Paths.FrameworkPatcher)
+                : Path.Combine(root, "BepInEx", "plugins", Name, Name + ".dll");
+        }
+
+        // For the log: "DragNWash.ModFramework: have 1.4.0, needs >= 1.2.0, pinned 1.4.3".
+        // offered: the version in the pinned zip, null before it is read.
+        internal string Describe(FrameworkPin pin, Version offered)
+        {
+            string pinned = offered != null ? InstallerCore.ShortVersion(offered) : Released ? pin.Version : null;
+            return $"{Name}: have {(Have == null ? "none" : InstallerCore.ShortVersion(Have))}" +
+                   (Min == null ? "" : ", needs >= " + InstallerCore.ShortVersion(Min)) +
+                   (pinned == null ? "" : ", pinned " + pinned);
+        }
+    }
+
+    // What the failure window offers when getting the pinned ModFramework failed.
+    internal sealed class FrameworkHelp
+    {
+        internal string Version;
+        internal string ReleasePage;
+        internal string ZipName;
+
+        // The installed core's version when it meets every minimum of the mod, so the
+        // mod alone can be installed; null otherwise.
+        internal string KeepVersion;
+
+        internal static FrameworkHelp For(FrameworkPlan plan)
+        {
+            return new FrameworkHelp
+            {
+                Version = plan.Pin.Version,
+                ReleasePage = Paths.FrameworkReleasePage(plan.Pin.Version),
+                ZipName = plan.Pin.ZipName,
+                KeepVersion = plan.MinimumsMet ? InstallerCore.ShortVersion(plan.Core) : null,
+            };
+        }
     }
 
     internal sealed class InstallerException : Exception
@@ -915,10 +1695,38 @@ namespace DragNWash.Installer
         internal readonly Strings.Key Key;
         internal readonly string Detail;
 
-        internal InstallerException(Strings.Key key, string detail = null) : base(key + (detail == null ? "" : ": " + detail))
+        // Fill the key's {0}, {1}...
+        internal readonly object[] Args;
+
+        // What to do about it, when the failure underneath does not say (see ErrorDialog.Describe).
+        internal Strings.Key? HelpKey;
+
+        // Set when getting ModFramework failed: the failure window's release page, zip
+        // to choose and "install only the mod".
+        internal FrameworkHelp Framework;
+
+        // The log's English line for it, when it says more than the key and the detail.
+        internal string LogText;
+
+        internal InstallerException(Strings.Key key, string detail = null, params object[] args) : base(key + (detail == null ? "" : ": " + detail))
         {
             Key = key;
             Detail = detail;
+            Args = args;
+        }
+
+        // For what failed underneath, which the details show in full.
+        internal InstallerException(Strings.Key key, Exception cause, params object[] args) : base(key + ": " + cause.Message, cause)
+        {
+            Key = key;
+            Detail = cause.ToString();
+            Args = args;
+        }
+
+        // In the installer's language, or in English for the log and bug reports.
+        internal string Text(bool english = false)
+        {
+            return english ? Strings.English(Key, Args) : Strings.Get(Key, Args);
         }
     }
 }
