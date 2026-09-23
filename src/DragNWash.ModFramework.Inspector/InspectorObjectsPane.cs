@@ -255,6 +255,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (selected)
                 {
                     TW.Fill(new Rect(0, ry, inner, row), TW.PanelColor);
+                    TW.Fill(new Rect(0, ry, 2, row), TW.AccentColor);
                 }
                 string fact = InspectorObjects.Fact(e);
                 float factWidth = string.IsNullOrEmpty(fact) ? 0 : Mathf.Min(inner * 0.4f, _mutedCell.CalcSize(new GUIContent(Drawable(fact))).x + 8);

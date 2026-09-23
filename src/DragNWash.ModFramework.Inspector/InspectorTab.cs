@@ -37,6 +37,14 @@ namespace DragNWash.ModFramework.Inspector
         private static string _search = "";
         private static string _searched;
         private static List<Node> _results;
+        // What the last search found beyond its first 500, and whether its t: named a component type.
+        private static bool _resultsMore, _resultsTypeKnown = true;
+        // A t: search waits until the typing stops: each one looks through
+        // every object of the type.
+        private static string _searchTyped = "";
+        private static float _searchChangedAt;
+        private const float TypeSearchWait = 0.4f;
+        private const int SearchMax = 500;
         private static bool _dirty = true;
         // Set when the selection changed from outside the tree (pick, Go, Parent,
         // console): the tree scrolls to show it on its next draw.
@@ -440,7 +448,9 @@ namespace DragNWash.ModFramework.Inspector
             }
             var searchRect = new Rect(bx, y, x + w - bx, row);
             // Each view keeps its own search; Objects' takes t:Type too.
-            string searchNext = TW.FilterField(searchRect, _objectsMode ? _objectsSearch : _search, _objectsMode ? "Search (t:Material for one type)" : "Search", s);
+            // Named, so typing in it sets off no shortcut.
+            GUI.SetNextControlName("DnWInspectSearch");
+            string searchNext = TW.FilterField(searchRect, _objectsMode ? _objectsSearch : _search, _objectsMode ? "Search (t:Material for one type)" : "Search (t:Rigidbody for one component)", s);
             if (_objectsMode) _objectsSearch = searchNext;
             else _search = searchNext;
             y += row + 6;
@@ -514,11 +524,23 @@ namespace DragNWash.ModFramework.Inspector
                 _tree = InspectorModel.BuildTree(Expanded);
                 _dirty = false;
             }
-            if (_search != _searched)
+            if (_search != _searchTyped)
+            {
+                _searchTyped = _search;
+                _searchChangedAt = Time.realtimeSinceStartup;
+                // In a narrow window the results are a page of their own: typing goes there.
+                if (narrow && !string.IsNullOrEmpty(_search))
+                {
+                    _showHierarchy = true;
+                    _page = 0;
+                }
+            }
+            bool typing = InspectorModel.IsTypeSearch(_search) && Time.realtimeSinceStartup - _searchChangedAt < TypeSearchWait;
+            if (_search != _searched && !typing)
             {
                 _searched = _search;
                 if (InspectorDebugView.Mode == InspectorDebugView.Scope.Filter) InspectorDebugView.Filter = _search ?? "";
-                _results = string.IsNullOrEmpty(_search) ? null : InspectorModel.Search(_search);
+                _results = string.IsNullOrEmpty(_search) ? null : InspectorModel.SearchScene(_search, SearchMax, out _resultsMore, out _resultsTypeKnown);
                 _scrollTree = Vector2.zero;
                 if (_results != null) _showHierarchy = true;
             }

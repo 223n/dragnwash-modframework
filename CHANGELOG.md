@@ -26,6 +26,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 - Every member row ends in a small "..." button, faint until the pointer is on the row, that opens the same menu as a right click (copy the value or the name, reset, go back one edit, show it in History). A gamepad or the Steam Deck only clicks with the left button, so this is the way to that menu there. The right click still works.
 - An enum's button shows its value with a small arrow and opens a list of all its values, the current one marked, so you pick the one you want. It used to step to the next value on each press, and going back meant going all the way round.
 
+- Scene's search says what it found in a line over the results: "3 objects match "wheel"", "Nothing matches "whel".", or "The first 500 are shown; type more to narrow it." Before, no match just left the tree empty, and the cut at 500 was silent.
+- Scene's search takes `t:Rigidbody` (or any component type) like Objects does, for the objects that have that component, with a name after it to narrow it down. It runs once you stop typing, since each one looks through every object of the type. A name no component type has says so.
+- In a narrow window, typing in the search goes to the results page, so it no longer looks like nothing happened.
+- The selected row in Scene's tree and in Objects' list has a 2 px accent line on its left, so it stands out by more than its text colour.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.
