@@ -32,7 +32,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 - When another setting has the same key, in another mod or in the Inspector itself, the key gets a yellow bar in the panel and the line the Mods screen shows under it, like "C is also used by Screenshot key (Photo Mode). Both will answer it." One key for two things is allowed, and both answer it.
 - The arrows, Home, End, Page Up and Page Down, Ctrl+Z, Ctrl+Up, Esc and ? can't be changed, and neither can the free camera's W A S D, Q E and Shift while you fly.
 - The Edit and View menus, the Tree and Pick tooltips and the free camera's notice name the key you set, and leave it out when there's none.
-- `ModFramework.SharedKeyNote(ConfigEntryBase)` (core), new: the line the Mods screen shows under a shortcut setting whose key another setting also has, for a mod that lets people change keys in a window of its own. The Mods screen uses it as well, so both always say the same thing.
+- `ModFramework.SharedKeyNote(ConfigEntryBase)` (core), new: the line the Mods screen shows under a shortcut setting whose key another setting also has, for a mod that lets people change keys in a window of its own. It gives one English line; the Mods screen shows the same thing in parts a language pack can translate.
 
 ### Inspector: easier to read and reach
 
@@ -69,7 +69,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 - The Internet tab uses the Tool window's colours.
 - Settings is a tab next to About, and the list of mods stays on the left while it's open. Every setting is a row with its name and description on the left and its control on the right, grouped under its section, so you can read what a setting does while you change it: a switch for on/off, a slider for a number with a range (with - and +), - and + with a box you can type in for other numbers, buttons side by side for up to four choices, the key and **Change** for a shortcut, and a colour's swatch beside its value. Before, the list turned into the settings and only one setting's description showed at a time.
 - A row whose value isn't the default has a dot and a button back to the default, and says what the default is. "Saved" shows on the row for two seconds after each change, as before, and changes are still saved at once.
-- A warning about a setting sits right under its row: "... is also used by ...", in the same words as before, a typed value that wasn't accepted, and "Change this in the mod's config file". Before, those shared one small note and only one could show at a time. A row that needs a restart says so under its description.
+- A warning about a setting sits right under its row: another setting on the same key, a typed value that wasn't accepted, and "Change this in the mod's config file". Before, those shared one small note and only one could show at a time. A row that needs a restart says so under its description.
 - The slider stops at the same round values as - and +; left and right on the gamepad move it one step, and up and down go to the next row. Esc while a key is being taken cancels it instead of becoming the key.
 - The - and + buttons move a number by a round step: about a twentieth of the range, rounded down to 1, 2 or 5 times a power of ten, and the value goes to the next multiple of it. The old `<` and `>` buttons moved Graphs' FrameBudgetMs (0.1 to 8) by 0.395, so one press from 1 gave 1.395; now it moves by 0.2 and gives 1.2. A number without a range moves by 1, or 0.1 when it has decimals.
 - Changing a value builds only that row again, not the whole screen, so the screen stays quick with many mods and many settings.
@@ -88,6 +88,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 ### Mods screen: fixes
 
 - The keyboard works on the Mods screen: the arrow keys move between the list and the details, the right arrow goes from Back into the list, and Enter presses the selected button. Before, the arrow keys only moved between the game's own buttons on the left, so the list could not be reached without the mouse or the pad.
+- Notes built from pieces can be translated now: **Same key as** with the other settings' names and then "Both will answer it.", **Not accepted** with the reason, and **Times reloaded this session** with the number and then "What runs now is not the file BepInEx loaded." Each fixed sentence is a text of its own, so a language pack matches it whole. Before, the names and numbers sat inside the sentences, so they stayed in English.
 - Pressing a tab in the details no longer flashes white. Every button the screen builds (the tabs, a tab's buttons, the rows' faces) came in white and faded to its colour over about five frames, since setting a button's colours starts a fade from what is drawn, and a new button is drawn white. The colours now land at once, and the short fade stays for hover and press.
 
 ### Mods screen: frosted glass

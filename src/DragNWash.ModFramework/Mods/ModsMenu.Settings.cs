@@ -26,12 +26,12 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextAfterRestart = "Some mods only use a change after a restart.";
         internal const string TextSaved = "Saved";
         internal const string TextEditInFile = "Change this in the mod's config file in BepInEx/config.";
-        internal const string TextNotAccepted = "Not accepted: ";
+        internal const string TextNotAccepted = "Not accepted";
         internal const string TextChange = "Change";
         internal const string TextPressKey = "Press a key...";
         internal const string TextShowAdvanced = "Show advanced settings";
         internal const string TextRestart = "Takes effect after the game restarts.";
-        internal const string TextAlsoUsedBy = "is also used by";
+        internal const string TextSameKeyAs = "Same key as";
         internal const string TextBothAnswer = "Both will answer it.";
         internal const string TextAllAnswer = "All of them will answer it.";
         internal const string TextSearchSettings = "Search settings";
@@ -327,10 +327,12 @@ namespace DragNWash.ModFramework.Mods
             {
                 Band(row, "EditInFile", null, TextEditInFile, ModsLook.Muted);
             }
-            string shared = SharedKeyWarning(item);
+            List<string> shared = SharedKeyWarning(item);
             if (shared != null)
             {
-                Band(row, "SharedKey", null, shared, ModsLook.Warning);
+                // The names are the mods' own words: not read as rich text.
+                Band(row, "SharedKey", TextSameKeyAs, Escape(string.Join(", ", shared)), ModsLook.Warning,
+                    note: KeyBindings.Answer(shared.Count));
                 if (built.Field != null)
                 {
                     RectTransform edge = ModsLook.Rect(built.Field.transform, "Edge");
@@ -341,7 +343,7 @@ namespace DragNWash.ModFramework.Mods
             if (_refused.TryGetValue(item, out string reason))
             {
                 _refused.Remove(item);
-                Band(row, "NotAccepted", null, TextNotAccepted + reason, ModsLook.Error);
+                Band(row, "NotAccepted", TextNotAccepted, Escape(reason), ModsLook.Error);
             }
 
             float elapsed = Time.unscaledTime - _savedAt;
@@ -737,24 +739,23 @@ namespace DragNWash.ModFramework.Mods
         // a key is captured or typed, and whenever a setting that already
         // clashes is opened. A report only; the key stays as the player set it,
         // since one key doing two things may be just what they want.
-        private string SharedKeyWarning(ConfigItem item)
+        // Its parts are shown apart, each fixed sentence a text of its own,
+        // so a language pack can translate them.
+        private List<string> SharedKeyWarning(ConfigItem item)
         {
             if (!item.IsShortcut)
             {
                 return null;
             }
-            string note;
             try
             {
-                note = KeyBindings.Note(item.Entry);
+                return KeyBindings.NamesSharing(item.Entry);
             }
             catch (Exception ex)
             {
                 ModFramework.Log.LogWarning($"Could not look for other mods on the key of {item.Section}.{item.Key}: {ex.Message}");
                 return null;
             }
-            // The names are the mods' own words: not read as rich text.
-            return note == null ? null : Escape(note);
         }
 
         // ---- changing a value ----

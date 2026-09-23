@@ -37,7 +37,8 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextSameCode = "Changes the same game code as:";
         internal const string TextSameCodeRisky = "Changes the same game code as, and may override:";
         internal const string TextUpdateTag = "Update";
-        internal const string TextReloaded = "Reloaded";
+        internal const string TextReloaded = "Times reloaded this session";
+        internal const string TextNotLoadedFile = "What runs now is not the file BepInEx loaded.";
         internal const string TextNewVersion = "New version available:";
         internal const string TextOpenReleasePage = "Open release page";
         internal const string TextUninstall = "Uninstall";

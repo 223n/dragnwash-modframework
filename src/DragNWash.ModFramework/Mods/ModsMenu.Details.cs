@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using TMPro;
 using UnityEngine;
@@ -326,7 +327,7 @@ namespace DragNWash.ModFramework.Mods
             int reloads = ModReload.ReloadCount(entry.Guid);
             if (reloads > 0)
             {
-                Band(content, "Reloaded", TextReloaded, reloads == 1 ? "once this session; not the file BepInEx loaded" : reloads + " times this session; not the file BepInEx loaded", ModsLook.Muted);
+                Band(content, "Reloaded", TextReloaded, reloads.ToString(CultureInfo.InvariantCulture), ModsLook.Muted, note: TextNotLoadedFile);
             }
             // What the mod clashes with is only certain once the check is in.
             if (Checking && !entry.IsFramework)
@@ -337,10 +338,11 @@ namespace DragNWash.ModFramework.Mods
 
         // One note: a bar of its colour on the left, a bold label in that
         // colour, the text (as given: names from mods are escaped by the
-        // caller), and maybe a button. A label too long to sit
-        // beside the text (common in Japanese or German) goes above it.
+        // caller), maybe a fixed sentence under it, and maybe a button. A
+        // label too long to sit beside the text (common in Japanese or
+        // German) goes above it.
         private void Band(RectTransform parent, string name, string label, string value, Color color,
-            string buttonText = null, UnityAction onClick = null, bool spinner = false)
+            string buttonText = null, UnityAction onClick = null, bool spinner = false, string note = null)
         {
             RectTransform band = ModsLook.Rect(parent, name);
             ModsLook.Shape(band.gameObject, ModsLook.Rounded, ModsLook.Card, 8f).raycastTarget = false;
@@ -415,6 +417,26 @@ namespace DragNWash.ModFramework.Mods
             LayoutElement bodySize = ModsLook.Size(body.gameObject, -1f, -1f, 1f, 0f);
             bodySize.minWidth = 0f;
             bodySize.preferredWidth = 0f;
+            if (note != null)
+            {
+                // A fixed sentence under the value, a text of its own so a
+                // language pack can translate it whole.
+                RectTransform values = ModsLook.Rect(text, "Values");
+                LayoutElement valuesSize = ModsLook.Size(values.gameObject, -1f, -1f, 1f, 0f);
+                valuesSize.minWidth = 0f;
+                valuesSize.preferredWidth = 0f;
+                VerticalLayoutGroup stack = values.gameObject.AddComponent<VerticalLayoutGroup>();
+                stack.spacing = 2f;
+                stack.childControlWidth = true;
+                stack.childControlHeight = true;
+                stack.childForceExpandWidth = true;
+                stack.childForceExpandHeight = false;
+                body.transform.SetParent(values, false);
+                TMP_Text after = ModsLook.Text(values, "Note", note, size, ModsLook.Label, FontStyles.Normal, true);
+                LayoutElement afterSize = ModsLook.Size(after.gameObject, -1f, -1f, 1f, 0f);
+                afterSize.minWidth = 0f;
+                afterSize.preferredWidth = 0f;
+            }
             // The button, if any, goes last, at the right.
             band.Find(name + "Button")?.SetAsLastSibling();
         }

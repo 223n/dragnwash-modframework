@@ -54,11 +54,28 @@ namespace DragNWash.ModFramework.Mods
         }
 
         /// <summary>
-        /// What the Mods screen says under a shortcut setting that shares its
-        /// key, or null when none does: each other setting by the name it has
-        /// on its own page, with its mod's name after it when that is another mod.
+        /// A shortcut setting's shared key in one English line, for other
+        /// mods and the Inspector (ModFramework.SharedKeyNote), or null when
+        /// no other setting uses the key. The Mods screen shows the same thing
+        /// in parts a language pack can translate.
         /// </summary>
         internal static string Note(ConfigEntryBase entry)
+        {
+            List<string> names = NamesSharing(entry);
+            if (names == null)
+            {
+                return null;
+            }
+            string key = ((KeyboardShortcut)entry.BoxedValue).MainKey.ToString();
+            return key + " is also used by " + string.Join(", ", names) + ". " + Answer(names.Count);
+        }
+
+        /// <summary>
+        /// The settings that share the key of this one, each by the name it has
+        /// on its own page with its mod's name after it when that is another
+        /// mod, or null when none does.
+        /// </summary>
+        internal static List<string> NamesSharing(ConfigEntryBase entry)
         {
             List<Bound> others = SharingKeyWith(entry);
             if (others.Count == 0)
@@ -66,9 +83,13 @@ namespace DragNWash.ModFramework.Mods
                 return null;
             }
             string own = OwnerOf(entry);
-            IEnumerable<string> names = others.Select(b => ConfigItem.TitleOf(b.Entry) + (b.Guid == own ? "" : " (" + b.Mod + ")"));
-            string key = ((KeyboardShortcut)entry.BoxedValue).MainKey.ToString();
-            return key + " " + ModsMenu.TextAlsoUsedBy + " " + string.Join(", ", names.Distinct()) + ". " + (others.Count == 1 ? ModsMenu.TextBothAnswer : ModsMenu.TextAllAnswer);
+            return others.Select(b => ConfigItem.TitleOf(b.Entry) + (b.Guid == own ? "" : " (" + b.Mod + ")")).Distinct().ToList();
+        }
+
+        // Its own sentence, so a language pack can translate it whole.
+        internal static string Answer(int others)
+        {
+            return others == 1 ? ModsMenu.TextBothAnswer : ModsMenu.TextAllAnswer;
         }
 
         // The plugin whose config file holds the entry, or null.
