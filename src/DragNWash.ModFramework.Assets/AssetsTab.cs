@@ -449,8 +449,8 @@ namespace DragNWash.ModFramework.Assets
             TW.Fill(pane, TW.PanelColor);
             TextureInfo t = _selected;
             float x = pane.x + 6, y = pane.y + 4, w = pane.width - 12;
-            GUI.Label(new Rect(x, y, w - 60, row), t.Name, _cell);
-            if (GUI.Button(new Rect(pane.xMax - 58, y + 2, 52, row - 4), "Close", s.Button))
+            GUI.Label(new Rect(x, y, w - 72, row), TW.Elide(TW.Drawable(t.Name), _cell, w - 72), _cell);
+            if (GUI.Button(new Rect(pane.xMax - 70, y, 64, row), "Close", s.Button))
             {
                 _selected = null;
                 return;
@@ -527,7 +527,7 @@ namespace DragNWash.ModFramework.Assets
             float inner = view.width - 20;
             bool wide = inner >= 580;
             const float gap = 8;
-            float inspectW = InspectMethod() != null ? 66 : 0;
+            float inspectW = InspectMethod() != null ? 80 : 0;
             float sizeW = wide ? 128 : 110, usersW = wide ? 118 : 0, markW = wide ? 160 : 130;
             float nameW = inner - (sizeW + gap) - (usersW > 0 ? usersW + gap : 0) - (markW + gap) - (inspectW > 0 ? inspectW + gap : 0);
             if (nameW < 90 && !wide)
@@ -535,6 +535,8 @@ namespace DragNWash.ModFramework.Assets
                 nameW += sizeW + gap;
                 sizeW = 0;
             }
+            // The gamepad stick and d-pad scroll it too (Steam Deck).
+            TW.ApplyScroll(view, ref _scroll);
             _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, inner, Mathf.Max(view.height, shown.Count * row)), false, false);
             // Only the rows in sight are drawn.
             int first = Mathf.Clamp((int)(_scroll.y / row), 0, shown.Count);
@@ -783,6 +785,7 @@ namespace DragNWash.ModFramework.Assets
                 modW = 0;
                 statusW = inner - gap - nameW;
             }
+            TW.ApplyScroll(view, ref _scrollReplacements);
             _scrollReplacements = GUI.BeginScrollView(view, _scrollReplacements, new Rect(0, 0, inner, Mathf.Max(view.height, shown.Count * row)), false, false);
             // Only the rows in sight are drawn.
             int first = Mathf.Clamp((int)(_scrollReplacements.y / row), 0, shown.Count);
