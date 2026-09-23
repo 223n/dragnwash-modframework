@@ -31,6 +31,9 @@ Versions of the core and of each library are separate, and follow semantic versi
 - In a narrow window, typing in the search goes to the results page, so it no longer looks like nothing happened.
 - The selected row in Scene's tree and in Objects' list has a 2 px accent line on its left, so it stands out by more than its text colour.
 
+- The View menu is split under headings: OVER THE GAME, DEBUG VIEW (PICK ONE), IT SHOWS, HOW IT DRAWS and IN THE PANE. The five settings that were indented under Rigidbodies, and looked like they belonged to it, are under HOW IT DRAWS now, since they're for the whole debug view. The debug view's three scopes, where only one can be on, have round marks, and the rest a tick when they're on (x and * where the window font has no such marks). The keys are the same.
+- History, Rigidbodies, Scenes and levels, Layers, Clips, Used by and Code, the views that take the members' place, all have the same band on top: "< Members" on the left, then the view's name and a few words about it. "< Members" used to sit at the end of each view's buttons, somewhere else in each one, and on a second line when they wrapped.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.

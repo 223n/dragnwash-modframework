@@ -66,48 +66,62 @@ namespace DragNWash.ModFramework.Inspector
                 return;
             }
             Event ev = Event.current;
-            var items = new List<(string label, bool on, Action click, bool keep)>();
+            // Each item: its words, whether it is on, what a click does, whether
+            // the menu stays open after it, and its mark ("" for none, null
+            // for a menu without the marks' column). A heading has no click.
+            var items = new List<(string label, bool on, Action click, bool keep, string mark)>();
+            void Heading(string text) => items.Add((text, false, null, true, ""));
+            void Check(string text, bool on, Action click, bool keep = true) => items.Add((text, on, click, keep, Mark(on, false)));
+            void Choice(string text, bool on, Action click) => items.Add((text, on, click, true, Mark(on, true)));
             GameObject sel = SelectedObject;
             if (_toolMenu == "edit")
             {
-                items.Add((IconMove + " Move" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoMove), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Move, () => ToggleGizmo(InspectorGizmo.GizmoMode.Move), false));
-                items.Add((IconRotate + " Rotate" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoRotate), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Rotate, () => ToggleGizmo(InspectorGizmo.GizmoMode.Rotate), false));
-                items.Add((IconScale + " Scale" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoScale), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Scale, () => ToggleGizmo(InspectorGizmo.GizmoMode.Scale), false));
-                items.Add((IconEditMesh + " Edit mesh vertices" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.EditMesh) + " - experimental", InspectorMesh.Editing, () => { if (InspectorMesh.Editing) InspectorMesh.StopEditing(); else InspectorMesh.Editing = true; }, false));
-                if (InspectorGizmo.HasOriginal(sel)) items.Add(("Reset transform", false, () => InspectorGizmo.ResetTransform(sel), false));
-                if (InspectorMesh.HasEdited(sel)) items.Add(("Reset mesh", false, () => InspectorMesh.ResetMesh(sel), false));
+                items.Add((IconMove + " Move" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoMove), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Move, () => ToggleGizmo(InspectorGizmo.GizmoMode.Move), false, null));
+                items.Add((IconRotate + " Rotate" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoRotate), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Rotate, () => ToggleGizmo(InspectorGizmo.GizmoMode.Rotate), false, null));
+                items.Add((IconScale + " Scale" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.GizmoScale), InspectorGizmo.Mode == InspectorGizmo.GizmoMode.Scale, () => ToggleGizmo(InspectorGizmo.GizmoMode.Scale), false, null));
+                items.Add((IconEditMesh + " Edit mesh vertices" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.EditMesh) + " - experimental", InspectorMesh.Editing, () => { if (InspectorMesh.Editing) InspectorMesh.StopEditing(); else InspectorMesh.Editing = true; }, false, null));
+                if (InspectorGizmo.HasOriginal(sel)) items.Add(("Reset transform", false, () => InspectorGizmo.ResetTransform(sel), false, null));
+                if (InspectorMesh.HasEdited(sel)) items.Add(("Reset mesh", false, () => InspectorMesh.ResetMesh(sel), false, null));
             }
             else
             {
-                items.Add((IconHighlight + " Highlight the selection" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Highlight), InspectorPick.Highlight, () => InspectorPick.Highlight = !InspectorPick.Highlight, true));
-                items.Add((IconBones + " Bones" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Bones), InspectorBones.Show, () => InspectorBones.Show = !InspectorBones.Show, true));
-                items.Add((IconWire + " Wireframe" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Wireframe), InspectorMesh.Wireframe, () => InspectorMesh.Wireframe = !InspectorMesh.Wireframe, true));
-                items.Add((IconCamera + " Free camera" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.FreeCamera), InspectorFreeCamera.Active, InspectorFreeCamera.Toggle, false));
-                items.Add(("Debug view: everything the camera sees", InspectorDebugView.Mode == InspectorDebugView.Scope.Visible, () => InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Visible ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Visible, true));
-                items.Add(("Debug view: the selection's children", InspectorDebugView.Mode == InspectorDebugView.Scope.Children, () => InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Children ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Children, true));
-                items.Add(("Debug view: what the search text matches", InspectorDebugView.Mode == InspectorDebugView.Scope.Filter, () => { InspectorDebugView.Filter = _search ?? ""; InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Filter ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Filter; }, true));
-                items.Add(("Colliders and triggers", InspectorDebugView.Colliders, () => InspectorDebugView.Colliders = !InspectorDebugView.Colliders, true));
-                items.Add(("Lights", InspectorDebugView.Lights, () => InspectorDebugView.Lights = !InspectorDebugView.Lights, true));
+                // By what the items are about; one of the debug view's scopes
+                // at a time, the rest on or off each.
+                Heading("OVER THE GAME");
+                Check("Highlight the selection" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Highlight), InspectorPick.Highlight, () => InspectorPick.Highlight = !InspectorPick.Highlight);
+                Check("Bones" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Bones), InspectorBones.Show, () => InspectorBones.Show = !InspectorBones.Show);
+                Check("Wireframe" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Wireframe), InspectorMesh.Wireframe, () => InspectorMesh.Wireframe = !InspectorMesh.Wireframe);
+                Check("Free camera" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.FreeCamera), InspectorFreeCamera.Active, InspectorFreeCamera.Toggle, false);
+                Heading("DEBUG VIEW (PICK ONE)");
+                Choice("Everything the camera sees", InspectorDebugView.Mode == InspectorDebugView.Scope.Visible, () => InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Visible ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Visible);
+                Choice("The selection's children", InspectorDebugView.Mode == InspectorDebugView.Scope.Children, () => InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Children ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Children);
+                Choice("What the search text matches", InspectorDebugView.Mode == InspectorDebugView.Scope.Filter, () => { InspectorDebugView.Filter = _search ?? ""; InspectorDebugView.Mode = InspectorDebugView.Mode == InspectorDebugView.Scope.Filter ? InspectorDebugView.Scope.Off : InspectorDebugView.Scope.Filter; });
+                Heading("IT SHOWS");
+                Check("Colliders and triggers", InspectorDebugView.Colliders, () => InspectorDebugView.Colliders = !InspectorDebugView.Colliders);
+                Check("Lights", InspectorDebugView.Lights, () => InspectorDebugView.Lights = !InspectorDebugView.Lights);
                 if (InspectorBodies.Available)
                 {
-                    items.Add(("Rigidbodies: centre of mass and velocity", InspectorDebugView.Bodies, () => InspectorDebugView.Bodies = !InspectorDebugView.Bodies, true));
+                    Check("Rigidbodies: centre of mass, velocity", InspectorDebugView.Bodies, () => InspectorDebugView.Bodies = !InspectorDebugView.Bodies);
                 }
-                items.Add(("    of the selection only", InspectorDebugView.SelectionOnly, () => InspectorDebugView.SelectionOnly = !InspectorDebugView.SelectionOnly, true));
-                items.Add(("    collider and light shapes", InspectorDebugView.Shapes, () => InspectorDebugView.Shapes = !InspectorDebugView.Shapes, true));
-                items.Add(("    draw screen rectangles", InspectorDebugView.Rects, () => InspectorDebugView.Rects = !InspectorDebugView.Rects, true));
-                items.Add(("    draw 3D boxes", InspectorDebugView.Boxes, () => InspectorDebugView.Boxes = !InspectorDebugView.Boxes, true));
-                items.Add(("    names (near the pointer when many)", InspectorDebugView.Names, () => InspectorDebugView.Names = !InspectorDebugView.Names, true));
+                Heading("HOW IT DRAWS");
+                Check("Of the selection only", InspectorDebugView.SelectionOnly, () => InspectorDebugView.SelectionOnly = !InspectorDebugView.SelectionOnly);
+                Check("Collider and light shapes", InspectorDebugView.Shapes, () => InspectorDebugView.Shapes = !InspectorDebugView.Shapes);
+                Check("Screen rectangles", InspectorDebugView.Rects, () => InspectorDebugView.Rects = !InspectorDebugView.Rects);
+                Check("3D boxes", InspectorDebugView.Boxes, () => InspectorDebugView.Boxes = !InspectorDebugView.Boxes);
+                Check("Names (near the pointer when many)", InspectorDebugView.Names, () => InspectorDebugView.Names = !InspectorDebugView.Names);
+                Heading("IN THE PANE");
                 if (InspectorBodies.Available)
                 {
-                    items.Add(("Rigidbodies list", _showBodies, () => { _showBodies = !_showBodies; if (_showBodies) { _showHistory = false; _showScenes = false; _showUsedBy = false; if (_page == 0) _page = 1; } }, false));
+                    Check("Rigidbodies list", _showBodies, () => { _showBodies = !_showBodies; if (_showBodies) { _showHistory = false; _showScenes = false; _showUsedBy = false; if (_page == 0) _page = 1; } }, false);
                 }
-                items.Add(("Scenes and levels", _showScenes, () => { _showScenes = !_showScenes; if (_showScenes) { _showHistory = false; _showBodies = false; _showUsedBy = false; if (_page == 0) _page = 1; } }, false));
+                Check("Scenes and levels", _showScenes, () => { _showScenes = !_showScenes; if (_showScenes) { _showHistory = false; _showBodies = false; _showUsedBy = false; if (_page == 0) _page = 1; } }, false);
             }
             float lineH = row - 2;
+            float markWidth = items.Exists(i => i.mark != null) ? 18 : 0;
             float width = 200;
             foreach (var item in items)
             {
-                width = Mathf.Max(width, s.Button.CalcSize(new GUIContent(Drawable(item.label))).x + 24);
+                width = Mathf.Max(width, s.Button.CalcSize(new GUIContent(Drawable(item.label))).x + 24 + markWidth);
             }
             // The window clips whatever is drawn past its edge, so the menu is
             // kept inside it: no wider than the tab, no taller than the room
@@ -146,11 +160,21 @@ namespace DragNWash.ModFramework.Inspector
                 var line = new Rect(8, y, box.width - 16, lineH);
                 y += lineH;
                 if (line.yMax <= 0 || line.y >= box.height) continue;
+                if (item.click == null)
+                {
+                    // A heading: dim capitals, at the size the font was made for.
+                    GUI.Label(line, item.label, _mutedCell);
+                    continue;
+                }
                 if (item.on)
                 {
                     TW.Fill(new Rect(3, line.y, box.width - 3, lineH), TW.InsetColor);
                 }
-                if (GUI.Button(line, Drawable(item.label), item.on ? _accentCell : _cell))
+                if (markWidth > 0)
+                {
+                    GUI.Label(new Rect(line.x, line.y, markWidth, lineH), item.mark ?? "", item.on ? _accentCell : _mutedCell);
+                }
+                if (GUI.Button(new Rect(line.x + markWidth, line.y, line.width - markWidth, lineH), Drawable(item.label), item.on ? _accentCell : _cell))
                 {
                     item.click();
                     if (!item.keep) _toolMenu = null;

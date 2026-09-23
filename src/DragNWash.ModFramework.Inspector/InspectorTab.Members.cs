@@ -158,6 +158,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             if (_showCode && !(_target is Material) && !(_target is GameObject))
             {
+                y = PaneHeader(new Rect(pane.x, y, pane.width, pane.yMax - y), "CODE", _target.GetType().FullName, () => _showCode = false, s, row);
                 InspectorCode.Draw(new Rect(x, y, w, pane.yMax - y - 2), _target, s, row);
                 return;
             }

@@ -22,7 +22,8 @@ namespace DragNWash.ModFramework.Inspector
         private static void DrawScenes(Rect pane, ToolWindowStyles s, float row)
         {
             TW.Fill(pane, TW.InsetColor);
-            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
+            float x = pane.x + 4, w = pane.width - 8;
+            float y = PaneHeader(pane, "SCENES AND LEVELS", "", () => _showScenes = false, s, row);
             y = WrappedLine(InspectorScenes.Describe(), x, y, w, InspectorScenes.InLevel ? _accentCell : _mutedCell, row);
             float bx = x;
             if (InspectorScenes.InLevel)
@@ -33,7 +34,6 @@ namespace DragNWash.ModFramework.Inspector
             string active = InspectorScenes.ActiveScene;
             string reload = "Reload " + active;
             if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, reload), Drawable(reload), false, s, row)) _scenesNote = InspectorScenes.LoadScene(active);
-            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "< Members"), "< Members", false, s, row)) _showScenes = false;
             y += row + 4;
             if (!string.IsNullOrEmpty(_scenesNote))
             {

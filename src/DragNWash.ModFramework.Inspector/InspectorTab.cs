@@ -682,6 +682,32 @@ namespace DragNWash.ModFramework.Inspector
             return string.IsNullOrEmpty(where) ? what : where + " : " + what;
         }
 
+        // The band over a view that stands in for the members (History,
+        // Rigidbodies, Scenes and levels, Layers, Clips, Used by, Code):
+        // "< Members" on its left, always in the same place, then the view's
+        // name and a few words about it. Returns the y under it.
+        private static float PaneHeader(Rect pane, string title, string detail, Action back, ToolWindowStyles s, float row)
+        {
+            var band = new Rect(pane.x, pane.y, pane.width, row + 6);
+            TW.Fill(band, TW.PanelColor);
+            TW.Fill(new Rect(band.x, band.yMax - 1, band.width, 1), new Color(TW.MutedColor.r, TW.MutedColor.g, TW.MutedColor.b, 0.35f));
+            float bw = ButtonWidth(s, "< Members");
+            if (GUI.Button(new Rect(band.x + 4, band.y + 3, bw, row), new GUIContent("< Members", "Back to the members"), s.Button))
+            {
+                back();
+            }
+            float tx = band.x + 4 + bw + 10, tw = band.xMax - 4 - tx;
+            float titleWidth = Mathf.Min(tw, _cell.CalcSize(new GUIContent(title)).x + 2);
+            GUI.Label(new Rect(tx, band.y + 3, titleWidth, row), title, _cell);
+            if (!string.IsNullOrEmpty(detail) && tw - titleWidth > 30)
+            {
+                string shown = Drawable(detail);
+                var rect = new Rect(tx + titleWidth + 8, band.y + 3, tw - titleWidth - 8, row);
+                GUI.Label(rect, new GUIContent(TW.Elide(shown, _mutedCell, rect.width), shown), _mutedCell);
+            }
+            return band.yMax + 4;
+        }
+
         // Buttons laid out left to right, onto a new line when the pane is too narrow.
         // The tip, when given, shows on the hint line while the pointer is on the button.
         private static bool FlowButton(ref float bx, ref float y, float x, float w, float width, string label, bool on, ToolWindowStyles s, float row, string tip = null)

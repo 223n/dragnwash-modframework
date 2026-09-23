@@ -16,9 +16,9 @@ namespace DragNWash.ModFramework.Inspector
         private static void DrawHistory(Rect pane, ToolWindowStyles s, float row)
         {
             TW.Fill(pane, TW.InsetColor);
-            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
-            GUI.Label(new Rect(x, y, w, row), $"History: {InspectorHistory.Count} edit(s) this session, newest first. Nothing is saved.", _mutedCell);
-            y += row;
+            float x = pane.x + 4, w = pane.width - 8;
+            int count = InspectorHistory.Count;
+            float y = PaneHeader(pane, "HISTORY", $"{(count == 1 ? "1 edit" : count + " edits")} this session, newest first. Nothing is saved.", () => _showHistory = false, s, row);
             float bx = x;
             // With nothing in it there is nothing to undo or clear.
             bool wasEnabled = GUI.enabled;
@@ -35,11 +35,6 @@ namespace DragNWash.ModFramework.Inspector
             }
             GUI.enabled = wasEnabled;
             bx += 78;
-            if (GUI.Button(new Rect(bx, y, 120, row), "< Members", s.Button))
-            {
-                _showHistory = false;
-            }
-            bx += 128;
             if (InspectorExport.Available && InspectorHistory.Count > 0 && GUI.Button(new Rect(bx, y, 170, row), "Export as overrides", _exporting ? s.SelectedButton : s.Button))
             {
                 _exporting = !_exporting;

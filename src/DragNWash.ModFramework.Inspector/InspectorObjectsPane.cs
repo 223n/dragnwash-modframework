@@ -387,22 +387,19 @@ namespace DragNWash.ModFramework.Inspector
         private static void DrawUsedBy(Rect pane, ToolWindowStyles s, float row)
         {
             TW.Fill(pane, TW.InsetColor);
-            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
+            float x = pane.x + 4, w = pane.width - 8;
             UnityEngine.Object o = _assetObject != null && _assetObject ? _assetObject : _target as UnityEngine.Object;
             if (o == null || !o || _usedBy == null || _usedByFor != o.GetInstanceID())
             {
                 _showUsedBy = false;
                 return;
             }
-            y = WrappedLine($"Used by: where {InspectorObjects.Describe(o)} is used. {_usedBySummary}", x, y, w, _mutedCell, row);
+            float y = PaneHeader(pane, "USED BY", InspectorObjects.Describe(o), () => _showUsedBy = false, s, row);
+            y = WrappedLine($"Where {InspectorObjects.Describe(o)} is used. {_usedBySummary}", x, y, w, _mutedCell, row);
             float bx = x;
             if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Look again"), "Look again", false, s, row))
             {
                 RunUsedBy(o);
-            }
-            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "< Members"), "< Members", false, s, row))
-            {
-                _showUsedBy = false;
             }
             y += row + 4;
             if (_usedBy.Count == 0)
