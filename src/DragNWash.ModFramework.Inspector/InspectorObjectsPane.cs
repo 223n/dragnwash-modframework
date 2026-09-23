@@ -247,7 +247,14 @@ namespace DragNWash.ModFramework.Inspector
                         ToggleFolder(r.Key, query.Active);
                         _cursorFolder = r.Key;
                     }
-                    GUI.Label(new Rect(indent + 20, ry, inner - indent - 20, row), Drawable((r.Group == null ? name.ToUpperInvariant() : name) + "   " + count), r.Group == null ? _cell : _mutedCell);
+                    // The name is cut to leave the count in view.
+                    GUIStyle titleStyle = r.Group == null ? _cell : _mutedCell;
+                    string countText = "   " + count;
+                    float countWidth = TextWidth(countText, titleStyle);
+                    var titleRect = new Rect(indent + 20, ry, Mathf.Max(0, inner - indent - 20 - countWidth), row);
+                    GUIContent title = Fit(Drawable(r.Group == null ? name.ToUpperInvariant() : name), titleStyle, titleRect);
+                    GUI.Label(titleRect, title, titleStyle);
+                    GUI.Label(new Rect(titleRect.x + Mathf.Min(titleRect.width, TextWidth(title.text, titleStyle)), ry, countWidth, row), countText, titleStyle);
                     continue;
                 }
                 ObjectEntry e = r.Entry;
@@ -258,18 +265,21 @@ namespace DragNWash.ModFramework.Inspector
                     TW.Fill(new Rect(0, ry, 2, row), TW.AccentColor);
                 }
                 string fact = InspectorObjects.Fact(e);
-                float factWidth = string.IsNullOrEmpty(fact) ? 0 : Mathf.Min(inner * 0.4f, _mutedCell.CalcSize(new GUIContent(Drawable(fact))).x + 8);
+                string factShown = string.IsNullOrEmpty(fact) ? "" : Drawable(fact);
+                float factWidth = factShown.Length == 0 ? 0 : Mathf.Min(inner * 0.4f, TextWidth(factShown, _mutedCell) + 8);
                 var label = new Rect(indent, ry, inner - indent - factWidth, row);
                 GUIStyle style = selected ? _accentCell : e.Gone || e.Hidden ? _mutedCell : _cell;
                 string text = string.IsNullOrEmpty(e.Name) ? "(no name) " + e.Type.Name
                     : e.Type.Kind == ObjectKind.OutsideScenes ? FitPath(e.Name, label.width, style) : e.Name;
-                if (GUI.Button(label, Drawable(text), style))
+                // Each column cut with "..." to its width, whole on the hint line.
+                if (GUI.Button(label, Fit(Drawable(text), style, new Rect(label.x, label.y, label.width - 6, label.height)), style))
                 {
                     SelectEntry(e);
                 }
                 if (factWidth > 0)
                 {
-                    GUI.Label(new Rect(inner - factWidth, ry, factWidth, row), Drawable(fact), _mutedCell);
+                    var factRect = new Rect(inner - factWidth + 4, ry, factWidth - 4, row);
+                    GUI.Label(factRect, Fit(factShown, _mutedCell, factRect), _mutedCell);
                 }
             }
             GUI.EndScrollView();

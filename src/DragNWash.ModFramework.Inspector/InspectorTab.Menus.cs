@@ -17,6 +17,8 @@ namespace DragNWash.ModFramework.Inspector
         private static int _menuComponent = -1;   // which x/y/z field was right-clicked, or -1 for the row
         // The menu lists an enum row's values to pick from, instead of the row's actions.
         private static bool _menuValues;
+        // At least this wide: an enum's list is never narrower than its button.
+        private static float _menuMinWidth;
         private static Vector2 _menuAt;
 
         // Opens a row's menu at a point in the coordinates being drawn in (a
@@ -28,6 +30,7 @@ namespace DragNWash.ModFramework.Inspector
             _menuComponent = component;
             _menuValues = values;
             _valuesWidth = 0;
+            _menuMinWidth = 0;
             _menuAt = GUIUtility.GUIToScreenPoint(at) - _tabScreenOrigin;
         }
 
@@ -381,7 +384,7 @@ namespace DragNWash.ModFramework.Inspector
             float lineH = row - 4;
             if (measured <= 0)
             {
-                measured = marks != null ? 140 : 200;
+                measured = Mathf.Max(marks != null ? 140 : 200, _menuMinWidth);
                 foreach (KeyValuePair<string, Action> item in items)
                 {
                     measured = Mathf.Max(measured, s.Button.CalcSize(new GUIContent(Drawable(item.Key))).x + 16 + markWidth);

@@ -811,5 +811,32 @@ namespace DragNWash.ModFramework.Inspector
         {
             return TW.Drawable(text ?? "");
         }
+
+        // Text widths already measured, by text and font: a long list is drawn
+        // several times a frame, and most of its lines fit and need no cutting.
+        private static readonly Dictionary<(string, Font, int, FontStyle), float> TextWidths = new Dictionary<(string, Font, int, FontStyle), float>();
+
+        internal static float TextWidth(string text, GUIStyle style)
+        {
+            var key = (text, style.font, style.fontSize, style.fontStyle);
+            if (!TextWidths.TryGetValue(key, out float width))
+            {
+                if (TextWidths.Count > 8192) TextWidths.Clear();
+                width = style.CalcSize(new GUIContent(text)).x;
+                TextWidths[key] = width;
+            }
+            return width;
+        }
+
+        // Text (already Drawable) cut with "..." to fit rect; when it was cut
+        // and the pointer is on rect, the whole text is the tip for the hint line.
+        internal static GUIContent Fit(string text, GUIStyle style, Rect rect)
+        {
+            if (string.IsNullOrEmpty(text) || TextWidth(text, style) <= rect.width)
+            {
+                return new GUIContent(text ?? "");
+            }
+            return new GUIContent(TW.Elide(text, style, rect.width), rect.Contains(Event.current.mousePosition) ? text : null);
+        }
     }
 }

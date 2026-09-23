@@ -561,6 +561,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (GUI.Button(button, TW.Elide(Drawable(shown), s.Button, button.width - 30) + "  " + arrow, s.Button))
                 {
                     OpenRowMenu(r, -1, true, new Vector2(button.x, button.yMax));
+                    _menuMinWidth = button.width;
                 }
             }
             else if (editable && InspectorModel.IsComposite(t))
