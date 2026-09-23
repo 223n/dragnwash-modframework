@@ -77,6 +77,7 @@ namespace DragNWash.ModFramework.Mods
             _confirmingUninstall = null;
             _tab = TabAbout;
             _query = "";
+            _settingsQuery = "";
             _filter = ListFilter.All;
             _search?.SetTextWithoutNotify("");
             DropCheck();
@@ -133,6 +134,7 @@ namespace DragNWash.ModFramework.Mods
             _confirming = null;
             _confirmingUninstall = null;
             _tab = TabAbout;
+            _settingsQuery = "";
             MarkShownRow();
             _detailsPending = true;
         }

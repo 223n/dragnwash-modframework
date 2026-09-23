@@ -34,7 +34,21 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextAlsoUsedBy = "is also used by";
         internal const string TextBothAnswer = "Both will answer it.";
         internal const string TextAllAnswer = "All of them will answer it.";
+        internal const string TextSearchSettings = "Search settings";
+        internal const string TextNoSettingsMatch = "No settings match.";
         private bool _showAdvanced;
+
+        // What is typed in the search above the settings, kept while the
+        // tab is built again for a change, and cleared for another mod.
+        private string _settingsQuery = "";
+
+        // Each section's spacer, heading and description, by section, hidden
+        // when the search leaves the section empty.
+        private readonly Dictionary<string, List<GameObject>> _sectionHeads = new Dictionary<string, List<GameObject>>();
+        private GameObject _noSettingsMatch;
+
+        // A mod with only a few settings needs no search.
+        private const int SearchFromSettings = 6;
 
         // Changes are saved at once; a "Saved" tag on the row says so.
         private const float SavedSeconds = 2f;
@@ -73,10 +87,17 @@ namespace DragNWash.ModFramework.Mods
         private void BuildSettingsTab(ModCatalog.Entry entry)
         {
             _settingRows.Clear();
+            _sectionHeads.Clear();
+            _noSettingsMatch = null;
             RectTransform content = ScrollArea(_body);
             content.GetComponent<VerticalLayoutGroup>().spacing = 8f;
             _settingsContent = content;
 
+            bool searchable = _items.Count >= SearchFromSettings;
+            if (searchable)
+            {
+                CreateSettingsSearch(content);
+            }
             Line(content, TextAfterRestart, 18f, FontStyles.Italic, ModsLook.Muted, 0f);
             if (_items.Any(i => i.Advanced))
             {
@@ -88,15 +109,99 @@ namespace DragNWash.ModFramework.Mods
                 if (item.Section != section)
                 {
                     section = item.Section;
+                    var heads = new List<GameObject>();
                     Spacer(content, 6f);
+                    heads.Add(LastChild(content));
                     Heading(content, Escape(item.SectionTitle));
+                    heads.Add(LastChild(content));
                     if (!string.IsNullOrEmpty(item.SectionDescription))
                     {
                         Line(content, Escape(item.SectionDescription), 18f, FontStyles.Normal, ModsLook.Muted, 0f);
+                        heads.Add(LastChild(content));
                     }
+                    _sectionHeads[section ?? ""] = heads;
                 }
                 _settingRows[item] = BuildSettingRow(content, item);
             }
+            if (searchable)
+            {
+                Line(content, TextNoSettingsMatch, 20f, FontStyles.Italic, ModsLook.Muted, 0f);
+                _noSettingsMatch = LastChild(content);
+                ApplySettingsSearch();
+            }
+        }
+
+        private static GameObject LastChild(Transform parent)
+        {
+            return parent.GetChild(parent.childCount - 1).gameObject;
+        }
+
+        // The search above the settings: finds them by name, key, description
+        // or section, hiding the rest without building anything again.
+        private void CreateSettingsSearch(RectTransform content)
+        {
+            RectTransform row = ModsLook.Rect(content, "SettingsSearchRow");
+            ModsLook.Size(row.gameObject, -1f, 48f, 1f, 0f);
+            TMP_InputField field = SearchBox(row, "SettingsSearch", TextSearchSettings, 20f, OnSettingsSearch);
+            var box = (RectTransform)field.transform;
+            box.anchorMin = new Vector2(0f, 0f);
+            box.anchorMax = new Vector2(0f, 1f);
+            box.pivot = new Vector2(0f, 0.5f);
+            box.offsetMin = Vector2.zero;
+            box.offsetMax = new Vector2(Mathf.Min(440f, InnerWidth), 0f);
+            field.SetTextWithoutNotify(_settingsQuery);
+        }
+
+        private void OnSettingsSearch(string value)
+        {
+            string query = (value ?? "").Trim();
+            if (query == _settingsQuery)
+            {
+                return;
+            }
+            _settingsQuery = query;
+            ApplySettingsSearch();
+        }
+
+        private void ApplySettingsSearch()
+        {
+            var sections = new HashSet<string>();
+            int shown = 0;
+            foreach (KeyValuePair<ConfigItem, SettingRow> pair in _settingRows)
+            {
+                if (pair.Value.Root == null)
+                {
+                    continue;
+                }
+                bool match = SettingMatches(pair.Key);
+                pair.Value.Root.gameObject.SetActive(match);
+                if (match)
+                {
+                    shown++;
+                    sections.Add(pair.Key.Section ?? "");
+                }
+            }
+            foreach (KeyValuePair<string, List<GameObject>> pair in _sectionHeads)
+            {
+                foreach (GameObject head in pair.Value)
+                {
+                    if (head != null)
+                    {
+                        head.SetActive(sections.Contains(pair.Key));
+                    }
+                }
+            }
+            if (_noSettingsMatch != null)
+            {
+                _noSettingsMatch.SetActive(shown == 0 && _settingsQuery.Length > 0);
+            }
+        }
+
+        private bool SettingMatches(ConfigItem item)
+        {
+            string query = _settingsQuery;
+            return query.Length == 0 || Contains(item.Title, query) || Contains(item.Key, query) ||
+                   Contains(item.Description, query) || Contains(item.SectionTitle, query);
         }
 
         // A row at the top of the tab that shows or hides the advanced settings.
@@ -185,6 +290,10 @@ namespace DragNWash.ModFramework.Mods
                     if (item.IsShortcut)
                     {
                         built.Field = ValueField(controls, item, 180f);
+                        // As wide as the key (F1 is short, Ctrl + Shift + F12 is
+                        // not), so on a small screen the description keeps its room.
+                        float keyWidth = Mathf.Ceil(built.Field.textComponent.GetPreferredValues(built.Field.text).x) + 28f;
+                        ModsLook.Size(built.Field.gameObject, Mathf.Clamp(keyWidth, 72f, 200f), 44f, 0f, 0f);
                         GameObject change = FlatButton(controls, "Capture", TextChange, 20f, ModsLook.Raised, ModsLook.Label, null);
                         // Wide enough for "Press a key..." too, which it says while taking one.
                         TMP_Text changeLabel = change.GetComponentInChildren<TMP_Text>();
@@ -685,6 +794,28 @@ namespace DragNWash.ModFramework.Mods
                     RebuildRow(item, "Field");
                 }
             };
+        }
+
+        // Back while typing in a setting's field: the value it had goes back
+        // in and typing stops, so ending the edit saves nothing.
+        private bool StopTyping(GameObject focused)
+        {
+            TMP_InputField field = focused.GetComponent<TMP_InputField>();
+            if (field == null || !field.isFocused)
+            {
+                return false;
+            }
+            foreach (KeyValuePair<ConfigItem, SettingRow> pair in _settingRows)
+            {
+                if (ReferenceEquals(pair.Value.Field, field))
+                {
+                    ConfigItem item = pair.Key;
+                    field.SetTextWithoutNotify(item.Type == ConfigItem.Kind.Number ? item.ValueText : item.SerializedText);
+                    field.DeactivateInputField();
+                    return true;
+                }
+            }
+            return false;
         }
 
         // Starts taking the next key for a shortcut, or stops if already taking one.

@@ -73,6 +73,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 - The slider stops at the same round values as - and +; left and right on the gamepad move it one step, and up and down go to the next row. Esc while a key is being taken cancels it instead of becoming the key.
 - Changing a value builds only that row again, not the whole screen, so the screen stays quick with many mods and many settings.
 - Gamepad: LB and RB go to the tab on the left or right, and Y goes to the search field. With a gamepad connected, a line at the bottom of the details names these buttons. Back steps out one level at a time: from something on a tab to the tab, from the tabs to the mod's row, from the list to Options. A click on the game's Back button still leaves at once. Whatever the pad selects is scrolled into view, in the list and in a tab.
+- A mod with six settings or more has a search field above them, like the one above the list. It finds a setting by its name, key, description or section and hides the rest, sections and all, without building the tab again.
+- In the Libraries group, a library goes by the part after the framework's name (Inspector, Graphs), since the group already says whose it is. The whole name was cut to "Drag'n Wash ModFramework: Insp...". The details still show all of it.
+- Back (Esc, or B on the gamepad) while typing a setting's value puts the old value back and stops typing. Before, leaving the field saved whatever was half typed.
+- The gamepad passing over a text field no longer starts typing in it (on the Steam Deck that could bring up the keyboard); A does, the Deck included.
+- A shortcut's box is as wide as its key, so on the Steam Deck's smaller screen the description beside it keeps its room. A very long tab title is cut short instead of running past the panel.
 
 ### Mods screen: fixes
 

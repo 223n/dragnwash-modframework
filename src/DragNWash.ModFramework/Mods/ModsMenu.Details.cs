@@ -473,7 +473,9 @@ namespace DragNWash.ModFramework.Mods
                 ModsLook.Colors(button, ModsLook.Clear, ModsLook.Hover, ModsLook.Raised);
 
                 TMP_Text label = ModsLook.Text(rect, "Label", tab.Title, 22f, chosen ? ModsLook.Label : ModsLook.Muted, FontStyles.Bold, false);
-                float labelWidth = ModsLook.Width(label);
+                // A long page title (or translation) is cut short rather than
+                // run past the panel; room is left for the count and the dot.
+                float labelWidth = Mathf.Min(ModsLook.Width(label), Mathf.Max(60f, width - 100f));
                 float w = 16f + labelWidth + 16f;
                 Place(label, 16f, labelWidth);
                 if (tab.Count != null)
@@ -720,6 +722,13 @@ namespace DragNWash.ModFramework.Mods
             if (capture != null)
             {
                 capture.Cancel();
+                return true;
+            }
+            // Back while typing a setting's value (Esc, or B on the pad) puts
+            // the value back and stops typing, and stays. Left alone, leaving
+            // the field would save what was half typed.
+            if (StopTyping(focused))
+            {
                 return true;
             }
             if (Details != null && focused.transform.IsChildOf(Details))

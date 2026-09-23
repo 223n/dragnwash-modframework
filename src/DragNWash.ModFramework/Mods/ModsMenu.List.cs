@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
@@ -161,12 +162,21 @@ namespace DragNWash.ModFramework.Mods
 
         private TMP_InputField CreateSearchField(RectTransform parent)
         {
-            RectTransform box = ModsLook.Rect(parent, "Search");
+            TMP_InputField field = SearchBox(parent, "Search", TextSearchMods, 22f, OnSearch);
+            var box = (RectTransform)field.transform;
             box.anchorMin = new Vector2(0f, 1f);
             box.anchorMax = new Vector2(1f, 1f);
             box.pivot = new Vector2(0.5f, 1f);
             box.offsetMin = new Vector2(ListLeftMargin - 20f, -66f);
             box.offsetMax = new Vector2(-14f, -14f);
+            return field;
+        }
+
+        // A search field: a magnifier, the placeholder, an accent line under
+        // it. The caller places it.
+        private static TMP_InputField SearchBox(Transform parent, string name, string placeholderText, float size, UnityAction<string> onChange)
+        {
+            RectTransform box = ModsLook.Rect(parent, name);
             // Built inactive: the input field looks for its text component when
             // it wakes, which must be set by then.
             box.gameObject.SetActive(false);
@@ -198,10 +208,10 @@ namespace DragNWash.ModFramework.Mods
             ModsLook.Stretch(area, 50f, 4f, 14f, 4f);
             area.gameObject.AddComponent<RectMask2D>();
 
-            TMP_Text text = ModsLook.Text(area, "Text", "", 22f, ModsLook.Label, FontStyles.Normal, false);
+            TMP_Text text = ModsLook.Text(area, "Text", "", size, ModsLook.Label, FontStyles.Normal, false);
             text.overflowMode = TextOverflowModes.Overflow;
             text.richText = false;
-            TMP_Text placeholder = ModsLook.Text(area, "Placeholder", TextSearchMods, 22f, ModsLook.Muted, FontStyles.Normal, false);
+            TMP_Text placeholder = ModsLook.Text(area, "Placeholder", placeholderText, size, ModsLook.Muted, FontStyles.Normal, false);
 
             TMP_InputField field = box.gameObject.AddComponent<TMP_InputField>();
             field.targetGraphic = background;
@@ -217,7 +227,7 @@ namespace DragNWash.ModFramework.Mods
             // The pad passing over it does not start typing (on the Steam Deck
             // that would open the keyboard): A does, or Y (FocusSearch).
             field.shouldActivateOnSelect = false;
-            field.onValueChanged.AddListener(OnSearch);
+            field.onValueChanged.AddListener(onChange);
             box.gameObject.SetActive(true);
             return field;
         }
@@ -589,7 +599,13 @@ namespace DragNWash.ModFramework.Mods
             }
 
             bool dim = !entry.WantOn;
-            TMP_Text name = ModsLook.Text(band, "Name", Escape(entry.DisplayName), 26f, dim ? ModsLook.Muted : ModsLook.Label, FontStyles.Bold, false);
+            // Under Libraries, a library goes by what follows the framework's
+            // name ("Inspector"): the whole name was cut to "Drag'n Wash
+            // ModFramework: Insp..." in the list. The details show all of it.
+            string shown = IsLibraryLike(entry) && !entry.IsFramework && entry.Guid != null
+                ? ModCatalog.ShortNameOf(_entries, entry.Guid)
+                : entry.DisplayName;
+            TMP_Text name = ModsLook.Text(band, "Name", Escape(shown), 26f, dim ? ModsLook.Muted : ModsLook.Label, FontStyles.Bold, false);
             var nameRect = (RectTransform)name.transform;
             nameRect.anchorMin = new Vector2(0f, 0.5f);
             nameRect.offsetMin = new Vector2(84f, -2f);

@@ -79,10 +79,17 @@ namespace DragNWash.ModFramework.Mods
                     KeepInView(selected);
                 }
 
-                // A text field takes the pad's presses itself (and, on the Steam
-                // Deck, the on-screen keyboard): nothing to click for it here.
-                if (selected.GetComponent<TMP_InputField>() != null)
+                // A text field starts typing on A, not on being passed over
+                // (shouldActivateOnSelect is off). Where the game's UI input
+                // does not pass A on (the Steam Deck), start it here; a field
+                // the game already started is only asked again, which is harmless.
+                TMP_InputField field = selected.GetComponent<TMP_InputField>();
+                if (field != null)
                 {
+                    if (PadPressedThisFrame() && !field.isFocused && field.IsInteractable() && _selectedFrame != Time.frameCount)
+                    {
+                        field.ActivateInputField();
+                    }
                     return;
                 }
 
@@ -207,7 +214,13 @@ namespace DragNWash.ModFramework.Mods
         {
             if (_frame != null && _framed == target)
             {
-                _frame.transform.SetAsLastSibling();
+                // On top of anything added to the target since (a Saved tag),
+                // without touching the hierarchy every frame.
+                Transform frame = _frame.transform;
+                if (frame.GetSiblingIndex() != target.transform.childCount - 1)
+                {
+                    frame.SetAsLastSibling();
+                }
                 return;
             }
             if (_frame == null)
