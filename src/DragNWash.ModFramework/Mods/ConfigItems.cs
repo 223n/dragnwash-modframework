@@ -341,20 +341,11 @@ namespace DragNWash.ModFramework.Mods
                 case Kind.Number:
                 {
                     double current = Convert.ToDouble(Entry.BoxedValue, CultureInfo.InvariantCulture);
-                    double step;
-                    if (HasRange)
-                    {
-                        step = (Max - Min) / 20.0;
-                        if (IsInteger)
-                        {
-                            step = Math.Max(1.0, Math.Round(step));
-                        }
-                    }
-                    else
-                    {
-                        step = IsInteger ? 1.0 : 0.1;
-                    }
-                    double next = current + direction * step;
+                    double step = StepSize;
+                    // To the next multiple of the step, so a value lands on round
+                    // numbers (1.2, not 1.395) and one that was off them comes back.
+                    double k = current / step;
+                    double next = direction > 0 ? (Math.Floor(k + 1e-9) + 1.0) * step : (Math.Ceiling(k - 1e-9) - 1.0) * step;
                     if (HasRange)
                     {
                         next = Math.Max(Min, Math.Min(Max, next));
@@ -370,6 +361,25 @@ namespace DragNWash.ModFramework.Mods
                     Set(Convert.ChangeType(next, Entry.SettingType, CultureInfo.InvariantCulture));
                     break;
                 }
+            }
+        }
+
+        // How far one press moves a number: about a twentieth of its range,
+        // rounded down to 1, 2 or 5 times a power of ten (0.1 to 8 moves by
+        // 0.2, 0 to 100 by 5). Without a range, 1 or 0.1.
+        internal double StepSize
+        {
+            get
+            {
+                double raw = HasRange ? (Max - Min) / 20.0 : 0.0;
+                if (!(raw > 0.0) || double.IsInfinity(raw))
+                {
+                    return IsInteger ? 1.0 : 0.1;
+                }
+                double power = Math.Pow(10.0, Math.Floor(Math.Log10(raw)));
+                double f = raw / power;
+                double step = (f >= 5.0 ? 5.0 : f >= 2.0 ? 2.0 : 1.0) * power;
+                return IsInteger ? Math.Max(1.0, Math.Round(step)) : step;
             }
         }
 

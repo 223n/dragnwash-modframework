@@ -61,6 +61,7 @@ Versions of the core and of each library are separate, and follow semantic versi
 - A library with a conflict or an update now shows the Conflict and Update tags in the list next to Library. Before, only one tag was shown and Library won, so a library's conflict couldn't be seen from the list.
 - Every page a mod adds gets its button on the details panel. Before, the row held two buttons at most, so a mod with an update and an Internet page had no way to reach its Graphs page.
 - The notes on a mod's details (going online without saying so, a new version, conflicts, what it uses) are never dropped any more. Before, the panel had room for two or three lines, and a long label like "Went online without saying so:" could use two of them, so the update or conflict notes after it disappeared without a word. Now, when there are more notes than lines, the lines get thinner and the text a little smaller so every note fits.
+- The `<` and `>` buttons of a number setting with a range move by a round step now: about a twentieth of the range, rounded down to 1, 2 or 5 times a power of ten, and the value goes to the next multiple of it. Graphs' FrameBudgetMs (0.1 to 8) used to move by 0.395, so one press from 1 gave 1.395; now it moves by 0.2 and gives 1.2.
 
 ### Tool window: its font is made when you first open it
 
