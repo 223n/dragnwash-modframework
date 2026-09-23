@@ -108,7 +108,7 @@ The same rows and the same rules as in Scene, with two additions:
 - **Shared objects.** An asset is usually used by many objects: changing a material, a texture's filter mode or a ScriptableObject's value changes every place that uses it. The header says how many places use it once **Used by** has run, and the first edit of a shared object in a session says so once, in the status line.
 - **Objects outside the scenes are read-only**, and so are their components. Changing a prefab the game keeps loaded changes everything the game makes from it later, which is hard to see and hard to undo. Their rows are shown, not edited; the Enabled button and the Rigidbody and Animator buttons are left out for them. If a real need shows up, it becomes a toggle with its own warning.
 
-Edits join the **History** view, with Revert and Redo, as Scene's edits do; they are labelled by folder and name (`Materials: Counter (Material)`). **Export as overrides** leaves them out with the reason: an override names a place in a scene, and an edit made in Objects is an edit of the asset. Nothing is written to a file.
+Edits join the **History** view, with Undo and Redo, as Scene's edits do; they are labelled by folder and name (`Materials: Counter (Material)`). **Export as overrides** leaves them out with the reason: an override names a place in a scene, and an edit made in Objects is an edit of the asset. Nothing is written to a file.
 
 ## Building the list
 

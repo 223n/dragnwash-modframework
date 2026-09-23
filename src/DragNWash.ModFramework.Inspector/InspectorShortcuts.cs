@@ -8,7 +8,7 @@ namespace DragNWash.ModFramework.Inspector
 {
     // The Inspector tab's keys a player can change: eleven KeyboardShortcut
     // settings in the plugin's [Keys] section. Being settings, the Mods screen
-    // shows them with its Capture button and its note on shared keys, and the
+    // shows them with its Change button and its note on shared keys, and the
     // "?" panel changes the same settings in place. The defaults are the keys
     // the tab always had; KeyboardShortcut.Empty is "none", the action has no
     // key. The keys that mean the same in every tool (arrows, Home, End, Page
@@ -179,7 +179,7 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         // A shortcut from a key press in the "?" panel: the key with the
-        // modifiers held, as the Mods screen's Capture takes it.
+        // modifiers held, as the Mods screen's Change takes it.
         internal static KeyboardShortcut From(Event ev)
         {
             var mods = new List<KeyCode>();

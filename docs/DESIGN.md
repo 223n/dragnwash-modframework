@@ -110,7 +110,7 @@ ModFramework.Register(new ModInfo
 });
 ```
 
-Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes an On/Off button, numbers, enums and lists of accepted values get `<` and `>` steps, and anything else is shown with a note to edit the config file), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
+Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes a switch, a number with a range gets a slider with - and +, other numbers get - and + and a box to type in, enums and lists of accepted values get a button for each choice, or - and + when there are more than four or they don't fit, text and shortcuts get a box to type in, a shortcut also gets a Change button that takes the next key you press, and anything else is shown with a note to edit the config file), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
 
 ### Update notices
 

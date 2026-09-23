@@ -4,16 +4,16 @@ using UnityEngine;
 namespace DragNWash.ModFramework
 {
     /// <summary>
-    /// An extra page for a mod on the Mods screen, opened with a button next to
-    /// the mod's Settings. The framework clears the details panel and hands it to
-    /// <see cref="Build"/>; Back returns to the list of mods.
+    /// An extra page for a mod on the Mods screen: a tab of the mod's details,
+    /// after About, Settings and Internet. The framework hands the tab's area to
+    /// <see cref="Build"/>; Back steps out of the page to the row of tabs.
     /// </summary>
     public sealed class ModsScreenPage
     {
         /// <summary>BepInEx GUID of the mod the page belongs to. Required.</summary>
         public string Guid { get; set; }
 
-        /// <summary>Button label and page title, in English. Required.</summary>
+        /// <summary>The tab's title, in English. Required.</summary>
         public string Title { get; set; }
 
         /// <summary>
