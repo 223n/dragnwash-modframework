@@ -31,7 +31,6 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextOutsidePlugins = "Installed outside BepInEx/plugins, so it cannot be switched off here";
         internal const string TextNeededBy = "Needed by";
         internal const string TextUses = "Uses";
-        internal const string TextLibrary = "Library";
         internal const string TextUnavailable = "Unavailable on this game build:";
         internal const string TextConflictTag = "Conflict";
         internal const string TextSameCode = "Changes the same game code as:";
@@ -71,7 +70,7 @@ namespace DragNWash.ModFramework.Mods
             _confirming = null;
             _confirmingUninstall = null;
             _settingsFor = null;
-            _page = null;
+            _tab = TabAbout;
             _query = "";
             _filter = ListFilter.All;
             _search?.SetTextWithoutNotify("");
@@ -96,14 +95,13 @@ namespace DragNWash.ModFramework.Mods
         {
             if (e is MenuEventUserIntent intent && (intent.name == "Back" || intent.name == "Cancel"))
             {
-                if (_page != null)
-                {
-                    ClosePage();
-                    return new MenuResponseIgnored();
-                }
                 if (_settingsFor != null)
                 {
                     CloseSettings();
+                    return new MenuResponseIgnored();
+                }
+                if (StepBack())
+                {
                     return new MenuResponseIgnored();
                 }
                 return new MenuResponseTransition("Menu_Options", "Player left the Mods screen.");
@@ -117,7 +115,7 @@ namespace DragNWash.ModFramework.Mods
         // building it again could lose what the player has done on it.
         internal void OnDetailsResized()
         {
-            if (_page != null || !isActiveAndEnabled)
+            if (OnModPage || !isActiveAndEnabled)
             {
                 return;
             }
@@ -128,7 +126,7 @@ namespace DragNWash.ModFramework.Mods
                 return;
             }
             GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
-            string focusName = focused != null && _detailParts.Contains(focused) ? focused.name : null;
+            string focusName = focused != null && focused.transform.IsChildOf(Details) ? focused.name : null;
             RebuildDetails(false);
             if (focusName != null)
             {
@@ -145,6 +143,7 @@ namespace DragNWash.ModFramework.Mods
             _selected = entry;
             _confirming = null;
             _confirmingUninstall = null;
+            _tab = TabAbout;
             MarkShownRow();
             RebuildDetails(false);
         }
@@ -184,20 +183,19 @@ namespace DragNWash.ModFramework.Mods
 
         private void RebuildDetails(bool focusSwitch)
         {
+            // Hidden at once, destroyed at the end of the frame: a search for
+            // a button to focus never finds the old ones.
             foreach (GameObject part in _detailParts)
             {
                 if (part != null)
                 {
+                    part.SetActive(false);
                     Destroy(part);
                 }
             }
             _detailParts.Clear();
+            _spinners.RemoveAll(t => t == null || !t.gameObject.activeInHierarchy);
 
-            if (_page != null)
-            {
-                BuildPage();
-                return;
-            }
             if (_settingsFor != null)
             {
                 BuildSettingDetails();
@@ -209,244 +207,7 @@ namespace DragNWash.ModFramework.Mods
             {
                 return;
             }
-
-            TMP_Text nameLabel = Label("Name", Escape(entry.DisplayName), UiText.TitleSize * 0.6f, 0.86f, 0.98f, false);
-            Texture2D icon = entry.Info?.Icon;
-            if (icon != null)
-            {
-                // Square, as tall as the name's band, with the name moved beside it.
-                float side = Details.rect.height * 0.12f - 8f;
-                GameObject iconPart = Part("Icon", 0f, 0f, 0.92f, 0.92f);
-                var iconRect = (RectTransform)iconPart.transform;
-                iconRect.pivot = new Vector2(0f, 0.5f);
-                iconRect.sizeDelta = new Vector2(side, side);
-                iconRect.anchoredPosition = new Vector2(28f, 0f);
-                RawImage image = iconPart.AddComponent<RawImage>();
-                image.texture = icon;
-                image.raycastTarget = false;
-                ((RectTransform)nameLabel.transform).offsetMin = new Vector2(28f + side + 16f, 0f);
-            }
-
-            string meta = string.IsNullOrEmpty(entry.Version) ? "" : "v" + Escape(entry.Version);
-            if (!string.IsNullOrEmpty(entry.Authors))
-            {
-                meta += (meta.Length > 0 ? "   " : "") + Escape(entry.Authors);
-            }
-            if (meta.Length > 0)
-            {
-                Label("Meta", meta, UiText.BodySize, 0.78f, 0.86f, false);
-            }
-
-            string description = entry.Description;
-            if (!string.IsNullOrEmpty(description))
-            {
-                TMP_Text d = Label("Description", description, UiText.BodySize, 0.57f, 0.77f, true);
-                d.alignment = TextAlignmentOptions.TopLeft;
-            }
-
-            string website = entry.Website;
-            if (!string.IsNullOrEmpty(website))
-            {
-                Label("Website", Escape(website), UiText.BodySize * 0.85f, 0.51f, 0.57f, false);
-            }
-
-            string status = Status(entry);
-            if (status != null)
-            {
-                TMP_Text s = Label("Status", status, UiText.BodySize * 0.9f, 0.42f, 0.51f, true);
-                s.fontStyle |= FontStyles.Italic;
-                s.alignment = TextAlignmentOptions.TopLeft;
-            }
-
-            // Notes about the mod, one per line from the top of this band down.
-            var notes = new List<(string Name, string Label, string Value, bool Warn)>();
-            if (_confirming != entry)
-            {
-                AddNetworkNote(entry, notes, true);
-            }
-            Updates.UpdateCheck.Release newer = entry.Loaded ? Updates.UpdateCheck.NewerRelease(entry.Guid, entry.Version) : null;
-            if (newer != null && _confirming != entry)
-            {
-                notes.Add(("Update", TextNewVersion, newer.Tag, false));
-            }
-            if (_confirming != entry)
-            {
-                AddNetworkNote(entry, notes, false);
-            }
-            int reloads = ModReload.ReloadCount(entry.Guid);
-            if (reloads > 0 && _confirming != entry)
-            {
-                notes.Add(("Reloaded", TextReloaded, reloads == 1 ? "once this session; not the file BepInEx loaded" : reloads + " times this session; not the file BepInEx loaded", false));
-            }
-            if (entry.ProblemGuids.Count > 0 && _confirming != entry)
-            {
-                notes.Add(("ProblemMods", null, string.Join(", ", entry.ProblemGuids.Select(g => ModCatalog.NameOf(_entries, g))), false));
-            }
-            IReadOnlyList<string> unavailable = GameHooks.UnavailableFeatures(entry.Guid);
-            if (unavailable.Count > 0 && _confirming != entry)
-            {
-                notes.Add(("Unavailable", TextUnavailable, string.Join(", ", unavailable), true));
-            }
-            // What the mod uses and clashes with is only certain once the check
-            // is in; until then one line says it is coming, in the place those
-            // notes take, so the notes above it neither move nor drop out of
-            // the band when the check ends.
-            if (Checking && !entry.IsFramework)
-            {
-                notes.Add(("Checking", null, TextChecking, false));
-            }
-            foreach (PatchConflicts.Conflict c in ConflictsOf(entry))
-            {
-                string others = string.Join(", ", c.Guids.Where(g => g != entry.Guid).Select(g => ModCatalog.NameOf(_entries, g)));
-                notes.Add(("Conflict", c.Risky ? TextSameCodeRisky : TextSameCode, others + " (" + c.Method + ")", true));
-            }
-            if (entry.Uses.Count > 0 && _confirming != entry && !entry.IsFramework && !Checking)
-            {
-                notes.Add(("Uses", TextUses, string.Join(", ", entry.Uses.Select(u =>
-                    ModCatalog.ShortNameOf(_entries, u.Key) + (u.Value != null && u.Value > new Version(0, 0) ? " " + u.Value + "+" : ""))), false));
-            }
-            if (entry.IsLibrary && entry.Dependents.Count > 0 && _confirming != entry && entry.ProblemGuids.Count == 0 && !Checking)
-            {
-                notes.Add(("UsedBy", TextNeededBy, string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g))), false));
-            }
-            if (_confirmingUninstall == entry && entry.Dependents.Count > 0)
-            {
-                notes.Add(("NeededBy", TextNeededBy, string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g))), true));
-            }
-            if (_confirming == entry)
-            {
-                notes.Add(("NeededBy", TextNeededBy, string.Join(", ", entry.Dependents.Select(g => ModCatalog.NameOf(_entries, g))), false));
-            }
-
-            List<ModsScreenPage> pages = entry.Loaded && entry.Guid != null ? ModFramework.PagesFor(entry.Guid) : new List<ModsScreenPage>();
-            if (entry.Loaded && IsOnline(entry, out _))
-            {
-                pages.Insert(0, InternetPage(entry));
-            }
-            bool hasButtonRow = pages.Count > 0 || newer != null;
-            int maxLines = hasButtonRow ? 2 : 3;
-            // No note is ever dropped: when there are more notes than lines,
-            // the lines get thinner (and the text smaller) so every one fits,
-            // and none takes a second line for its value.
-            float step = 0.07f;
-            float size = UiText.BodySize * 0.9f;
-            if (notes.Count > maxLines)
-            {
-                step = 0.07f * maxLines / notes.Count;
-                size *= Mathf.Max(0.6f, step / 0.07f);
-            }
-            float width = Details.rect.width - 56f;
-            int line = 0;
-            for (int i = 0; i < notes.Count; i++)
-            {
-                var note = notes[i];
-                float top = 0.42f - line * step;
-                // Lines still free after this note, if every later note takes one.
-                int spare = Math.Max(maxLines, notes.Count) - line - (notes.Count - i);
-                TMP_Text text;
-                if (note.Label == null)
-                {
-                    text = Label(note.Name + i, Escape(note.Value), size, top - step, top, false);
-                    if (note.Name == "Checking")
-                    {
-                        CheckingStyle(text);
-                        _detailParts.Add(AddSpinner(Details, text, 28f, size).gameObject);
-                    }
-                    line++;
-                }
-                else
-                {
-                    TMP_Text head = Label(note.Name + i + "Label", note.Label, size, top - step, top, false);
-                    head.fontStyle |= FontStyles.Bold;
-                    head.enableAutoSizing = false;
-                    head.fontSize = size;
-                    float labelWidth = head.GetPreferredValues(head.text).x;
-                    // Measured in the label's bold style, a little wider than the value's.
-                    float valueWidth = head.GetPreferredValues(Escape(note.Value)).x;
-                    bool squeezed = labelWidth > width * 0.5f || labelWidth + 16f + valueWidth * 0.75f > width;
-                    if (width > 0f && squeezed && spare > 0)
-                    {
-                        // A long label (common in Japanese or German), or names that
-                        // would shrink to fit beside it, get their own line, when
-                        // that leaves a line for every note after it.
-                        text = Label(note.Name + i, Escape(note.Value), size, top - 2f * step, top - step, false);
-                        ((RectTransform)text.transform).offsetMin = new Vector2(56f, 0f);
-                        line += 2;
-                    }
-                    else
-                    {
-                        text = Label(note.Name + i, Escape(note.Value), size, top - step, top, false);
-                        ((RectTransform)text.transform).offsetMin = new Vector2(28f + labelWidth + 16f, 0f);
-                        line++;
-                    }
-                    if (note.Warn)
-                    {
-                        head.color = WarnColor;
-                    }
-                    else if (note.Name == "Update")
-                    {
-                        head.color = UpdateColor;
-                    }
-                }
-                if (note.Warn)
-                {
-                    text.color = WarnColor;
-                }
-                else if (note.Name == "Update")
-                {
-                    text.color = UpdateColor;
-                }
-            }
-
-            // Bottom row: On/Off, Settings and, for mods that can be uninstalled, Uninstall.
-            bool three = entry.CanUninstall;
-            if (entry.CanSwitch)
-            {
-                GameObject button = CreateSwitch(entry, three ? 0.32f : 0.4f);
-                if (Checking)
-                {
-                    Hold(button);
-                }
-                else if (focusSwitch && EventSystem.current != null)
-                {
-                    EventSystem.current.SetSelectedGameObject(button);
-                }
-            }
-
-            if (entry.Loaded && ConfigItem.For(entry).Count > 0)
-            {
-                MakeButton("Settings", TextSettings, three ? 0.35f : 0.44f, three ? 0.63f : 0.8f, 0.04f, 0.16f, SettingsColor, () => OpenSettings(entry));
-            }
-
-            if (three)
-            {
-                bool confirming = _confirmingUninstall == entry;
-                GameObject uninstall = MakeButton("Uninstall", entry.PendingUninstall ? TextCancelUninstall : TextUninstall, 0.66f, 0.96f, 0.04f, 0.16f,
-                    confirming ? OffColor : UninstallColor, () => OnUninstall(entry));
-                if (Checking)
-                {
-                    Hold(uninstall);
-                }
-            }
-
-            // A row of buttons above Switch and Settings: the release page first,
-            // then every page the mod added. They share the row's width, so none
-            // is left out; with many, their labels shrink.
-            int slots = pages.Count + (newer != null ? 1 : 0);
-            float slotWidth = slots == 0 ? 0f : (0.92f - (slots - 1) * 0.02f) / slots;
-            int slot = 0;
-            if (newer != null)
-            {
-                string url = newer.Url;
-                MakeButton("Release", TextOpenReleasePage, 0.04f, 0.04f + slotWidth, 0.18f, 0.26f, SettingsColor, () => OpenReleasePage(url));
-                slot++;
-            }
-            for (int i = 0; i < pages.Count; i++, slot++)
-            {
-                ModsScreenPage page = pages[i];
-                float left = 0.04f + slot * (slotWidth + 0.02f);
-                MakeButton("Page" + i, page.Title, left, left + slotWidth, 0.18f, 0.26f, SettingsColor, () => OpenPage(entry, page));
-            }
+            BuildDetails(entry, focusSwitch);
         }
 
         private static void OpenReleasePage(string url)
@@ -521,32 +282,6 @@ namespace DragNWash.ModFramework.Mods
             ((RectTransform)text.transform).offsetMin = new Vector2(28f + width + 16f, 0f);
             return text;
         }
-
-        private GameObject CreateSwitch(ModCatalog.Entry entry, float right)
-        {
-            GameObject go = Part("Switch", 0.04f, right, 0.04f, 0.16f);
-            Image background = go.AddComponent<Image>();
-            background.color = entry.WantOn ? OnColor : OffColor;
-
-            Button button = go.AddComponent<Button>();
-            button.targetGraphic = background;
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.selectedColor = Color.white;
-            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-            button.colors = colors;
-
-            TMP_Text label = UiText.Create(go.transform, "Label", entry.WantOn ? TextOn : TextOff, UiText.ButtonSize);
-            label.alignment = TextAlignmentOptions.Center;
-            label.textWrappingMode = TextWrappingModes.NoWrap;
-            label.overflowMode = TextOverflowModes.Ellipsis;
-
-            button.onClick.AddListener(() => OnSwitch(entry));
-            return go;
-        }
-
-        private static readonly Color UninstallColor = new Color(0.3f, 0.3f, 0.3f, 1f);
 
         // First press asks, second press records it; on a mod waiting to be
         // uninstalled the button takes the wish back.

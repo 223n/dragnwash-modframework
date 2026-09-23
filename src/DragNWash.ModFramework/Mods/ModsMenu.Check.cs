@@ -117,7 +117,6 @@ namespace DragNWash.ModFramework.Mods
             // The new list has new entries; keep pointing at the same mods.
             _selected = entries.FirstOrDefault(e => SameMod(e, _selected)) ?? FirstShown(entries);
             _settingsFor = _settingsFor == null ? null : entries.FirstOrDefault(e => SameMod(e, _settingsFor)) ?? _settingsFor;
-            _pageFor = _pageFor == null ? null : entries.FirstOrDefault(e => SameMod(e, _pageFor)) ?? _pageFor;
             _entries = entries;
             if (rebuild)
             {
@@ -227,13 +226,13 @@ namespace DragNWash.ModFramework.Mods
         // alone until the player comes back to the list.
         private void RebuildKeepingFocus()
         {
-            if (!isActiveAndEnabled || _page != null || _settingsFor != null)
+            if (!isActiveAndEnabled || OnModPage || _settingsFor != null)
             {
                 return;
             }
             GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
             ModCatalog.Entry focusedRow = focused != null ? focused.GetComponent<ModRowSelect>()?.Entry : null;
-            string focusName = focused != null && _detailParts.Contains(focused) ? focused.name : null;
+            string focusName = focused != null && focused.transform.IsChildOf(Details) ? focused.name : null;
             // A filter or the libraries' row, found again by name.
             string listName = focused != null && focusedRow == null &&
                               (ListTop != null && focused.transform.IsChildOf(ListTop) || focused.transform.IsChildOf(Content)) ? focused.name : null;

@@ -6,8 +6,8 @@ using UnityEngine.UI;
 
 namespace DragNWash.ModFramework.Mods
 {
-    // What a mod does online, for players: the "Online" tag in the list, a line
-    // in the details and the Internet page, which lists what the mod declared
+    // What a mod does online, for players: the "Online" tag in the list, a note
+    // in the details and the Internet tab, which lists what the mod declared
     // (ModInfo.Network) and what the framework saw it connect to this session.
     // Experimental; see https://github.com/TomXV/dragnwash-modframework/wiki/Going-online.
     internal sealed partial class ModsMenu
@@ -27,8 +27,6 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextWatchingOff = "Connection watching is off (Mods → Drag'n Wash ModFramework → Settings → Watch connections).";
         internal const string TextWatchOnly = "The framework only watches: it blocks nothing, and a mod can get around it.";
 
-        private static readonly Color OnlineColor = new Color(0.7f, 0.85f, 1f, 1f);
-
         private static bool IsOnline(ModCatalog.Entry entry, out bool undeclared)
         {
             undeclared = false;
@@ -38,33 +36,6 @@ namespace DragNWash.ModFramework.Mods
             }
             undeclared = NetworkWatch.HasUndeclared(entry.Guid);
             return undeclared || NetworkWatch.DeclaredBy(entry.Guid).Count > 0 || NetworkWatch.SeenBy(entry.Guid).Count > 0;
-        }
-
-        // The line in the details: a warning when the mod went online without
-        // saying so, otherwise the hosts it declared.
-        private static void AddNetworkNote(ModCatalog.Entry entry, List<(string Name, string Label, string Value, bool Warn)> notes, bool warningsOnly)
-        {
-            if (entry.Guid == null)
-            {
-                return;
-            }
-            List<string> undeclared = NetworkWatch.SeenBy(entry.Guid).Where(c => !c.Declared).Select(c => c.Host).ToList();
-            if (undeclared.Count > 0)
-            {
-                if (warningsOnly)
-                {
-                    notes.Add(("NetUndeclared", TextUndeclaredOnline, string.Join(", ", undeclared), true));
-                }
-                return;
-            }
-            if (!warningsOnly)
-            {
-                List<string> hosts = NetworkWatch.DeclaredBy(entry.Guid).Select(u => u.Host).Distinct().ToList();
-                if (hosts.Count > 0)
-                {
-                    notes.Add(("Net", TextUsesInternet, string.Join(", ", hosts), false));
-                }
-            }
         }
 
         private ModsScreenPage InternetPage(ModCatalog.Entry entry)
@@ -82,11 +53,11 @@ namespace DragNWash.ModFramework.Mods
             IReadOnlyList<NetworkUse> uses = NetworkWatch.DeclaredBy(guid);
             if (uses.Count == 0)
             {
-                Line(content, TextNotDeclared, size, FontStyles.Italic, Color.white, 0f);
+                Line(content, TextNotDeclared, size, FontStyles.Italic, ModsLook.Label, 0f);
             }
             foreach (NetworkUse use in uses)
             {
-                Line(content, Escape(use.Host), size * 1.1f, FontStyles.Bold, OnlineColor, 0f);
+                Line(content, Escape(use.Host), size * 1.1f, FontStyles.Bold, ModsLook.Accent, 0f);
                 Pair(content, TextWhatFor, use.Purpose, size);
                 Pair(content, TextWhatIsSent, use.Sends, size);
                 Pair(content, TextTurnOff, use.TurnOff, size);
@@ -96,34 +67,34 @@ namespace DragNWash.ModFramework.Mods
             Spacer(content, size * 0.4f);
             if (!NetworkWatch.Enabled)
             {
-                Line(content, TextWatchingOff, size, FontStyles.Italic, Color.white, 0f);
+                Line(content, TextWatchingOff, size, FontStyles.Italic, ModsLook.Label, 0f);
             }
             else
             {
-                Line(content, TextSeenThisSession, size, FontStyles.Bold, Color.white, 0f);
+                Line(content, TextSeenThisSession, size, FontStyles.Bold, ModsLook.Label, 0f);
                 IReadOnlyList<NetworkWatch.Connection> seen = NetworkWatch.SeenBy(guid);
                 if (seen.Count == 0)
                 {
-                    Line(content, TextNoConnections, size, FontStyles.Normal, Color.white, 24f);
+                    Line(content, TextNoConnections, size, FontStyles.Normal, ModsLook.Label, 24f);
                 }
                 foreach (NetworkWatch.Connection c in seen)
                 {
                     string text = $"{Escape(c.Host)}  ({c.Via}, ×{c.Count})";
-                    Line(content, text, size, FontStyles.Normal, c.Declared ? Color.white : WarnColor, 24f);
+                    Line(content, text, size, FontStyles.Normal, c.Declared ? ModsLook.Label : ModsLook.Warning, 24f);
                     if (!c.Declared)
                     {
-                        Line(content, TextNotDeclaredByMod, size * 0.9f, FontStyles.Italic, WarnColor, 48f);
+                        Line(content, TextNotDeclaredByMod, size * 0.9f, FontStyles.Italic, ModsLook.Warning, 48f);
                     }
                 }
             }
             Spacer(content, size * 0.6f);
-            Line(content, TextWatchOnly, size * 0.85f, FontStyles.Italic, new Color(1f, 1f, 1f, 0.7f), 0f);
+            Line(content, TextWatchOnly, size * 0.85f, FontStyles.Italic, ModsLook.Muted, 0f);
         }
 
         private static void Pair(RectTransform content, string label, string value, float size)
         {
-            Line(content, label, size, FontStyles.Bold, Color.white, 24f);
-            Line(content, string.IsNullOrEmpty(value) ? TextNotStated : Escape(value), size, string.IsNullOrEmpty(value) ? FontStyles.Italic : FontStyles.Normal, Color.white, 48f);
+            Line(content, label, size, FontStyles.Bold, ModsLook.Label, 24f);
+            Line(content, string.IsNullOrEmpty(value) ? TextNotStated : Escape(value), size, string.IsNullOrEmpty(value) ? FontStyles.Italic : FontStyles.Normal, ModsLook.Label, 48f);
         }
 
         // A scrolling column inside the page, so a mod with many hosts still fits.

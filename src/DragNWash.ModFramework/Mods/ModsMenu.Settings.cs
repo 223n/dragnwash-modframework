@@ -31,7 +31,6 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextAllAnswer = "All of them will answer it.";
         private bool _showAdvanced;
 
-        private static readonly Color SettingsColor = new Color(0.3f, 0.42f, 0.62f, 1f);
         private static readonly Color StepColor = new Color(0.25f, 0.25f, 0.25f, 1f);
         private static readonly Color FieldColor = new Color(0.12f, 0.12f, 0.14f, 1f);
         private static readonly Color NoteErrorColor = new Color(1f, 0.55f, 0.5f, 1f);
@@ -69,7 +68,7 @@ namespace DragNWash.ModFramework.Mods
             _item = null;
             RebuildList();
             RebuildDetails(false);
-            Focus("Settings");
+            Focus("Tab" + TabSettings);
         }
 
         internal void SelectItem(ConfigItem item)
@@ -538,10 +537,8 @@ namespace DragNWash.ModFramework.Mods
             }
             foreach (string name in names)
             {
-                GameObject target = _detailParts.FirstOrDefault(p => p != null && p.name == name && p.GetComponent<Selectable>() is Selectable s && s.IsInteractable());
-                if (target != null)
+                if (FocusIn(Details, name))
                 {
-                    EventSystem.current.SetSelectedGameObject(target);
                     return;
                 }
             }

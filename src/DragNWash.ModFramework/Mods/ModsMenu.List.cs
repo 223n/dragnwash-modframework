@@ -481,7 +481,7 @@ namespace DragNWash.ModFramework.Mods
                 // With the pad, pressing a mod moves on to its buttons.
                 if (PadSupport.PadPressedThisFrame())
                 {
-                    Focus("Settings", "Switch");
+                    Focus("Switch", "Tab" + _tab);
                 }
             });
 
