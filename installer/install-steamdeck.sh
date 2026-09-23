@@ -51,7 +51,7 @@ BEPINEX_SHA256="e538560be65739f562519ab518a75f9c65b3f57f87457403ae7cde683c12dab7
 LAUNCH_OPTION="./run_bepinex.sh %command%"
 # The same version as Install.exe (installer/AssemblyInfo.cs); both send it as
 # their User-Agent, and nothing else about the player.
-INSTALLER_VERSION="1.0.0"
+INSTALLER_VERSION="1.1.0"
 USER_AGENT="DragNWash.Installer/$INSTALLER_VERSION"
 FRAMEWORK_REPO="TomXV/dragnwash-modframework"
 MAX_DOWNLOAD=$((20 * 1024 * 1024))
