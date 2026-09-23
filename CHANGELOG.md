@@ -4,6 +4,10 @@ Versions of the core and of each library are separate, and follow semantic versi
 
 ## Unreleased
 
+### Bridge: a clearer message when Windows holds the port
+
+- When the Bridge can't listen because Windows refused the port ("access denied"), the F1 Bridge tab and the log now say the port has probably been set aside by Windows. Hyper-V, WSL and Docker reserve ranges of ports, and the ranges can change when the PC restarts. The message says to choose another `[Bridge] Port` and register the new address with the client. Before, it said another program might be using the port, which isn't what happens in that case. The system's own error text also no longer leaves a line break in the middle of the message.
+
 ### Bridge page and Graphs page: the Tool window's look
 
 - Bridge page: the view switches (Code and Graphs, Blocks and Nodes) look like the F1 window's tabs. The one showing sits on the page's ground with a 2 px accent line on top, and the others are plain dim words. The open graph in the list is marked the same way, with the line on its left. The status line is a band under the header with a 3 px bar on its left, in the accent colour, or in the error colour when something went wrong, and a long line wraps instead of making the page scroll sideways.

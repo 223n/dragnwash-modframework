@@ -105,9 +105,25 @@ namespace DragNWash.ModFramework.Bridge
             catch (Exception ex)
             {
                 Server = null;
-                _note = $"Could not listen on port {_port.Value}: {ex.Message}. Another program may use it; change [Bridge] Port.";
+                _note = $"Could not listen on port {_port.Value}: {ex.Message.Trim().TrimEnd('.', '。')}. " + ListenAdvice(ex);
                 Log.LogWarning("[bridge] " + _note);
             }
+        }
+
+        // What to do about a port that could not be used. "Access denied" on
+        // Windows nearly always means the port sits in a range Windows keeps for
+        // Hyper-V, WSL or Docker (see "netsh interface ipv4 show
+        // excludedportrange protocol=tcp"); those ranges can move at every
+        // restart, so the port may work again later or stop working one day.
+        private static string ListenAdvice(Exception ex)
+        {
+            var socket = ex as System.Net.Sockets.SocketException ?? ex.InnerException as System.Net.Sockets.SocketException;
+            if (socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied)
+            {
+                return "Windows has probably set this port aside (Hyper-V, WSL and Docker do that, and the ranges can change when the PC restarts). " +
+                       "Choose another [Bridge] Port, and register the new address with your client.";
+            }
+            return "Another program may use it; change [Bridge] Port.";
         }
 
         private static void Stop(string why)
