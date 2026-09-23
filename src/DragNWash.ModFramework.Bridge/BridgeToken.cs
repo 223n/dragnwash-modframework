@@ -25,7 +25,10 @@ namespace DragNWash.ModFramework.Bridge
                     if (File.Exists(FilePath))
                     {
                         string saved = File.ReadAllText(FilePath).Trim();
-                        if (saved.Length >= 32) return _token = saved;
+                        // Only the letters a made token has: the setups Copy puts on the
+                        // clipboard carry it inside a command and JSON as it is.
+                        if (saved.Length >= 32 && Plain(saved)) return _token = saved;
+                        BridgePlugin.Log.LogWarning("[bridge] The token file does not hold a token the Bridge made; making a new token.");
                     }
                 }
                 catch (Exception ex)
@@ -34,6 +37,16 @@ namespace DragNWash.ModFramework.Bridge
                 }
                 return Renew();
             }
+        }
+
+        // Letters, digits, '-' and '_', as Renew makes them.
+        private static bool Plain(string token)
+        {
+            foreach (char c in token)
+            {
+                if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-' || c == '_')) return false;
+            }
+            return true;
         }
 
         // A new token; every client must be set up again.

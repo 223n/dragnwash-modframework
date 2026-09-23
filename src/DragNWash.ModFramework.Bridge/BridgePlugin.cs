@@ -157,6 +157,25 @@ namespace DragNWash.ModFramework.Bridge
             return "Another program may use it; press Use a free port in the Bridge tab of the F1 window, or change [Bridge] Port.";
         }
 
+        // Why it isn't listening, in one line for a notice: made from the kind
+        // of failure, not the system's message, which can be in the system's
+        // language and a notice draws ASCII only (the log and the console
+        // have the whole _note).
+        private string NotListening()
+        {
+            switch (_problem)
+            {
+                case ListenProblem.None:
+                    return "The Bridge is not listening: the developer tools are off.";
+                case ListenProblem.Reserved:
+                    return $"The Bridge is not listening: Windows won't let the game use port {_problemPort}. The Bridge tab of the F1 window can move it to a free port.";
+                case ListenProblem.InUse:
+                    return $"The Bridge is not listening: port {_problemPort} is in use. The Bridge tab of the F1 window can move it to a free port.";
+                default:
+                    return $"The Bridge is not listening on port {_problemPort}. The Bridge tab of the F1 window says why.";
+            }
+        }
+
         // "Use a free port": looks on a worker thread (netsh and a bind per
         // port take a moment), then Update moves the Bridge there.
         private void UseFreePort()
@@ -239,7 +258,7 @@ namespace DragNWash.ModFramework.Bridge
                 args =>
                 {
                     if (Server == null) throw new InvalidOperationException(!_enabled.Value ? "The Bridge is off: turn it on in the Bridge tab of the F1 window."
-                        : _note.Length > 0 ? _note : "The Bridge is not listening: the developer tools are off.");
+                        : NotListening());
                     string focus = args.String("focus");
                     if (OpenInApp(focus)) return "Opened the code graph in its window.";
                     string url = $"http://127.0.0.1:{_port.Value}/page#code={PageDoor.NewCode()}";
@@ -354,7 +373,7 @@ namespace DragNWash.ModFramework.Bridge
 
         private string SetupFor(int client)
         {
-            string token = BridgeToken.Value;   // letters, digits, '-' and '_': nothing to escape
+            string token = BridgeToken.Value;   // letters, digits, '-' and '_' (BridgeToken checks a saved one): nothing to escape
             string headers = "      \"headers\": { \"Authorization\": \"Bearer " + token + "\" }\n";
             switch (client)
             {
@@ -462,8 +481,10 @@ namespace DragNWash.ModFramework.Bridge
             TW.Fill(new Rect(x, y, width, height), TW.PanelColor);
             TW.Fill(new Rect(x, y, 3, height), bar);
             var titleRect = new Rect(textX, y + pad, textWidth, titleHeight);
-            string shown = TW.Elide(title, s.Label, textWidth);
-            GUI.Label(titleRect, shown, s.Label);
+            // The title in the error colour too when it can't listen, as the mock has it.
+            GUIStyle titleStyle = failed ? s.Danger : s.Label;
+            string shown = TW.Elide(title, titleStyle, textWidth);
+            GUI.Label(titleRect, shown, titleStyle);
             if (shown != title) TW.Hint(titleRect, title);
             GUI.Label(new Rect(textX, y + pad + titleHeight, textWidth, detailHeight), detail, s.WrappedLabel);
 
@@ -579,15 +600,20 @@ namespace DragNWash.ModFramework.Bridge
             y += row + 6;
             // After Use a free port, until a copy or a client connecting shows
             // the client has the new address.
+            // Back on the old port (the Mods screen, the cfg): nothing to redo.
+            if (_portChangedFrom == _port.Value) _portChangedFrom = 0;
             if (_portChangedFrom != 0)
             {
-                Color was = GUI.contentColor;
-                GUI.contentColor = TW.WarningColor;
+                // A panel with a 3 px bar in the warning colour, like a notice.
+                var line = new Rect(x, y, width, 26);
+                TW.Fill(line, TW.PanelColor);
+                TW.Fill(new Rect(x, y, 3, 26), TW.WarningColor);
                 string changed = $"Port changed from {_portChangedFrom}. Set your client up again with Copy setup.";
-                GUI.Label(new Rect(left, y, room, 26), TW.Elide(changed, s.Label, room), s.Label);
-                GUI.contentColor = was;
-                TW.Hint(new Rect(left, y, room, 26), changed);
-                y += 30;
+                var text = new Rect(x + 13, y, width - 23, 26);
+                string changedShown = TW.Elide(changed, s.Label, text.width);
+                GUI.Label(text, changedShown, s.Label);
+                if (changedShown != changed) TW.Hint(line, changed);
+                y += 32;
             }
 
             float newWidth = ButtonRow.Width("New token"), buttonsWidth = copyWidth + 8 + newWidth;
@@ -643,6 +669,8 @@ namespace DragNWash.ModFramework.Bridge
         // graphs are made, so it needs a way in that does not go through the
         // game's code (the Inspector's Graph buttons open it at a method), and
         // somebody writing a graph has no reason to arrive at the code first.
+        private static readonly string[] OpenInChoices = { "App", "Browser" };
+
         private float DrawCodeGraph(float x, float y, float width)
         {
             var s = TW.Styles;
@@ -657,24 +685,25 @@ namespace DragNWash.ModFramework.Bridge
             GUI.enabled = was;
 
             string note = null;
-            if (!listening)
+            if (AppPossible)
             {
-                note = "Opens once the Bridge is listening.";
-            }
-            else if (!AppPossible)
-            {
-                note = "Opens in the browser.";
-            }
-            else
-            {
-                // The same setting as the Mods screen's "Open the code graph in".
+                // The same setting as the Mods screen's "Open the code graph in",
+                // and it can be picked before the Bridge listens.
                 Rect label = row.Place(s.MutedLabel.CalcSize(new GUIContent("Opens in")).x + 4);
                 GUI.Label(label, "Opens in", s.MutedLabel);
-                foreach (string where in new[] { "App", "Browser" })
+                foreach (string where in OpenInChoices)
                 {
                     if (row.Button(where, _openIn.Value == where) && _openIn.Value != where) _openIn.Value = where;
                 }
-                if (_openIn.Value == "App" && !AppThere) note = "CodeGraph.exe isn't there, so it opens in the browser.";
+                if (listening && _openIn.Value == "App" && !AppThere) note = "CodeGraph.exe isn't there, so it opens in the browser.";
+            }
+            else if (listening)
+            {
+                note = "Opens in the browser.";
+            }
+            if (!listening)
+            {
+                note = "Opens once the Bridge is listening.";
             }
             y = row.Bottom + 4;
             if (note != null)
