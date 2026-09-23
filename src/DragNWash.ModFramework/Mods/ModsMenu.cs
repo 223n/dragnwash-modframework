@@ -427,17 +427,28 @@ namespace DragNWash.ModFramework.Mods
             }
             bool hasButtonRow = pages.Count > 0 || newer != null;
             int maxLines = hasButtonRow ? 2 : 3;
+            // No note is ever dropped: when there are more notes than lines,
+            // the lines get thinner (and the text smaller) so every one fits,
+            // and none takes a second line for its value.
+            float step = 0.07f;
             float size = UiText.BodySize * 0.9f;
+            if (notes.Count > maxLines)
+            {
+                step = 0.07f * maxLines / notes.Count;
+                size *= Mathf.Max(0.6f, step / 0.07f);
+            }
             float width = Details.rect.width - 56f;
             int line = 0;
-            for (int i = 0; i < notes.Count && line < maxLines; i++)
+            for (int i = 0; i < notes.Count; i++)
             {
                 var note = notes[i];
-                float top = 0.42f - line * 0.07f;
+                float top = 0.42f - line * step;
+                // Lines still free after this note, if every later note takes one.
+                int spare = Math.Max(maxLines, notes.Count) - line - (notes.Count - i);
                 TMP_Text text;
                 if (note.Label == null)
                 {
-                    text = Label(note.Name + i, Escape(note.Value), size, top - 0.07f, top, false);
+                    text = Label(note.Name + i, Escape(note.Value), size, top - step, top, false);
                     if (note.Name == "Checking")
                     {
                         CheckingStyle(text);
@@ -447,7 +458,7 @@ namespace DragNWash.ModFramework.Mods
                 }
                 else
                 {
-                    TMP_Text head = Label(note.Name + i + "Label", note.Label, size, top - 0.07f, top, false);
+                    TMP_Text head = Label(note.Name + i + "Label", note.Label, size, top - step, top, false);
                     head.fontStyle |= FontStyles.Bold;
                     head.enableAutoSizing = false;
                     head.fontSize = size;
@@ -455,17 +466,18 @@ namespace DragNWash.ModFramework.Mods
                     // Measured in the label's bold style, a little wider than the value's.
                     float valueWidth = head.GetPreferredValues(Escape(note.Value)).x;
                     bool squeezed = labelWidth > width * 0.5f || labelWidth + 16f + valueWidth * 0.75f > width;
-                    if (width > 0f && squeezed && line + 1 < maxLines)
+                    if (width > 0f && squeezed && spare > 0)
                     {
                         // A long label (common in Japanese or German), or names that
-                        // would shrink to fit beside it, get their own line.
-                        text = Label(note.Name + i, Escape(note.Value), size, top - 0.14f, top - 0.07f, false);
+                        // would shrink to fit beside it, get their own line, when
+                        // that leaves a line for every note after it.
+                        text = Label(note.Name + i, Escape(note.Value), size, top - 2f * step, top - step, false);
                         ((RectTransform)text.transform).offsetMin = new Vector2(56f, 0f);
                         line += 2;
                     }
                     else
                     {
-                        text = Label(note.Name + i, Escape(note.Value), size, top - 0.07f, top, false);
+                        text = Label(note.Name + i, Escape(note.Value), size, top - step, top, false);
                         ((RectTransform)text.transform).offsetMin = new Vector2(28f + labelWidth + 16f, 0f);
                         line++;
                     }
