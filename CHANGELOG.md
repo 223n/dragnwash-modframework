@@ -107,6 +107,11 @@ Versions of the core and of each library are separate, and follow semantic versi
 - `GameSaves.Keep` (Flags and saves library), new: how many snapshots a slot keeps, the library's `[History] Keep` setting. A tab can show "30 of 30 kept" and say when the next snapshot will push the oldest one out. It's right even while `[History] Enabled` is off.
 - `GameSaves.SnapshotMatchesSave` now says true for a snapshot from before the game update of 2026-09-14 once it has been restored. The restore adds the `{"version":1}` entry the game needs, so the save and the snapshot were never byte for byte the same, and a tab couldn't mark that snapshot as the current save.
 
+### Saves: no snapshot is lost to another one taken in the same second
+
+- Snapshots are named by the second they're taken, and a second one in the same second was copied over the first. A mod's edit followed by the game saving within that second lost the save from before the edit. Now the second one is named with "-2" (then "-3", and so on) and both are kept.
+- An edit that changes nothing (a level the save already has, flags already set that way) no longer takes a snapshot first. With the history full, that snapshot pushed the oldest one out for nothing.
+
 ### Bridge: a clearer message when Windows holds the port
 
 - When the Bridge can't listen because Windows refused the port ("access denied"), the F1 Bridge tab and the log now say the port has probably been set aside by Windows. Hyper-V, WSL and Docker reserve ranges of ports, and the ranges can change when the PC restarts. The message says to choose another `[Bridge] Port` and register the new address with the client. Before, it said another program might be using the port, which isn't what happens in that case. The system's own error text also no longer leaves a line break in the middle of the message.

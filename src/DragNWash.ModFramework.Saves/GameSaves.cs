@@ -431,8 +431,16 @@ namespace DragNWash.ModFramework.Saves
                 return;
             }
 
-            string target = System.IO.Path.Combine(dir, DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".dgn");
-            File.Copy(savePath, target, overwrite: true);
+            // Named by the second it was taken. A second one in the same second
+            // (an edit, then the game saving) gets "-2", "-3": copying over the
+            // first would lose it.
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            string target = System.IO.Path.Combine(dir, stamp + ".dgn");
+            for (int n = 2; File.Exists(target); n++)
+            {
+                target = System.IO.Path.Combine(dir, stamp + "-" + n + ".dgn");
+            }
+            File.Copy(savePath, target);
             SavesLibraryPlugin.Log.LogInfo($"Snapshot of {slot} saved ({existing.Count + 1} kept, level {LevelOfFile(target)}).");
 
             for (int i = _keep - 1; i < existing.Count; i++)
@@ -480,12 +488,14 @@ namespace DragNWash.ModFramework.Saves
                 string savePath = SavePath(slot);
                 string current = File.ReadAllText(savePath);
                 LastContent[slot] = current;
-                TakeSnapshot(slot, savePath, current);
                 string edited = change(current);
+                // No snapshot for an edit that changes nothing: with the history
+                // full it would push the oldest one out for no reason.
                 if (edited == current)
                 {
                     return $"Nothing changed ({what}).";
                 }
+                TakeSnapshot(slot, savePath, current);
                 // Same bytes as the plain File.WriteAllText(path, text) this
                 // replaces: UTF-8, no byte-order mark.
                 SafeFile.Write(savePath, new UTF8Encoding(false), w => w.Write(edited));
