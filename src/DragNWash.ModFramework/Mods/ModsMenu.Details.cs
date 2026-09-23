@@ -428,7 +428,8 @@ namespace DragNWash.ModFramework.Mods
         }
 
         // A button with a rounded face and its label, as wide as the label.
-        private static GameObject FlatButton(Transform parent, string name, string text, float size, Color face, Color color, UnityAction onClick)
+        // Pages other mods add use it too (ModsScreenLook.Button).
+        internal static GameObject FlatButton(Transform parent, string name, string text, float size, Color face, Color color, UnityAction onClick)
         {
             RectTransform rect = ModsLook.Rect(parent, name);
             Image image = ModsLook.Shape(rect.gameObject, ModsLook.Rounded, Color.white, 10f);

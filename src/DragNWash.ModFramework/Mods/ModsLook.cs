@@ -43,9 +43,11 @@ namespace DragNWash.ModFramework.Mods
         internal static Color Card;
         internal static Color Field;
 
-        // Small text, and the accent when it is text rather than a line.
+        // Small text, and the accent and the error colour when they are text
+        // rather than a line or a bar.
         internal static Color Muted;
         internal static Color AccentText;
+        internal static Color ErrorText;
 
         // A button's face.
         internal static Color Raised;
@@ -79,9 +81,11 @@ namespace DragNWash.ModFramework.Mods
         // same there (Opaque, Light). Colours need no converting: Unity turns
         // a UI colour into linear by itself.
         //
-        // Small text is lighter than the Tool window's, and the accent as
-        // text lighter than the accent as a line, so both keep 4.5:1 or more
-        // over the brightest picture behind (the white title logo).
+        // Small text is lighter than the Tool window's, and the accent and
+        // the error colour as text lighter than as a line, so all three keep
+        // 4.5:1 or more over the brightest picture behind (the white title
+        // logo): the error colour itself gives about 2.9:1 there on the glass
+        // and 3.7:1 on the tint.
         internal static void UseLook(bool glass)
         {
             Glass = glass;
@@ -92,6 +96,7 @@ namespace DragNWash.ModFramework.Mods
                 Field = Gamma(3, 5, 9, Opaque(0.55f));
                 Muted = Gamma(0xc0, 0xca, 0xd5, 1f);
                 AccentText = Gamma(0x7f, 0xe0, 0xd3, 1f);
+                ErrorText = Gamma(0xff, 0xb1, 0xa8, 1f);
                 Raised = Gamma(52, 62, 82, Opaque(0.85f));
                 TrackOff = Gamma(90, 100, 120, Opaque(0.70f));
                 ChipEdge = new Color(1f, 1f, 1f, Light(0.16f));
@@ -105,6 +110,7 @@ namespace DragNWash.ModFramework.Mods
                 Field = Gamma(4, 6, 10, Opaque(0.60f));
                 Muted = Gamma(0xaa, 0xb6, 0xc4, 1f);
                 AccentText = Gamma(0x62, 0xd3, 0xc4, 1f);
+                ErrorText = Gamma(0xff, 0x9d, 0x93, 1f);
                 Raised = new Color(0.165f, 0.196f, 0.26f);
                 TrackOff = new Color(0.23f, 0.26f, 0.32f);
                 ChipEdge = Border;

@@ -378,7 +378,9 @@ namespace DragNWash.ModFramework.Mods
 
         // ---- the pieces of a row ----
 
-        private static RectTransform RowFrame(RectTransform content, string name)
+        // A setting's row: a see-through card with rounded corners, its
+        // children in a column. Pages other mods add use it too (ModsScreenLook.Card).
+        internal static RectTransform RowFrame(RectTransform content, string name)
         {
             RectTransform row = ModsLook.Rect(content, name);
             ModsLook.Shape(row.gameObject, ModsLook.Rounded, ModsLook.Card, 10f).raycastTarget = false;

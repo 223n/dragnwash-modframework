@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace DragNWash.ModFramework.Graphs
@@ -12,29 +14,17 @@ namespace DragNWash.ModFramework.Graphs
     // this session.
     //
     // The page is built from what GameGraphs reports, so the console command
-    // and this page always say the same thing. The core's own page helpers are
-    // internal to it, so the few pieces used here are made with TextMeshPro and
-    // UnityEngine.UI directly.
+    // and this page always say the same thing. Each graph is a card, with the
+    // Mods screen's colours and its button (ModsScreenLook, see Look below);
+    // the rest is made with TextMeshPro and UnityEngine.UI directly.
     internal static class GraphsPage
     {
         private const float Size = 20f;
-        // The Tool window's palette. The page sits on a Panel-coloured ground of
-        // its own: over the Mods screen's see-through band these colours would
-        // depend on the game's picture behind it, and Muted and Error fall
-        // under 4.5:1 there. The values are copied rather than read from
-        // ToolWindow.*Color: the Tool window is a soft dependency, and without
-        // its DLL the first touch of its class would take this page down.
-        private static readonly Color Label = new Color(0.91f, 0.94f, 0.97f);
-        private static readonly Color Border = new Color(0.165f, 0.2f, 0.26f);
-        private static readonly Color Panel = new Color(0.09f, 0.11f, 0.15f);
-        private static readonly Color Inset = new Color(0.055f, 0.07f, 0.10f);
-        private static readonly Color Dim = new Color(0.60f, 0.66f, 0.73f);
-        private static readonly Color Bad = new Color(0.96f, 0.45f, 0.40f);
-        private static readonly Color Good = new Color(0.32f, 0.78f, 0.72f);
 
         internal static void Build(RectTransform panel, string guid)
         {
-            RectTransform content = ScrollArea(panel);
+            Look look = Look.Get();
+            RectTransform content = ScrollArea(panel, look);
             List<GameGraphs.GraphReport> graphs;
             try
             {
@@ -46,158 +36,129 @@ namespace DragNWash.ModFramework.Graphs
                 // on it: this page saying nothing is better than the screen
                 // failing to draw.
                 GraphsPlugin.Log.LogError($"[graphs] The Mods screen's page could not be built: {ex}");
-                Line(content, "The graphs could not be read: " + ex.Message, Size, FontStyles.Italic, Bad, 0f);
+                Line(content, "The graphs could not be read: " + ex.Message, Size, FontStyles.Italic, look.Error, 0f);
                 return;
             }
 
             if (graphs.Count == 0)
             {
-                Line(content, "This mod has no graphs the library could read.", Size, FontStyles.Italic, Dim, 0f);
+                Line(content, "This mod has no graphs the library could read.", Size, FontStyles.Italic, look.Muted, 0f);
                 return;
             }
 
+            // A card for each graph, like a setting's row on the Settings tab.
             foreach (GameGraphs.GraphReport graph in graphs)
             {
-                Line(content, graph.File, Size * 1.1f, FontStyles.Bold, Label, 0f);
+                RectTransform card = look.Card(content);
+                Line(card, graph.File, Size * 1.1f, FontStyles.Bold, look.Text, 0f);
                 if (!string.IsNullOrEmpty(graph.Name) && graph.Name != graph.File)
                 {
-                    Line(content, graph.Name, Size, FontStyles.Normal, Dim, 24f);
+                    Line(card, graph.Name, Size, FontStyles.Normal, look.Muted, 0f);
                 }
 
-                Line(content, graph.State, Size, FontStyles.Normal,
-                    graph.Problems.Count > 0 ? Bad : graph.State == "runs" ? Good : Dim, 24f);
+                Line(card, graph.State, Size, FontStyles.Normal,
+                    graph.Problems.Count > 0 ? look.Error : graph.State == "runs" ? look.Accent : look.Muted, 0f);
 
                 foreach (string problem in graph.Problems)
                 {
-                    Line(content, "• " + problem, Size * 0.9f, FontStyles.Normal, Bad, 48f);
+                    Line(card, "• " + problem, Size * 0.9f, FontStyles.Normal, look.Error, 0f);
                 }
 
                 if (graph.Events.Count > 0)
                 {
-                    Pair(content, "Answers", string.Join(", ", graph.Events.ToArray()));
+                    Pair(card, look, "Answers", string.Join(", ", graph.Events.ToArray()), look.Muted);
                 }
                 if (graph.Reads.Count > 0)
                 {
-                    Pair(content, "Reads", string.Join(", ", graph.Reads.ToArray()));
+                    Pair(card, look, "Reads", string.Join(", ", graph.Reads.ToArray()), look.Muted);
                 }
                 if (graph.Changes.Count > 0)
                 {
                     // What a graph changes is the thing a player most wants to
                     // see before switching the mod on, so it is not dimmed.
-                    Pair(content, "Changes", string.Join(", ", graph.Changes.ToArray()), Label);
+                    Pair(card, look, "Changes", string.Join(", ", graph.Changes.ToArray()), look.Text);
                 }
                 if (graph.Needs.Count > 0)
                 {
-                    Pair(content, "Needs", string.Join(", ", graph.Needs.ToArray()), Bad);
+                    Pair(card, look, "Needs", string.Join(", ", graph.Needs.ToArray()), look.Error);
                 }
                 foreach (string share in graph.Shares)
                 {
-                    Pair(content, "Key shared", share, Label);
+                    Pair(card, look, "Key shared", share, look.Text);
                 }
                 foreach (string clash in graph.Clashes)
                 {
                     // Why an edit may seem to do nothing: somebody else writes
                     // the same value, and the later write is the one that stands.
-                    Pair(content, "Also changed", clash.Replace(" - also changed by ", ": "), Label);
+                    Pair(card, look, "Also changed", clash.Replace(" - also changed by ", ": "), look.Text);
                 }
                 if (graph.Started > 0)
                 {
-                    Pair(content, "Runs", $"{graph.Running} going, {graph.Started} started this session" +
-                                          (graph.Failures > 0 ? $", {graph.Failures} failure(s) in a row" : ""));
+                    Pair(card, look, "Runs", $"{graph.Running} going, {graph.Started} started this session" +
+                                             (graph.Failures > 0 ? $", {graph.Failures} failure(s) in a row" : ""), look.Muted);
                 }
 
                 if (graph.Problems.Count == 0)
                 {
                     string file = graph.File;
-                    StopButton(content, guid, file);
+                    StopButton(card, look, guid, file);
                 }
-                Spacer(content, Size * 0.8f);
             }
 
+            // Under the cards, its text in line with theirs.
+            Spacer(content, 4f);
             Line(content, "A graph may only call the operations the libraries registered. Stopping one puts back what it changed; it starts again the next time the game does, or with \"graphs reload\" in the console.",
-                Size * 0.85f, FontStyles.Italic, Dim, 0f);
+                Size * 0.85f, FontStyles.Italic, look.Muted, Look.CardPadding);
         }
 
-        private static void StopButton(RectTransform content, string guid, string file)
+        private static void StopButton(RectTransform card, Look look, string guid, string file)
         {
             var row = new GameObject("StopRow", typeof(RectTransform));
             var rowRect = (RectTransform)row.transform;
-            rowRect.SetParent(content, false);
-            HorizontalLayoutGroup pad = row.AddComponent<HorizontalLayoutGroup>();
-            pad.padding = new RectOffset(24, 0, 4, 4);
-            pad.childControlHeight = true;
+            rowRect.SetParent(card, false);
+            HorizontalLayoutGroup line = row.AddComponent<HorizontalLayoutGroup>();
+            line.padding = new RectOffset(0, 0, 4, 0);
             // The layout group has to control the width for the button's
             // LayoutElement to mean anything; without it the button keeps a new
             // RectTransform's 100 px and the label is cut to "Stop for ...".
-            pad.childControlWidth = true;
-            pad.childForceExpandWidth = false;
+            line.childControlWidth = true;
+            line.childControlHeight = true;
+            line.childForceExpandWidth = false;
+            line.childForceExpandHeight = false;
 
-            var button = new GameObject("Stop", typeof(RectTransform), typeof(Image), typeof(Button));
-            ((RectTransform)button.transform).SetParent(rowRect, false);
-            // The button's own picture is its 1px edge, and a face sits inside
-            // it. Hover and press tint the face only: a tint multiplies, so over
-            // the whole button it would turn the edge black, and on a face that
-            // is Inset already it would hardly show. The face gets its colours
-            // from the button instead.
-            button.GetComponent<Image>().color = Border;
-            var face = new GameObject("Face", typeof(RectTransform), typeof(Image));
-            var faceRect = (RectTransform)face.transform;
-            faceRect.SetParent(button.transform, false);
-            faceRect.anchorMin = Vector2.zero;
-            faceRect.anchorMax = Vector2.one;
-            faceRect.offsetMin = Vector2.one;
-            faceRect.offsetMax = -Vector2.one;
-            LayoutElement size = button.AddComponent<LayoutElement>();
-            size.minWidth = 300f;
-            size.preferredWidth = 300f;
-            size.minHeight = Size * 2f;
-
-            TMP_Text label = Text(button.transform, "Stop for this session", Size, FontStyles.Normal, Label);
-            label.alignment = TextAlignmentOptions.Center;
-            // On one line: wrapped, the label grew past the button and printed
-            // over the line above it.
-            label.textWrappingMode = TextWrappingModes.NoWrap;
-            label.overflowMode = TextOverflowModes.Ellipsis;
-            var labelRect = (RectTransform)label.transform;
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
-
-            Button press = button.GetComponent<Button>();
-            press.targetGraphic = face.GetComponent<Image>();
-            ColorBlock colors = press.colors;
-            colors.normalColor = Inset;
-            // Selected is where a gamepad is, so it shows as plainly as a pointer.
-            colors.highlightedColor = Border;
-            colors.selectedColor = Border;
-            colors.pressedColor = Panel;
-            // Once used it says "Stopped"; it does not need to grey out as well.
-            colors.disabledColor = Inset;
-            press.colors = colors;
-            press.onClick.AddListener(() =>
+            Button press = null;
+            TMP_Text label = null;
+            press = look.Button(rowRect, "Stop for this session", () =>
             {
                 string said = GameGraphs.Stop(guid, file);
                 label.text = said.Contains("stopped") ? "Stopped" : "Could not stop it";
+                // Once used it says "Stopped" and can't be pressed again.
                 press.interactable = false;
             });
+            press.name = "Stop";
+            label = press.GetComponentInChildren<TMP_Text>();
         }
 
         // ---- the pieces --------------------------------------------------------
 
-        private static void Pair(RectTransform content, string label, string value)
+        // What a graph has, under a small bold label.
+        private static void Pair(RectTransform card, Look look, string label, string value, Color color)
         {
-            Pair(content, label, value, Dim);
-        }
-
-        private static void Pair(RectTransform content, string label, string value, Color color)
-        {
-            Line(content, label, Size * 0.9f, FontStyles.Bold, Dim, 24f);
-            Line(content, value, Size * 0.9f, FontStyles.Normal, color, 48f);
+            var group = new GameObject("Pair", typeof(RectTransform));
+            var groupRect = (RectTransform)group.transform;
+            groupRect.SetParent(card, false);
+            VerticalLayoutGroup column = group.AddComponent<VerticalLayoutGroup>();
+            column.spacing = 2f;
+            column.childControlWidth = true;
+            column.childControlHeight = true;
+            column.childForceExpandWidth = true;
+            column.childForceExpandHeight = false;
+            Line(groupRect, label, Size * 0.9f, FontStyles.Bold, look.Muted, 0f);
+            Line(groupRect, value, Size * 0.9f, FontStyles.Normal, color, 0f);
         }
 
         // A scrolling column, so a mod with many graphs still fits the panel.
-        private static RectTransform ScrollArea(RectTransform panel)
+        private static RectTransform ScrollArea(RectTransform panel, Look look)
         {
             var viewport = new GameObject("GraphsViewport", typeof(RectTransform), typeof(RectMask2D));
             var viewRect = (RectTransform)viewport.transform;
@@ -206,9 +167,10 @@ namespace DragNWash.ModFramework.Graphs
             viewRect.anchorMax = Vector2.one;
             viewRect.offsetMin = Vector2.zero;
             viewRect.offsetMax = Vector2.zero;
-            // The page's own ground, which also catches the wheel over empty space.
+            // Catches the wheel over empty space. Clear on the Mods screen's
+            // panel; on an older core's see-through band, the page's ground.
             Image ground = viewport.AddComponent<Image>();
-            ground.color = Panel;
+            ground.color = look.Ground;
 
             var content = new GameObject("GraphsContent", typeof(RectTransform));
             var contentRect = (RectTransform)content.transform;
@@ -223,7 +185,7 @@ namespace DragNWash.ModFramework.Graphs
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = true;
-            layout.spacing = 2f;
+            layout.spacing = 10f;
             ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
@@ -233,16 +195,19 @@ namespace DragNWash.ModFramework.Graphs
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 30f;
+            // A notch of the wheel moves about a row, as on the rest of the
+            // Mods screen (the game's input gives 6 a notch).
+            scroll.scrollSensitivity = 14f;
             return contentRect;
         }
 
+        // A line of text that wraps, `indent` in from the left and the right.
         private static void Line(RectTransform content, string text, float size, FontStyles style, Color color, float indent)
         {
             var row = new GameObject("Line", typeof(RectTransform));
             ((RectTransform)row.transform).SetParent(content, false);
             HorizontalLayoutGroup pad = row.AddComponent<HorizontalLayoutGroup>();
-            pad.padding = new RectOffset((int)indent, 0, 0, 0);
+            pad.padding = new RectOffset((int)indent, (int)indent, 0, 0);
             pad.childControlHeight = true;
             pad.childControlWidth = true;
             pad.childForceExpandWidth = true;
@@ -271,6 +236,130 @@ namespace DragNWash.ModFramework.Graphs
             var spacer = new GameObject("Spacer", typeof(RectTransform), typeof(LayoutElement));
             ((RectTransform)spacer.transform).SetParent(content, false);
             spacer.GetComponent<LayoutElement>().minHeight = height;
+        }
+
+        // The colours and pieces the page is built with: the Mods screen's
+        // own (ModsScreenLook, core 1.5.0 and later), so the page sits on the
+        // screen's see-through panel like its other tabs do. An older core
+        // has no ModsScreenLook and draws the page straight over the game's
+        // see-through band, so there the page keeps copies of the Tool
+        // window's colours on a dark ground of its own, as it did before.
+        // ModsScreenLook is only touched in the NoInlining methods, so its
+        // absence is caught in Get instead of taking the page down.
+        private sealed class Look
+        {
+            // A card's inner padding on the left (ModsScreenLook.Card), for
+            // text under the cards to line up with the text in them.
+            internal const float CardPadding = 20f;
+
+            internal Color Text;
+            internal Color Muted;
+            internal Color Accent;
+            internal Color Error;
+            internal Color Ground;
+            private bool _screen;
+
+            internal static Look Get()
+            {
+                try
+                {
+                    return FromScreen();
+                }
+                catch (Exception ex) when (ex is TypeLoadException || ex is MissingMemberException)
+                {
+                    return new Look
+                    {
+                        Text = new Color(0.91f, 0.94f, 0.97f),
+                        Muted = new Color(0.60f, 0.66f, 0.73f),
+                        Accent = new Color(0.32f, 0.78f, 0.72f),
+                        Error = new Color(0.96f, 0.45f, 0.40f),
+                        Ground = new Color(0.09f, 0.11f, 0.15f),
+                    };
+                }
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            private static Look FromScreen()
+            {
+                return new Look
+                {
+                    Text = ModsScreenLook.Text,
+                    Muted = ModsScreenLook.Muted,
+                    Accent = ModsScreenLook.Accent,
+                    Error = ModsScreenLook.Error,
+                    Ground = new Color(0f, 0f, 0f, 0f),
+                    _screen = true,
+                };
+            }
+
+            internal RectTransform Card(RectTransform parent)
+            {
+                return _screen ? ScreenCard(parent) : OwnCard(parent);
+            }
+
+            internal Button Button(RectTransform parent, string text, UnityAction onClick)
+            {
+                return _screen ? ScreenButton(parent, text, onClick) : OwnButton(parent, text, onClick);
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            private static RectTransform ScreenCard(RectTransform parent)
+            {
+                return ModsScreenLook.Card(parent);
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            private static Button ScreenButton(RectTransform parent, string text, UnityAction onClick)
+            {
+                return ModsScreenLook.Button(parent, text, onClick);
+            }
+
+            // On the page's own ground: a column with the card's padding.
+            private static RectTransform OwnCard(RectTransform parent)
+            {
+                var card = new GameObject("Card", typeof(RectTransform));
+                var rect = (RectTransform)card.transform;
+                rect.SetParent(parent, false);
+                VerticalLayoutGroup column = card.AddComponent<VerticalLayoutGroup>();
+                column.padding = new RectOffset((int)CardPadding, 14, 12, 12);
+                column.spacing = 8f;
+                column.childControlWidth = true;
+                column.childControlHeight = true;
+                column.childForceExpandWidth = true;
+                column.childForceExpandHeight = false;
+                return rect;
+            }
+
+            // A plain button in the Tool window's colours.
+            private Button OwnButton(RectTransform parent, string text, UnityAction onClick)
+            {
+                var go = new GameObject("Button", typeof(RectTransform), typeof(Image), typeof(Button));
+                ((RectTransform)go.transform).SetParent(parent, false);
+                Button button = go.GetComponent<Button>();
+                button.targetGraphic = go.GetComponent<Image>();
+                ColorBlock colors = button.colors;
+                colors.normalColor = new Color(0.165f, 0.2f, 0.26f);
+                colors.highlightedColor = new Color(0.24f, 0.29f, 0.37f);
+                colors.selectedColor = colors.highlightedColor;
+                colors.pressedColor = new Color(0.055f, 0.07f, 0.10f);
+                colors.disabledColor = colors.normalColor;
+                // At once: a fade would start from the new Image's white.
+                colors.fadeDuration = 0f;
+                button.colors = colors;
+                TMP_Text label = GraphsPage.Text(go.transform, text, Size, FontStyles.Bold, Text);
+                label.alignment = TextAlignmentOptions.Center;
+                label.textWrappingMode = TextWrappingModes.NoWrap;
+                var labelRect = (RectTransform)label.transform;
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = Vector2.zero;
+                labelRect.offsetMax = Vector2.zero;
+                LayoutElement size = go.AddComponent<LayoutElement>();
+                size.minWidth = size.preferredWidth = Mathf.Ceil(label.preferredWidth) + 32f;
+                size.minHeight = size.preferredHeight = 44f;
+                button.onClick.AddListener(onClick);
+                return button;
+            }
         }
     }
 }
