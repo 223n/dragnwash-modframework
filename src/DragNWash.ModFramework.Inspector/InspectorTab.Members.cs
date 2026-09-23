@@ -17,7 +17,13 @@ namespace DragNWash.ModFramework.Inspector
     {
         // Members pane.
         private static bool _showPrivate;
+        // Hold values: the rows stop reading the values (the game keeps changing them).
         private static bool _freeze;
+        // Filter members: kept while the selection is of the same type, so
+        // going from one enemy to the next keeps looking at the same rows.
+        private static string _memberFilter = "";
+        private static Type _memberFilterType;
+        private const string MemberFilterControl = "DnWInspectMemberFilter";
         private static readonly Dictionary<string, string> Frozen = new Dictionary<string, string>();
         private static readonly Dictionary<string, string> Drafts = new Dictionary<string, string>();
         // What each draft started from: leaving a field applies it only when it was typed in,
@@ -127,28 +133,24 @@ namespace DragNWash.ModFramework.Inspector
             }
             else if (!(_target is GameObject))
             {
+                // Onto a second line when the pane is narrow, instead of running out of it.
                 float bx = x;
-                if (GUI.Button(new Rect(bx, y, 120, row), "Show private", _showPrivate ? s.SelectedButton : s.Button))
+                if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Show private"), "Show private", _showPrivate, s, row, "Also lists private fields and properties. Changing them is at your own risk."))
                 {
                     _showPrivate = !_showPrivate;
                     if (_showPrivate) Tell("Private members: setting them is the mod author's own risk.", NoticeKind.Warning);
                 }
-                bx += 128;
-                if (GUI.Button(new Rect(bx, y, 80, row), "Freeze", _freeze ? s.SelectedButton : s.Button))
+                if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Hold values"), "Hold values", _freeze, s, row, "Stops reading the values; the game keeps changing them."))
                 {
                     _freeze = !_freeze;
                     Frozen.Clear();
                 }
-                bx += 88;
-                if (_target is Behaviour beh && !readOnly)
+                if (_target is Behaviour beh && !readOnly
+                    && FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Disabled"), beh.enabled ? "Enabled" : "Disabled", beh.enabled, s, row, "Turns the component on or off in the game."))
                 {
-                    if (GUI.Button(new Rect(bx, y, 90, row), beh.enabled ? "Enabled" : "Disabled", beh.enabled ? s.SelectedButton : s.Button))
-                    {
-                        beh.enabled = !beh.enabled;
-                    }
-                    bx += 98;
+                    beh.enabled = !beh.enabled;
                 }
-                if (GUI.Button(new Rect(bx, y, 70, row), "Code", _showCode ? s.SelectedButton : s.Button))
+                if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Code"), "Code", _showCode, s, row, "The type's methods, patches and listeners, and their IL."))
                 {
                     _showCode = !_showCode;
                 }
@@ -171,7 +173,9 @@ namespace DragNWash.ModFramework.Inspector
 
             // The rows. Values are read on Repaint only, and kept while frozen.
             List<Member> members = MembersOfTarget();
-            bool compactTransform = _target is Transform && !_allMembers;
+            string filter = (_memberFilter ?? "").Trim();
+            // A filter looks through every member, the ones a Transform keeps back too.
+            bool compactTransform = _target is Transform && !_allMembers && filter.Length == 0;
             if (_target is Transform)
             {
                 if (GUI.Button(new Rect(x, y, 130, row), _allMembers ? "Fewer members" : "All members", _allMembers ? s.SelectedButton : s.Button))
@@ -181,6 +185,7 @@ namespace DragNWash.ModFramework.Inspector
                 y += row + 4;
             }
             Rows.Clear();
+            int memberCount = 0, matched = 0;
             foreach (Member m in members)
             {
                 if (m.IsPrivate && !_showPrivate)
@@ -191,6 +196,12 @@ namespace DragNWash.ModFramework.Inspector
                 {
                     continue;
                 }
+                memberCount++;
+                if (filter.Length > 0 && m.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+                matched++;
                 object tgt = _target;
                 Rows.Add(new RowInfo { Member = m, Key = ControlPrefix + m.Name, Getter = () => m.Get(tgt), Setter = m.CanWrite && !readOnly ? (Action<object>)(v => m.Set(tgt, v)) : null, Label = m.Name, Type = m.Type });
                 if (InspectorModel.IsList(m.Type) && ExpandedLists.Contains(m.Name))
@@ -216,6 +227,7 @@ namespace DragNWash.ModFramework.Inspector
                     }
                 }
             }
+            y = DrawMemberFilter(x, y, w, memberCount, matched, s, row);
             // The colour picker sits at the bottom of the pane while it is open.
             float pickerHeight = InspectorColorPicker.Open ? InspectorColorPicker.Height + 4 : 0;
             var view = new Rect(x, y, w, pane.yMax - y - 2 - pickerHeight);
@@ -243,6 +255,76 @@ namespace DragNWash.ModFramework.Inspector
             {
                 InspectorColorPicker.Draw(new Rect(x, view.yMax + 4, w, InspectorColorPicker.Height), s);
             }
+        }
+
+        // The members' own filter (the toolbar's search is the tree's), and
+        // how many rows it leaves. Named, so typing in it sets off no shortcut.
+        private static float DrawMemberFilter(float x, float y, float w, int total, int matched, ToolWindowStyles s, float row)
+        {
+            string count = string.IsNullOrEmpty(_memberFilter) ? "" : $"{matched} of {total}";
+            float countWidth = count.Length > 0 ? _mutedCell.CalcSize(new GUIContent(count)).x + 8 : 0;
+            GUI.SetNextControlName(MemberFilterControl);
+            _memberFilter = TW.FilterField(new Rect(x, y, w - countWidth, row), _memberFilter, "Filter members", s);
+            if (count.Length > 0)
+            {
+                GUI.Label(new Rect(x + w - countWidth + 8, y, countWidth - 8, row), count, _mutedCell);
+            }
+            y += row + 4;
+            if (matched == 0 && total > 0)
+            {
+                GUI.Label(new Rect(x + 8, y, w - 8, row), Drawable($"No member matches \"{_memberFilter}\"."), _mutedCell);
+                y += row;
+            }
+            return y;
+        }
+
+        // The name as C# writes it: float, int, List<string>, Vector3[].
+        private static string TypeName(Type t)
+        {
+            if (t == null) return "?";
+            if (t.IsArray) return TypeName(t.GetElementType()) + "[]";
+            if (t.IsGenericType)
+            {
+                string name = t.Name;
+                int tick = name.IndexOf('`');
+                var args = new List<string>();
+                foreach (Type a in t.GetGenericArguments()) args.Add(TypeName(a));
+                return (tick > 0 ? name.Substring(0, tick) : name) + "<" + string.Join(", ", args.ToArray()) + ">";
+            }
+            if (t.IsEnum) return t.Name;
+            switch (Type.GetTypeCode(t))
+            {
+                case TypeCode.Boolean: return "bool";
+                case TypeCode.Byte: return "byte";
+                case TypeCode.SByte: return "sbyte";
+                case TypeCode.Char: return "char";
+                case TypeCode.Int16: return "short";
+                case TypeCode.UInt16: return "ushort";
+                case TypeCode.Int32: return "int";
+                case TypeCode.UInt32: return "uint";
+                case TypeCode.Int64: return "long";
+                case TypeCode.UInt64: return "ulong";
+                case TypeCode.Single: return "float";
+                case TypeCode.Double: return "double";
+                case TypeCode.Decimal: return "decimal";
+                case TypeCode.String: return "string";
+            }
+            return t == typeof(object) ? "object" : t.Name;
+        }
+
+        // For the hint line while the pointer is on a row's name: the whole
+        // name, its type, and how a number is changed.
+        private static string RowTip(RowInfo r)
+        {
+            bool own = r.Label == r.Member.Name;
+            string name = own ? r.Member.Name : r.Member.Name + r.Label.Trim();
+            string kind = own && r.Member.Kind != null ? $"  ({r.Member.Kind})" : "";
+            string tip = $"{name} : {TypeName(r.Type)}{kind}.";
+            if (r.Setter != null && r.Type != null && (InspectorModel.IsNumber(r.Type) || InspectorModel.IsComposite(r.Type)))
+            {
+                tip += " Drag up or down on the value to change it.";
+            }
+            return tip;
         }
 
         // Fields narrower than this are unreadable; the composite then goes on
@@ -380,7 +462,9 @@ namespace DragNWash.ModFramework.Inspector
         {
             Event ev = Event.current;
             string label = r.Label + (r.Member.IsPrivate && r.Label == r.Member.Name ? "  (private)" : "");
-            GUI.Label(new Rect(rect.x, rect.y, nameWidth - 6, row), Drawable(label), r.Member.IsPrivate ? _mutedCell : _cell);
+            // Cut with "..." when it does not fit; the whole name and its type show on the hint line.
+            GUIStyle nameStyle = r.Member.IsPrivate ? _mutedCell : _cell;
+            GUI.Label(new Rect(rect.x, rect.y, nameWidth - 6, row), new GUIContent(TW.Elide(Drawable(label), nameStyle, nameWidth - 6), Drawable(RowTip(r))), nameStyle);
             var valueRect = new Rect(rect.x + nameWidth, rect.y, rect.width - nameWidth, row);
 
             // The value: frozen text, or read now.

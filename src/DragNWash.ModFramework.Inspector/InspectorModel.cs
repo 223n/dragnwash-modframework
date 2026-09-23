@@ -168,6 +168,7 @@ namespace DragNWash.ModFramework.Inspector
             public Type Type;
             public bool IsPrivate;
             public bool CanWrite;
+            public string Kind;      // "field" or "property" for a type's own members, else null
             public Func<object, object> Get;
             public Action<object, object> Set;
             public string Failure;   // the last exception from Get or Set, shown on the row
@@ -204,7 +205,7 @@ namespace DragNWash.ModFramework.Inspector
                         FieldInfo field = f;
                         members.Add(new Member
                         {
-                            Name = f.Name, Type = f.FieldType, IsPrivate = isPrivate, CanWrite = !f.IsInitOnly && !f.IsLiteral,
+                            Name = f.Name, Type = f.FieldType, IsPrivate = isPrivate, CanWrite = !f.IsInitOnly && !f.IsLiteral, Kind = "field",
                             Get = o => field.GetValue(o), Set = (o, v) => field.SetValue(o, v),
                         });
                     }
@@ -223,7 +224,7 @@ namespace DragNWash.ModFramework.Inspector
                         MethodInfo setter = p.GetSetMethod(true);
                         members.Add(new Member
                         {
-                            Name = p.Name, Type = p.PropertyType, IsPrivate = isPrivate || !getter.IsPublic, CanWrite = setter != null && !setter.IsStatic,
+                            Name = p.Name, Type = p.PropertyType, IsPrivate = isPrivate || !getter.IsPublic, CanWrite = setter != null && !setter.IsStatic, Kind = "property",
                             Get = o => prop.GetValue(o, null), Set = (o, v) => prop.SetValue(o, v, null),
                         });
                     }

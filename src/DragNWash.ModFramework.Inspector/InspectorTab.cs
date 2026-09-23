@@ -130,6 +130,11 @@ namespace DragNWash.ModFramework.Inspector
         private static void SetTarget(object target)
         {
             _target = target;
+            if (target?.GetType() != _memberFilterType)
+            {
+                _memberFilter = "";
+                _memberFilterType = target?.GetType();
+            }
             // A new selection shows its members, not the history that was open.
             _showHistory = false;
             _showBodies = false;
@@ -656,14 +661,15 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         // Buttons laid out left to right, onto a new line when the pane is too narrow.
-        private static bool FlowButton(ref float bx, ref float y, float x, float w, float width, string label, bool on, ToolWindowStyles s, float row)
+        // The tip, when given, shows on the hint line while the pointer is on the button.
+        private static bool FlowButton(ref float bx, ref float y, float x, float w, float width, string label, bool on, ToolWindowStyles s, float row, string tip = null)
         {
             if (bx > x && bx + width > x + w)
             {
                 bx = x;
                 y += row + 2;
             }
-            bool clicked = GUI.Button(new Rect(bx, y, width, row), label, on ? s.SelectedButton : s.Button);
+            bool clicked = GUI.Button(new Rect(bx, y, width, row), new GUIContent(label, tip), on ? s.SelectedButton : s.Button);
             bx += width + 6;
             return clicked;
         }
