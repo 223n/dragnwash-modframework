@@ -65,9 +65,10 @@ MCP の通信方式の安全のきまりに沿います。
 
 - **Mods 画面**：Bridge は自分を `ModInfo.Network` で申告します（ホストは 127.0.0.1、受ける側、「この PC の AI クライアントがゲームを読めるようにする」）。なので、ネットワークを使うほかの Mod と同じく、Online の印とページに出ます（[Going online (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online-ja)）。
 - **Bridge のタブ**（F1 の窓。Bridge は開発者ツールがオンのときだけ動き、開発者ツールの画面は F1 の窓なので）：
-  - 状態：オフ、またはどのポートで待ち受けているか。
-  - つながっているクライアント（クライアントが名乗った名前、`clientInfo`）と、最近の呼び出し。
-  - ボタン：**Disconnect all**、**New token**、**Copy setup**（下の設定のコマンドをクリップボードに入れる）。
+  - 一番上の枠で、待ち受けているかどうかを言います。待ち受け中はアクセント色、オフは薄い色、待ち受けられないときは赤で、理由も出ます。赤のときは **Use a free port**（いまのポートの後ろから、Windows の除外範囲に入っていなくて 127.0.0.1 で一瞬待ち受けられる最初のポートを探して、`[Bridge] Port` に保存します）と **Try again** があります。
+  - CONNECTION：アドレス、トークン（画面には出さず、コピーだけ）と **New token**、Claude Code・VS Code・Cursor 向けの **Copy setup**。
+  - CODE GRAPH：コードのグラフかグラフのエディターを、アプリかブラウザで開きます。
+  - CLIENTS：つながっているクライアント（名乗った名前、`clientInfo`）と、1 つずつ切る **Disconnect**、**Disconnect all**。LAST CALLS では失敗した呼び出しに印が付きます。
 - **Console**：`bridge`（状態とクライアント）、`bridge token new`、`bridge disconnect`。
 
 ## クライアントの設定
@@ -78,7 +79,36 @@ Claude Code：
 claude mcp add --transport http dragnwash http://127.0.0.1:47821/mcp --header "Authorization: Bearer <トークン>"
 ```
 
-VS Code（`.vscode/mcp.json`）と Cursor（`mcp.json`）は、HTTP のサーバーの項目に、同じ URL とヘッダーを書きます。Bridge のタブの **Copy setup** が、トークンを埋めてくれます。
+もう `dragnwash` を登録してあるとき（トークンやポートを変えたあと）は、先に `claude mcp remove dragnwash` を走らせてください。同じ名前で 2 回登録しようとすると失敗します。
+
+VS Code（`.vscode/mcp.json`）：
+
+```json
+{
+  "servers": {
+    "dragnwash": {
+      "type": "http",
+      "url": "http://127.0.0.1:47821/mcp",
+      "headers": { "Authorization": "Bearer <トークン>" }
+    }
+  }
+}
+```
+
+Cursor（プロジェクトの `.cursor/mcp.json`、または `~/.cursor/mcp.json`）：
+
+```json
+{
+  "mcpServers": {
+    "dragnwash": {
+      "url": "http://127.0.0.1:47821/mcp",
+      "headers": { "Authorization": "Bearer <トークン>" }
+    }
+  }
+}
+```
+
+Bridge のタブの **Copy setup** なら、この 3 つのどれでも、トークンといまのポートを埋めた形でコピーできます。
 
 ## まだしないこと
 

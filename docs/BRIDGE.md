@@ -46,7 +46,7 @@ Following the transport's security rules:
 ## What the player sees
 
 - **Mods screen**: the Bridge declares itself in `ModInfo.Network` (host 127.0.0.1, incoming, "lets AI clients on this computer read the game"), so the Online tag and page show it, as for any mod that uses the network ([Going online (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Going-online)).
-- **Bridge tab** (in the F1 window: the Bridge runs only with the developer tools on, and their screen is the F1 window): off / listening on the port; the clients connected, by the name they gave (`clientInfo`); the last calls; buttons **Disconnect all**, **New token**, and **Copy setup** (puts the command below on the clipboard).
+- **Bridge tab** (in the F1 window: the Bridge runs only with the developer tools on, and their screen is the F1 window): a panel at the top says whether it listens, with a bar in the accent colour, dim when it's off, and red with the reason when it can't listen. The red one has **Use a free port** (the first port after the current one that isn't in Windows' excluded ranges and that it can listen on for a moment on 127.0.0.1; saved as `[Bridge] Port`) and **Try again**. Under it, CONNECTION has the address, the token (never drawn, only copied) with **New token**, and **Copy setup** for Claude Code, VS Code or Cursor. CODE GRAPH opens the code graph or the graphs editor, in the app or the browser. CLIENTS lists who is connected, by the name they gave (`clientInfo`), each with its own **Disconnect**, and **Disconnect all**; LAST CALLS marks the failed ones.
 - **Console**: `bridge` (status and clients), `bridge token new`, `bridge disconnect`.
 
 ## Setting up a client
@@ -57,7 +57,36 @@ Claude Code:
 claude mcp add --transport http dragnwash http://127.0.0.1:47821/mcp --header "Authorization: Bearer <token>"
 ```
 
-VS Code (`.vscode/mcp.json`) and Cursor (`mcp.json`) take the same URL and header in their HTTP server entry. The Bridge tab's **Copy setup** fills in the token.
+If `dragnwash` is already set up (after a new token or a new port), run `claude mcp remove dragnwash` first: adding the same name twice fails.
+
+VS Code (`.vscode/mcp.json`):
+
+```json
+{
+  "servers": {
+    "dragnwash": {
+      "type": "http",
+      "url": "http://127.0.0.1:47821/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+Cursor (`.cursor/mcp.json` in the project, or `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "dragnwash": {
+      "url": "http://127.0.0.1:47821/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+The Bridge tab's **Copy setup** gives any of the three with the token and the current port filled in.
 
 ## What it does not do (yet)
 
