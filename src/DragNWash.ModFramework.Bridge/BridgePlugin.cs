@@ -426,7 +426,7 @@ namespace DragNWash.ModFramework.Bridge
                     return $"Disconnected {n} client(s).";
             }
             var sb = new StringBuilder();
-            sb.Append(Server != null ? $"Listening on http://127.0.0.1:{_port.Value}/mcp" : !_enabled.Value ? "Off ([Bridge] Enabled, or: bridge on)" : "On, but the developer tools are off");
+            sb.Append(Server != null ? $"Listening on http://127.0.0.1:{_port.Value}/mcp" : !_enabled.Value ? "Off ([Bridge] Enabled, or: bridge on)" : _note.Length > 0 ? _note : "On, but the developer tools are off");
             foreach (McpProtocol.Session s in McpProtocol.AllSessions())
             {
                 sb.Append($"\n  {s.Client}: {s.Calls} call(s), last {s.LastUsed:HH:mm:ss}");
