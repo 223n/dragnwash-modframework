@@ -45,9 +45,10 @@ namespace DragNWash.ModFramework.Mods
 
         internal static void Install(Harmony harmony)
         {
-            // Loaded here, from the plugin's Awake: a texture made later can
-            // crash Direct3D 12.
+            // Loaded and made here, from the plugin's Awake: a texture made
+            // later can crash Direct3D 12.
             LoadButtonArt();
+            ModsLook.MakeSprites();
             try
             {
                 MethodInfo onShow = AccessTools.Method(typeof(MenuOptions), "OnShow");
@@ -240,7 +241,7 @@ namespace DragNWash.ModFramework.Mods
                 MenuContainerField.SetValue(menu, container);
                 MenuIntentsField.SetValue(menu, intents);
                 menu.Content = (RectTransform)content;
-                menu.Details = SplitForDetails(panel);
+                SplitForDetails(panel, menu);
                 menu.Details.gameObject.AddComponent<DetailsResizeWatcher>().Menu = menu;
                 menu.gameObject.AddComponent<PadSupport>().Menu = menu;
                 menu.gameObject.AddComponent<UpdateResultWatcher>().Menu = menu;
@@ -261,7 +262,12 @@ namespace DragNWash.ModFramework.Mods
         // Both go into a holder that takes the scroll view's place, and are
         // anchored by fractions of it, so they keep their shares when the window
         // is resized (fixed offsets measured at build time did not).
-        private static RectTransform SplitForDetails(Transform panel)
+        //
+        // Each side sits on a panel of its own: a dark tint over a blurred copy
+        // of the game's picture (ModsGlass), or over the picture as it is
+        // when the glass is off. The game's see-through panel under the whole
+        // menu left how readable the text was to the picture behind it.
+        private static void SplitForDetails(Transform panel, ModsMenu menu)
         {
             var scroll = (RectTransform)panel.Find("Scroll View");
             Transform horizontal = scroll.Find("Scrollbar Horizontal");
@@ -279,13 +285,84 @@ namespace DragNWash.ModFramework.Mods
             split.anchoredPosition = scroll.anchoredPosition;
             split.sizeDelta = scroll.sizeDelta;
 
+            ModsGlass glass = split.gameObject.AddComponent<ModsGlass>();
+
+            // The list's panel starts right of the Back button's pointing hand,
+            // as the rows do.
+            RectTransform listCard = Glass(split, "List", 0f, 0.45f, out glass.ListBackdrop, out glass.ListTint, out glass.ListEdge);
+            listCard.offsetMin = new Vector2(ModsMenu.ListPanelLeft, 0f);
+            ((RectTransform)glass.ListBackdrop.transform.parent).offsetMin = listCard.offsetMin;
+
+            // A notch of the wheel moves about a row (the game's view moved 6),
+            // and the scrollbar is thin and dark like the rest of the panel.
+            ScrollRect scrollRect = scroll.GetComponent<ScrollRect>();
+            if (scrollRect != null)
+            {
+                scrollRect.scrollSensitivity = ModsLook.WheelStep;
+                ModsLook.StyleScrollbar(scrollRect.verticalScrollbar);
+            }
+
+            // The game leaves 50 above the first row, for its settings; the
+            // list's first heading sits under the filters as the other
+            // headings sit under the row before them.
+            VerticalLayoutGroup rows = menu.Content.GetComponent<VerticalLayoutGroup>();
+            if (rows != null)
+            {
+                rows.padding = new RectOffset(rows.padding.left, rows.padding.right, 8, rows.padding.bottom);
+            }
+
+            // The search field and the filters stay above the scrolling list.
             scroll.SetParent(split, false);
             Fill(scroll, 0f, 0.45f);
+            scroll.offsetMax = new Vector2(0f, -ModsMenu.ListTopHeight);
+            RectTransform listTop = ModsLook.Rect(split, "ListTop");
+            Fill(listTop, 0f, 0.45f);
+            listTop.anchorMin = new Vector2(0f, 1f);
+            listTop.pivot = new Vector2(0.5f, 1f);
+            listTop.offsetMin = new Vector2(0f, -ModsMenu.ListTopHeight);
+            listTop.offsetMax = Vector2.zero;
+            menu.ListTop = listTop;
+
+            Glass(split, "Details", 0.47f, 1f, out glass.DetailsBackdrop, out glass.DetailsTint, out glass.DetailsEdge);
 
             var details = (RectTransform)new GameObject("Details", typeof(RectTransform)).transform;
             details.SetParent(split, false);
             Fill(details, 0.47f, 1f);
-            return details;
+            menu.Details = details;
+        }
+
+        // A panel, from the back: the blurred picture, cut to the panel's
+        // rounded shape by a mask; the tint; and a faint line around it. The
+        // picture waits hidden until ModsGlass has one. Returns the tint's
+        // rect, which is the panel as the rest of the screen knows it.
+        private static RectTransform Glass(RectTransform split, string name, float left, float right,
+            out RawImage backdrop, out Image tint, out Image edge)
+        {
+            RectTransform shape = ModsLook.Rect(split, name + "Glass");
+            Fill(shape, left, right);
+            ModsLook.Shape(shape.gameObject, ModsLook.Rounded, Color.white, 18f).raycastTarget = false;
+            shape.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            RectTransform picture = ModsLook.Rect(shape, "Backdrop");
+            ModsLook.Stretch(picture);
+            backdrop = picture.gameObject.AddComponent<RawImage>();
+            backdrop.raycastTarget = false;
+            backdrop.enabled = false;
+
+            RectTransform card = ModsLook.Rect(split, name + "Panel");
+            Fill(card, left, right);
+            tint = ModsLook.Shape(card.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f);
+            tint.raycastTarget = false;
+
+            RectTransform line = ModsLook.Rect(card, "Edge");
+            ModsLook.Stretch(line);
+            edge = ModsLook.Shape(line.gameObject, ModsLook.PanelEdge, ModsLook.Hairline, 18f);
+            edge.raycastTarget = false;
+            if (ModsLook.PanelEdge == null)
+            {
+                // A square line would stick out of the rounded corners.
+                edge.enabled = false;
+            }
+            return card;
         }
 
         private static void Fill(RectTransform rect, float left, float right)

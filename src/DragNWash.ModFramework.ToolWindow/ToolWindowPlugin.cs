@@ -32,6 +32,11 @@ namespace DragNWash.ModFramework.ToolWindow
         private bool _savingConsole;
 
         internal bool ShowWindow;
+        // Asked to open before its font was made: it shows from the frame
+        // after the font is made (see MenuFont).
+        private bool _opening;
+        // The key pressed while developer tools are off, before the font was made.
+        private bool _toastSoon;
         // The tab being drawn, for ToolWindow.Busy.
         private ToolTab _drawingTab;
         // Until when the "developer tools are off" word shows after the key.
@@ -88,9 +93,10 @@ namespace DragNWash.ModFramework.ToolWindow
             // and the key refuse to open it while the switch is off.
             DeveloperTools.Changed += () =>
             {
-                if (!DeveloperTools.Enabled && ShowWindow)
+                if (!DeveloperTools.Enabled)
                 {
                     ShowWindow = false;
+                    _opening = false;
                 }
             };
             _rectSetting = Config.Bind("Window", "Rect", "24,24,780,580",
@@ -110,11 +116,8 @@ namespace DragNWash.ModFramework.ToolWindow
             _background = new Texture2D(1, 1);
             _background.SetPixel(0, 0, new Color(0.06f, 0.06f, 0.08f, 0.95f));
             _background.Apply();
-            MenuFont.Create(_fontMode.Value);
-            // Cut text ends in an ellipsis, and More has its triangle, where the font has them.
-            MenuFont.Prepare("\u2026\u25BE");
-            ToolWindow.Ellipsis = MenuText.CanDraw(MenuFont.Font, MenuFont.Size, "\u2026") ? "\u2026" : "...";
-            ToolWindow.DownArrow = MenuText.CanDraw(MenuFont.Font, MenuFont.Size, "\u25BE") ? "\u25BE" : "v";
+            // The font itself is made when the window first opens.
+            MenuFont.Configure(_fontMode.Value);
 
             var harmony = new Harmony(ToolWindow.Guid);
             Install("Pad and trackpad clicks", () => VirtualClick.Install(harmony));
@@ -236,7 +239,15 @@ namespace DragNWash.ModFramework.ToolWindow
             {
                 return;
             }
-            ShowWindow = open;
+            if (open)
+            {
+                Show();
+            }
+            else
+            {
+                ShowWindow = false;
+                _opening = false;
+            }
             if (open && tabTitle != null)
             {
                 lock (ToolWindow.Tabs)
@@ -248,6 +259,20 @@ namespace DragNWash.ModFramework.ToolWindow
                         _wantedTab = null;
                     }
                 }
+            }
+        }
+
+        // At once when the font is ready; otherwise Update makes it and the
+        // window shows on the frame after.
+        private void Show()
+        {
+            if (MenuFont.Usable)
+            {
+                ShowWindow = true;
+            }
+            else
+            {
+                _opening = true;
             }
         }
 
@@ -282,20 +307,48 @@ namespace DragNWash.ModFramework.ToolWindow
         private void Update()
         {
             MenuFont.FlushQueued();
+            MenuText.CheckQueued();
             ConsoleTab.Tick();
+
+            // Asked for before the font was made: they show now that it was
+            // made on an earlier frame.
+            if (_opening && MenuFont.Usable)
+            {
+                _opening = false;
+                ShowWindow = true;
+            }
+            if (_toastSoon && MenuFont.Usable)
+            {
+                _toastSoon = false;
+                _toastUntil = Time.realtimeSinceStartup + 6f;
+            }
 
             if (_toggleKey.Value.IsDown())
             {
-                if (ShowWindow || ToolsOn())
+                if (ShowWindow || _opening)
                 {
-                    ShowWindow = !ShowWindow;
+                    ShowWindow = false;
+                    _opening = false;
                 }
-                else
+                else if (ToolsOn())
+                {
+                    Show();
+                }
+                else if (MenuFont.Usable)
                 {
                     // Not nothing: the key was pressed, and the player sees why
                     // no window came.
                     _toastUntil = Time.realtimeSinceStartup + 6f;
                 }
+                else
+                {
+                    // The same, once its font is made.
+                    _toastSoon = true;
+                }
+            }
+            if (_opening || _toastSoon || MenuFont.Wanted)
+            {
+                MenuFont.Create();
             }
             // The window also closes from its own X button, so follow the state
             // here rather than only on the key.

@@ -2,9 +2,17 @@
 
 [日本語](ROADMAP.ja.md)
 
-Where Drag'n Wash ModFramework is going. Plans change; dates are given only when they are close. Updated 2026-09-20.
+Where Drag'n Wash ModFramework is going. Plans change; dates are given only when they are close. Updated 2026-09-23.
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
+
+## Pre-release: 1.5.0 (2026-09-23)
+
+The core, the preloader patcher and every library go to 1.5.0; from here on they share one number. See [CHANGELOG.md](../CHANGELOG.md) for the whole list.
+
+- **A whole new look.** The Mods screen looks like a settings app on frosted glass (a blurred copy of the game behind each panel), with search, filters, tabs for a mod's pages and a row per setting. Every tab of the F1 window was gone through: notices, questions right where you pressed, a window that opens where you left it, one row of tabs.
+- **Faster and safer.** Fonts the fallback drew are kept between starts, the F1 window's font is made when it first opens, and a restore or two snapshots in the same second no longer lose a save snapshot.
+- **The installer fetches ModFramework** from its own release, checked by size and SHA-256, and stops before changing anything when another mod loader is in the game folder.
 
 ## Released: 1.4.3 (2026-09-20)
 

@@ -27,6 +27,7 @@ namespace DragNWash.ModFramework
             FontAtlasUploads.Install(Config, harmony, this);
             // Before anything else can go online, the framework's own update check included.
             NetworkWatch.Install(Config, harmony);
+            Mods.ModsGlass.Install(Config);
             Mods.ModsScreen.Install(harmony);
             Options.OptionsRows.Install(harmony);
             Title.TitleVersion.Install(harmony);

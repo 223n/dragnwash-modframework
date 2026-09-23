@@ -1,70 +1,45 @@
 using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace DragNWash.ModFramework.Mods
 {
     // Pages other mods add to their entry on the Mods screen (ModsScreenPage).
-    // The details panel is handed over to the page; Back returns to the list.
+    // Each is a tab of the mod's details; the tab's area is handed over to it.
     internal sealed partial class ModsMenu
     {
         internal const string TextPageFailed = "This page could not be shown. See BepInEx/LogOutput.log.";
         internal const string TextTryAgain = "Try again";
 
-        private ModsScreenPage _page;
-        private ModCatalog.Entry _pageFor;
-
-        private void OpenPage(ModCatalog.Entry entry, ModsScreenPage page)
+        private void BuildPage(ModsScreenPage page)
         {
-            _page = page;
-            _pageFor = entry;
-            RebuildDetails(false);
-        }
-
-        private void ClosePage()
-        {
-            _page = null;
-            _selected = _pageFor ?? _selected;
-            _pageFor = null;
-            RebuildDetails(false);
-            Focus("Page0", "Page1", "Settings", "Switch");
-        }
-
-        private void BuildPage()
-        {
-            GameObject band = Part("Band", 0f, 1f, 0f, 1f);
-            Image bandImage = band.AddComponent<Image>();
-            bandImage.color = BandColor;
-            bandImage.raycastTarget = false;
-
-            Label("Mod", Escape(_pageFor?.DisplayName), UiText.BodySize, 0.91f, 0.98f, false);
-            Label("Title", _page.Title, UiText.TitleSize * 0.55f, 0.81f, 0.91f, false);
-
-            GameObject root = Part("PageContent", 0f, 1f, 0f, 0.8f);
-            var rect = (RectTransform)root.transform;
-            rect.offsetMin = new Vector2(28f, 20f);
-            rect.offsetMax = new Vector2(-28f, 0f);
+            RectTransform root = ModsLook.Rect(_body, "PageContent");
+            ModsLook.Stretch(root);
             try
             {
-                _page.Build(rect);
+                page.Build(root);
             }
             catch (Exception ex)
             {
-                ModFramework.Log.LogError($"The page \"{_page.Title}\" of {_page.Guid} threw while building: {ex}");
+                ModFramework.Log.LogError($"The page \"{page.Title}\" of {page.Guid} threw while building: {ex}");
                 // Whatever the page built before it threw is hidden, so half a
                 // page does not sit there looking like the whole of it. Some of
                 // what a page shows can be missing for a moment only, so one
                 // press builds it again rather than a restart.
-                root.SetActive(false);
-                TMP_Text failed = Label("PageFailed", TextPageFailed, UiText.BodySize, 0.5f, 0.76f, true);
-                failed.alignment = TextAlignmentOptions.TopLeft;
-                failed.color = WarnColor;
-                MakeButton("TryAgain", TextTryAgain, 0.04f, 0.4f, 0.04f, 0.16f, StepColor, () =>
+                root.gameObject.SetActive(false);
+                RectTransform content = ScrollArea(_body);
+                Line(content, TextPageFailed, 22f, FontStyles.Normal, ModsLook.Warning, 0f);
+                Spacer(content, 12f);
+                RectTransform row = ModsLook.Rect(content, "TryAgainRow");
+                ModsLook.Size(row.gameObject, -1f, 48f, 1f, 0f);
+                GameObject button = FlatButton(row, "TryAgain", TextTryAgain, 20f, ModsLook.Raised, ModsLook.Label, () =>
                 {
                     RebuildDetails(false);
                     Focus("TryAgain");
                 });
+                var rect = (RectTransform)button.transform;
+                rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
+                rect.pivot = new Vector2(0f, 0.5f);
                 Focus("TryAgain");
             }
         }

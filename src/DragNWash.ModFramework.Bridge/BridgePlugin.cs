@@ -27,8 +27,19 @@ namespace DragNWash.ModFramework.Bridge
         private ConfigEntry<bool> _enabled;
         private ConfigEntry<int> _port;
         private ConfigEntry<string> _openIn;
-        private string _note = "";
+        private string _note = "";              // why the last Listen failed, whole, for the log and the console
+        private ListenProblem _problem;         // the same, for the band at the top of the tab
+        private int _problemPort;
+        private string _problemText = "";
         private Vector2 _scroll;
+        private float _contentHeight = 400;     // how tall the tab came out last draw
+        private volatile bool _searching;       // Use a free port is looking
+        private int _searchFrom;
+        private int _found = -1;                // what it found, for Update: the port, 0 for none, -1 for nothing yet
+        private int _portChangedFrom;           // the port clients were set up for, until they are set up again; 0 for none
+        private DateTime _portChangedAt;
+
+        private enum ListenProblem { None, Reserved, InUse, Other }
 
         private void Awake()
         {
@@ -82,8 +93,23 @@ namespace DragNWash.ModFramework.Bridge
 
         private void Apply()
         {
-            if (Wanted && Server == null) Listen();
-            else if (!Wanted && Server != null) Stop(_enabled.Value ? "the developer tools were turned off" : "it was switched off");
+            if (Wanted && Server == null)
+            {
+                Listen();
+            }
+            else if (!Wanted)
+            {
+                Stop(_enabled.Value ? "the developer tools were turned off" : "it was switched off");
+                // Off is off: an old failure no longer shows under it.
+                ClearProblem();
+            }
+        }
+
+        private void ClearProblem()
+        {
+            _note = "";
+            _problem = ListenProblem.None;
+            _problemText = "";
         }
 
         // Not named Start: Unity calls a MonoBehaviour's Start() by itself after Awake.
@@ -99,19 +125,115 @@ namespace DragNWash.ModFramework.Bridge
                 // browser, above all) takes the front: keep answering while listening.
                 if (_runInBackground == null) _runInBackground = Application.runInBackground;
                 Application.runInBackground = true;
-                _note = "";
+                ClearProblem();
                 Log.LogInfo($"[bridge] Listening on http://127.0.0.1:{_port.Value}/mcp (read-only, this computer only).");
             }
             catch (Exception ex)
             {
                 Server = null;
-                _note = $"Could not listen on port {_port.Value}: {ex.Message}. Another program may use it; change [Bridge] Port.";
+                var socket = ex as System.Net.Sockets.SocketException ?? ex.InnerException as System.Net.Sockets.SocketException;
+                _problem = socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied ? ListenProblem.Reserved
+                    : socket != null && socket.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse ? ListenProblem.InUse
+                    : ListenProblem.Other;
+                _problemPort = _port.Value;
+                _problemText = ex.Message.Trim().TrimEnd('.', '。');
+                _note = $"Could not listen on port {_port.Value}: {_problemText}. " + ListenAdvice(_problem);
                 Log.LogWarning("[bridge] " + _note);
             }
         }
 
-        private static void Stop(string why)
+        // What to do about a port that could not be used. "Access denied" on
+        // Windows nearly always means the port sits in a range Windows keeps for
+        // Hyper-V, WSL or Docker (see "netsh interface ipv4 show
+        // excludedportrange protocol=tcp"); those ranges can move at every
+        // restart, so the port may work again later or stop working one day.
+        private static string ListenAdvice(ListenProblem problem)
         {
+            if (problem == ListenProblem.Reserved)
+            {
+                return "Windows has probably set this port aside (Hyper-V, WSL and Docker do that, and the ranges can change when the PC restarts). " +
+                       "Press Use a free port in the Bridge tab of the F1 window (or change [Bridge] Port), and set your client up again.";
+            }
+            return "Another program may use it; press Use a free port in the Bridge tab of the F1 window, or change [Bridge] Port.";
+        }
+
+        // Why it isn't listening, in one line for a notice: made from the kind
+        // of failure, not the system's message, which can be in the system's
+        // language and a notice draws ASCII only (the log and the console
+        // have the whole _note).
+        private string NotListening()
+        {
+            switch (_problem)
+            {
+                case ListenProblem.None:
+                    return "The Bridge is not listening: the developer tools are off.";
+                case ListenProblem.Reserved:
+                    return $"The Bridge is not listening: Windows won't let the game use port {_problemPort}. The Bridge tab of the F1 window can move it to a free port.";
+                case ListenProblem.InUse:
+                    return $"The Bridge is not listening: port {_problemPort} is in use. The Bridge tab of the F1 window can move it to a free port.";
+                default:
+                    return $"The Bridge is not listening on port {_problemPort}. The Bridge tab of the F1 window says why.";
+            }
+        }
+
+        // "Use a free port": looks on a worker thread (netsh and a bind per
+        // port take a moment), then Update moves the Bridge there.
+        private void UseFreePort()
+        {
+            if (_searching) return;
+            _searching = true;
+            int from = _searchFrom = _port.Value;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                int found = 0;
+                try
+                {
+                    found = FreePort.After(from);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogWarning($"[bridge] Looking for a free port failed: {ex.Message}");
+                }
+                System.Threading.Interlocked.Exchange(ref _found, found);
+            });
+        }
+
+        private void Update()
+        {
+            int found = System.Threading.Interlocked.Exchange(ref _found, -1);
+            if (found < 0) return;
+            _searching = false;
+            if (found == 0)
+            {
+                TW.ShowNotice($"None of the {FreePort.Tries} ports after {_searchFrom} is free. Try again after the PC restarts.", NoticeKind.Error);
+                return;
+            }
+            // Turned off, moved elsewhere or listening again while it looked.
+            if (!Wanted || Server != null || _port.Value != _searchFrom) return;
+            if (_portChangedFrom == 0) _portChangedFrom = _searchFrom;
+            if (_portChangedFrom == found) _portChangedFrom = 0;
+            _portChangedAt = DateTime.Now;
+            Log.LogInfo($"[bridge] Port {_searchFrom} could not be used; moving to {found}.");
+            _port.Value = found;   // saved, and SettingChanged listens on it
+            if (Server != null)
+            {
+                TW.ShowNotice(_portChangedFrom != 0
+                    ? $"Listening on port {found} now. Clients set up for {_portChangedFrom} need the new setup (Copy setup)."
+                    : $"Listening on port {found} now.", NoticeKind.Info, 10f);
+            }
+        }
+
+        private void TryAgain()
+        {
+            int port = _port.Value;
+            Apply();
+            if (Server != null) TW.ShowNotice($"Listening on port {port} now.", NoticeKind.Info, 6f);
+            else TW.ShowNotice($"Port {port} still can't be used.", NoticeKind.Warning, 6f);
+        }
+
+        private void Stop(string why)
+        {
+            ClearProblem();
             if (Server == null) return;
             Server.Stop();
             Server = null;
@@ -135,7 +257,8 @@ namespace DragNWash.ModFramework.Bridge
                 "a line saying it opened",
                 args =>
                 {
-                    if (Server == null) throw new InvalidOperationException(_enabled.Value ? "The Bridge is not listening (the developer tools are off, or the port is taken)." : "The Bridge is off: turn it on in the Bridge tab of the F1 window.");
+                    if (Server == null) throw new InvalidOperationException(!_enabled.Value ? "The Bridge is off: turn it on in the Bridge tab of the F1 window."
+                        : NotListening());
                     string focus = args.String("focus");
                     if (OpenInApp(focus)) return "Opened the code graph in its window.";
                     string url = $"http://127.0.0.1:{_port.Value}/page#code={PageDoor.NewCode()}";
@@ -160,10 +283,32 @@ namespace DragNWash.ModFramework.Bridge
 
         // CodeGraph.exe, next to this DLL, on Windows: it signs in with the token by itself,
         // and a window already open takes the focus instead of a second one opening.
+        private static string CodeGraphExe => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(BridgePlugin).Assembly.Location) ?? "", "CodeGraph", "CodeGraph.exe");
+
+        private static bool AppPossible => Application.platform == RuntimePlatform.WindowsPlayer;
+
+        // Whether CodeGraph.exe is there, for the tab: looked up every few
+        // seconds rather than on every draw.
+        private bool _appThere;
+        private float _appCheckedAt = -10f;
+
+        private bool AppThere
+        {
+            get
+            {
+                if (Time.unscaledTime - _appCheckedAt > 3f)
+                {
+                    _appCheckedAt = Time.unscaledTime;
+                    _appThere = AppPossible && System.IO.File.Exists(CodeGraphExe);
+                }
+                return _appThere;
+            }
+        }
+
         private bool OpenInApp(string focus)
         {
-            if (_openIn.Value != "App" || Application.platform != RuntimePlatform.WindowsPlayer) return false;
-            string exe = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(BridgePlugin).Assembly.Location) ?? "", "CodeGraph", "CodeGraph.exe");
+            if (_openIn.Value != "App" || !AppPossible) return false;
+            string exe = CodeGraphExe;
             if (!System.IO.File.Exists(exe)) return false;
             try
             {
@@ -199,7 +344,7 @@ namespace DragNWash.ModFramework.Bridge
             var names = new List<string>();
             foreach (McpProtocol.Session c in sessions)
             {
-                string name = string.IsNullOrEmpty(c.Client) ? "a client" : c.Client;
+                string name = string.IsNullOrEmpty(c.Client) ? "a client" : TW.Drawable(c.Client);
                 if (!names.Contains(name)) names.Add(name);
             }
             if (names.Count > 3)
@@ -217,7 +362,42 @@ namespace DragNWash.ModFramework.Bridge
             return names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
         }
 
-        private string Setup => $"claude mcp add --transport http dragnwash http://127.0.0.1:{_port.Value}/mcp --header \"Authorization: Bearer {BridgeToken.Value}\"";
+        private string Address => $"http://127.0.0.1:{_port.Value}/mcp";
+
+        // The clients Copy setup has a setup for, each in the form its own
+        // documentation gives: Claude Code's "claude mcp add" with --header,
+        // VS Code's .vscode/mcp.json ("servers", type "http", "headers"), and
+        // Cursor's mcp.json ("mcpServers", "url", "headers").
+        private static readonly string[] Clients = { "Claude Code", "VS Code", "Cursor" };
+        private int _client;
+
+        private string SetupFor(int client)
+        {
+            string token = BridgeToken.Value;   // letters, digits, '-' and '_' (BridgeToken checks a saved one): nothing to escape
+            string headers = "      \"headers\": { \"Authorization\": \"Bearer " + token + "\" }\n";
+            switch (client)
+            {
+                case 1:
+                    return "{\n  \"servers\": {\n    \"dragnwash\": {\n      \"type\": \"http\",\n      \"url\": \"" + Address + "\",\n" + headers + "    }\n  }\n}\n";
+                case 2:
+                    return "{\n  \"mcpServers\": {\n    \"dragnwash\": {\n      \"url\": \"" + Address + "\",\n" + headers + "    }\n  }\n}\n";
+                default:
+                    return $"claude mcp add --transport http dragnwash {Address} --header \"Authorization: Bearer {token}\"";
+            }
+        }
+
+        private static string SetupNote(int client)
+        {
+            switch (client)
+            {
+                case 1:
+                    return "For .vscode/mcp.json in your project. If the file lists other servers, add just the dragnwash entry to them.";
+                case 2:
+                    return "For .cursor/mcp.json in your project, or ~/.cursor/mcp.json for every project. If the file lists other servers, add just the dragnwash entry.";
+                default:
+                    return "Run it in a terminal. Already set up in Claude Code? Run claude mcp remove dragnwash first, since adding the same name twice fails.";
+            }
+        }
 
         private string Command(string[] args)
         {
@@ -246,7 +426,7 @@ namespace DragNWash.ModFramework.Bridge
                     return $"Disconnected {n} client(s).";
             }
             var sb = new StringBuilder();
-            sb.Append(Server != null ? $"Listening on http://127.0.0.1:{_port.Value}/mcp" : !_enabled.Value ? "Off ([Bridge] Enabled, or: bridge on)" : "On, but the developer tools are off");
+            sb.Append(Server != null ? $"Listening on http://127.0.0.1:{_port.Value}/mcp" : !_enabled.Value ? "Off ([Bridge] Enabled, or: bridge on)" : _note.Length > 0 ? _note : "On, but the developer tools are off");
             foreach (McpProtocol.Session s in McpProtocol.AllSessions())
             {
                 sb.Append($"\n  {s.Client}: {s.Calls} call(s), last {s.LastUsed:HH:mm:ss}");
@@ -254,89 +434,307 @@ namespace DragNWash.ModFramework.Bridge
             return sb.ToString();
         }
 
-        private void DrawTab(Rect area)
+        // The state at the top of the tab: a panel with a 3 px bar in its
+        // colour (accent listening, muted off, error when it cannot listen),
+        // one line saying it, the reason under it, and the buttons that change
+        // it. Returns the bottom.
+        private float DrawStatus(float x, float y, float width)
         {
             var s = TW.Styles;
-            TW.Fill(area, TW.InsetColor);
-            float x = 12, w = area.width - 24, row = TW.RowHeight;
-            float inner = w - 20;
-            List<McpProtocol.Session> sessions = McpProtocol.AllSessions();
-            List<McpProtocol.CallRecord> calls = McpProtocol.RecentCalls();
-            float content = 360 + (sessions.Count + calls.Count) * 26 + (TW.IsConfirming(NewTokenId) || TW.IsConfirming(DisconnectId) ? row + 6 : 0);
-            TW.ApplyScroll(area, ref _scroll);
-            _scroll = GUI.BeginScrollView(area, _scroll, new Rect(0, 0, inner, Mathf.Max(area.height, content)), false, false);
-            float y = 8;
-            GUI.Label(new Rect(x, y, inner, 26), "BRIDGE: AI CLIENTS OVER MCP (READ-ONLY)", s.Label);
-            y += 32;
-            string status = Server != null ? $"Listening on http://127.0.0.1:{_port.Value}/mcp. Clients can read the game; nothing can be changed."
-                : !_enabled.Value ? "Off. AI clients on this computer cannot reach the game."
-                : "On, but the developer tools are off, so it is not listening.";
-            GUI.Label(new Rect(x, y, inner, 44), status, s.WrappedLabel);
-            y += 48;
-            // The row wraps: six buttons do not fit a narrow window, and the
-            // last of them was walking off the edge.
-            float bx = x, by = y;
-            bool Button(string label, float width, bool lit = false)
+            bool failed = Server == null && _enabled.Value && _problem != ListenProblem.None;
+            Color bar;
+            string title, detail;
+            if (Server != null)
             {
-                if (bx > x && bx + width > x + inner)
-                {
-                    bx = x;
-                    by += row + 6;
-                }
-                bool pressed = GUI.Button(new Rect(bx, by, width, row), label, lit ? s.SelectedButton : s.Button);
-                bx += width + 8;
-                return pressed;
+                bar = TW.AccentColor;
+                title = $"Listening on 127.0.0.1:{Server.Port}";
+                detail = "AI clients on this computer can read the game. Nothing can be changed from outside.";
+            }
+            else if (!_enabled.Value)
+            {
+                bar = TW.MutedColor;
+                title = "Off";
+                detail = "AI clients on this computer can't reach the game.";
+            }
+            else if (failed)
+            {
+                bar = TW.ErrorColor;
+                ProblemLines(out title, out detail);
+            }
+            else
+            {
+                // Hardly seen: the F1 window is the developer tools' screen.
+                bar = TW.MutedColor;
+                title = "On, but the developer tools are off";
+                detail = "The Bridge only listens while the developer tools are on.";
             }
 
-            if (Button(Server != null || _enabled.Value ? "Turn off" : "Turn on", 120, _enabled.Value))
+            // Mending it where it shows: the Mods screen's port stepper jumps
+            // by thousands, and a gamepad or the Deck has no cfg to edit.
+            string[] buttons = failed
+                ? new[] { _searching ? "Looking..." : "Use a free port", "Try again", "Turn off" }
+                : new[] { _enabled.Value ? "Turn off" : "Turn on" };
+            const float pad = 10, titleHeight = 26;
+            float textX = x + 3 + pad, textWidth = width - 3 - pad * 2;
+            float detailHeight = s.WrappedLabel.CalcHeight(new GUIContent(detail), textWidth);
+            float height = pad + titleHeight + detailHeight + 8 + ButtonRow.Height(textWidth, buttons) + pad;
+            TW.Fill(new Rect(x, y, width, height), TW.PanelColor);
+            TW.Fill(new Rect(x, y, 3, height), bar);
+            var titleRect = new Rect(textX, y + pad, textWidth, titleHeight);
+            // The title in the error colour too when it can't listen, as the mock has it.
+            GUIStyle titleStyle = failed ? s.Danger : s.Label;
+            string shown = TW.Elide(title, titleStyle, textWidth);
+            GUI.Label(titleRect, shown, titleStyle);
+            if (shown != title) TW.Hint(titleRect, title);
+            GUI.Label(new Rect(textX, y + pad + titleHeight, textWidth, detailHeight), detail, s.WrappedLabel);
+
+            var row = new ButtonRow(textX, y + pad + titleHeight + detailHeight + 8, textWidth);
+            if (failed)
+            {
+                bool was = GUI.enabled;
+                GUI.enabled = was && !_searching;
+                if (row.Button(buttons[0])) UseFreePort();
+                if (row.Button(buttons[1])) TryAgain();
+                GUI.enabled = was;
+            }
+            if (row.Button(buttons[buttons.Length - 1]))
             {
                 _enabled.Value = !_enabled.Value;
             }
-            // The page is where graphs are made, so it needs a way in that does
-            // not go through the game's code: the Inspector's Graph buttons open
-            // it at a method, which is no help to somebody writing a graph.
-            if (Button("Open page", 120))
+            return y + height;
+        }
+
+        // What went wrong, said for the player: the port is in the title so a
+        // screenshot carries it, and the system's own words only when the
+        // cause is not one of the two usual ones.
+        private void ProblemLines(out string title, out string detail)
+        {
+            switch (_problem)
             {
-                OpenPage(null);
+                case ListenProblem.Reserved:
+                    title = $"Not listening: Windows won't let the game use port {_problemPort}";
+                    detail = "Windows keeps some ports for Hyper-V, WSL or Docker, and which ones can change when the PC restarts. Use a free port and set your client up again, or try this one later.";
+                    break;
+                case ListenProblem.InUse:
+                    title = $"Not listening: port {_problemPort} is in use";
+                    detail = "Another program probably has it. Use a free port, or close that program and try again.";
+                    break;
+                default:
+                    title = $"Not listening on port {_problemPort}";
+                    // Mono's message can come in the system's language.
+                    detail = TW.Drawable(_problemText) + ". Use a free port, or try again.";
+                    break;
             }
-            // The same page, on the editor: somebody writing a graph has no
-            // reason to arrive at the game's code first.
-            if (Button("Graphs", 120))
+        }
+
+        // Buttons in a row that wraps: each as wide as its text, on the next
+        // line when it does not fit. Height measures without drawing, for a
+        // panel that is filled before its buttons are drawn on it.
+        private sealed class ButtonRow
+        {
+            private const float Gap = 8;
+            private readonly float _left, _right;
+            private float _x, _y;
+
+            internal ButtonRow(float left, float top, float width)
             {
-                OpenPage("v:graphs");
+                _left = _x = left;
+                _right = left + width;
+                _y = top;
             }
-            if (Button("Copy setup", 130))
+
+            internal float Bottom => _y + TW.RowHeight;
+
+            internal static float Width(string label) => Mathf.Max(90f, TW.Styles.Button.CalcSize(new GUIContent(label)).x + 20f);
+
+            internal static float Height(float width, params string[] labels)
             {
-                GUIUtility.systemCopyBuffer = Setup;
-                TW.ShowNotice("The Claude Code setup command, with the token, is on the clipboard.", NoticeKind.Info, 8f);
+                var row = new ButtonRow(0, 0, width);
+                foreach (string label in labels) row.Place(Width(label));
+                return row.Bottom;
             }
-            // Both cut off whoever is connected, so they ask first - and only
+
+            internal Rect Place(float width)
+            {
+                if (_x > _left && _x + width > _right)
+                {
+                    _x = _left;
+                    _y += TW.RowHeight + 6;
+                }
+                var rect = new Rect(_x, _y, width, TW.RowHeight);
+                _x += width + Gap;
+                return rect;
+            }
+
+            internal bool Button(string label, bool lit = false)
+            {
+                return GUI.Button(Place(Width(label)), label, lit ? TW.Styles.SelectedButton : TW.Styles.Button);
+            }
+        }
+
+        // Address, token and setup, a row each, every one with its own Copy.
+        // The token is never drawn: the tab may be on a stream or in a
+        // screenshot. Copying it alone gives away no more than Copy setup,
+        // which always had it in.
+        private float DrawConnection(float x, float y, float width, string who)
+        {
+            var s = TW.Styles;
+            float row = TW.RowHeight, labelWidth = 80, left = x + labelWidth, room = width - labelWidth;
+            // Copying works while it is not listening, for setting a client up
+            // ahead; the notice says it won't answer yet.
+            string later = Server != null ? "" : " It won't answer until the Bridge is listening.";
+            GUI.Label(new Rect(x, y, width, 26), "CONNECTION", s.Label);
+            y += 30;
+
+            string address = Address;
+            float copyWidth = ButtonRow.Width("Copy");
+            GUI.Label(new Rect(x, y, labelWidth, row), "Address", s.MutedLabel);
+            float addressWidth = Mathf.Max(0, room - copyWidth - 8);
+            GUI.Label(new Rect(left, y, addressWidth, row), TW.Elide(address, s.Label, addressWidth), s.Label);
+            if (GUI.Button(new Rect(x + width - copyWidth, y, copyWidth, row), "Copy", s.Button))
+            {
+                GUIUtility.systemCopyBuffer = address;
+                _portChangedFrom = 0;
+                TW.ShowNotice("The address is on the clipboard." + later, NoticeKind.Info, 8f);
+            }
+            y += row + 6;
+            // After Use a free port, until a copy or a client connecting shows
+            // the client has the new address.
+            // Back on the old port (the Mods screen, the cfg): nothing to redo.
+            if (_portChangedFrom == _port.Value) _portChangedFrom = 0;
+            if (_portChangedFrom != 0)
+            {
+                // A panel with a 3 px bar in the warning colour, like a notice.
+                var line = new Rect(x, y, width, 26);
+                TW.Fill(line, TW.PanelColor);
+                TW.Fill(new Rect(x, y, 3, 26), TW.WarningColor);
+                string changed = $"Port changed from {_portChangedFrom}. Set your client up again with Copy setup.";
+                var text = new Rect(x + 13, y, width - 23, 26);
+                string changedShown = TW.Elide(changed, s.Label, text.width);
+                GUI.Label(text, changedShown, s.Label);
+                if (changedShown != changed) TW.Hint(line, changed);
+                y += 32;
+            }
+
+            float newWidth = ButtonRow.Width("New token"), buttonsWidth = copyWidth + 8 + newWidth;
+            GUI.Label(new Rect(x, y, labelWidth, row), "Token", s.MutedLabel);
+            const string kept = "Kept in your user profile, never shown here";
+            var keptRect = new Rect(left, y, Mathf.Max(0, room - buttonsWidth - 8), row);
+            string keptShown = TW.Elide(kept, s.MutedLabel, keptRect.width);
+            GUI.Label(keptRect, keptShown, s.MutedLabel);
+            if (keptShown != kept) TW.Hint(keptRect, kept);
+            if (GUI.Button(new Rect(x + width - buttonsWidth, y, copyWidth, row), "Copy", s.Button))
+            {
+                GUIUtility.systemCopyBuffer = BridgeToken.Value;
+                TW.ShowNotice("The token is on the clipboard." + later, NoticeKind.Info, 8f);
+            }
+            // It cuts off whoever is connected, so it asks first - and only
             // then: with nobody connected there is nothing to lose.
-            string who = Connected(sessions);
-            if (Button("New token", 120, TW.IsConfirming(NewTokenId)))
+            if (GUI.Button(new Rect(x + width - newWidth, y, newWidth, row), "New token", TW.IsConfirming(NewTokenId) ? s.SelectedButton : s.Button))
             {
                 if (who == null) NewToken(null);
                 else TW.AskConfirm(NewTokenId);
             }
-            if (Button("Disconnect all", 150, TW.IsConfirming(DisconnectId)))
-            {
-                if (who == null) TW.ShowNotice("No client is connected.", NoticeKind.Info, 6f);
-                else TW.AskConfirm(DisconnectId);
-            }
-            y = by;
-            y += row + 10;
+            y += row + 6;
             if (TW.IsConfirming(NewTokenId))
             {
-                if (TW.Confirm(new Rect(x, y, inner, row), NewTokenId, who != null ? $"New token? Disconnects {who}." : "New token?", "Yes, new token",
+                if (TW.Confirm(new Rect(x, y, width, row), NewTokenId, who != null ? $"New token? Disconnects {who}." : "New token?", "Yes, new token",
                     "Yes makes the token; Cancel or 5 s keeps the old one. Esc = Cancel."))
                 {
                     NewToken(who);
                 }
                 y += row + 6;
             }
+
+            GUI.Label(new Rect(x, y, labelWidth, row), "Setup", s.MutedLabel);
+            var buttons = new ButtonRow(left, y, room);
+            for (int i = 0; i < Clients.Length; i++)
+            {
+                if (buttons.Button(Clients[i], _client == i)) _client = i;
+            }
+            if (buttons.Button("Copy setup"))
+            {
+                GUIUtility.systemCopyBuffer = SetupFor(_client);
+                _portChangedFrom = 0;
+                TW.ShowNotice($"The {Clients[_client]} setup, with the token, is on the clipboard." + later, NoticeKind.Info, 8f);
+            }
+            y = buttons.Bottom + 4;
+            string note = SetupNote(_client);
+            float noteHeight = s.WrappedLabel.CalcHeight(new GUIContent(note), room);
+            GUI.Label(new Rect(left, y, room, noteHeight), note, s.WrappedLabel);
+            return y + noteHeight;
+        }
+
+        // The page's two ways in, and where they open. The page is where
+        // graphs are made, so it needs a way in that does not go through the
+        // game's code (the Inspector's Graph buttons open it at a method), and
+        // somebody writing a graph has no reason to arrive at the code first.
+        private static readonly string[] OpenInChoices = { "App", "Browser" };
+
+        private float DrawCodeGraph(float x, float y, float width)
+        {
+            var s = TW.Styles;
+            GUI.Label(new Rect(x, y, width, 26), "CODE GRAPH", s.Label);
+            y += 30;
+            bool listening = Server != null;
+            var row = new ButtonRow(x, y, width);
+            bool was = GUI.enabled;
+            GUI.enabled = was && listening;
+            if (row.Button("Code graph")) OpenPage(null);
+            if (row.Button("Graphs editor")) OpenPage("v:graphs");
+            GUI.enabled = was;
+
+            string note = null;
+            if (AppPossible)
+            {
+                // The same setting as the Mods screen's "Open the code graph in",
+                // and it can be picked before the Bridge listens.
+                Rect label = row.Place(s.MutedLabel.CalcSize(new GUIContent("Opens in")).x + 4);
+                GUI.Label(label, "Opens in", s.MutedLabel);
+                foreach (string where in OpenInChoices)
+                {
+                    if (row.Button(where, _openIn.Value == where) && _openIn.Value != where) _openIn.Value = where;
+                }
+                if (listening && _openIn.Value == "App" && !AppThere) note = "CodeGraph.exe isn't there, so it opens in the browser.";
+            }
+            else if (listening)
+            {
+                note = "Opens in the browser.";
+            }
+            if (!listening)
+            {
+                note = "Opens once the Bridge is listening.";
+            }
+            y = row.Bottom + 4;
+            if (note != null)
+            {
+                GUI.Label(new Rect(x, y, width, 26), TW.Elide(note, s.MutedLabel, width), s.MutedLabel);
+                y += 26;
+            }
+            return y;
+        }
+
+        // Who is connected, each with a Disconnect of its own, and the last
+        // calls. A client's name is its own (clientInfo), so it goes through
+        // Drawable, is cut to its column, and shows whole on the hint line.
+        private float DrawClients(float x, float y, float width, List<McpProtocol.Session> sessions, List<McpProtocol.CallRecord> calls, string who)
+        {
+            var s = TW.Styles;
+            float row = TW.RowHeight;
+            float allWidth = ButtonRow.Width("Disconnect all");
+            string heading = $"CLIENTS ({sessions.Count})" + (PageDoor.SignedIn > 0 ? $"   PAGE: {PageDoor.SignedIn} signed in" : "");
+            GUI.Label(new Rect(x, y, width - allWidth - 8, row), TW.Elide(heading, s.Label, width - allWidth - 8), s.Label);
+            // It cuts off everyone, so it asks first - and only then: with
+            // nobody connected there is nothing to lose.
+            if (GUI.Button(new Rect(x + width - allWidth, y, allWidth, row), "Disconnect all", TW.IsConfirming(DisconnectId) ? s.SelectedButton : s.Button))
+            {
+                if (who == null) TW.ShowNotice("No client is connected.", NoticeKind.Info, 6f);
+                else TW.AskConfirm(DisconnectId);
+            }
+            y += row + 6;
             if (TW.IsConfirming(DisconnectId))
             {
-                if (TW.Confirm(new Rect(x, y, inner, row), DisconnectId, who != null ? $"Disconnect {who}?" : "Disconnect every client?", "Yes, disconnect",
+                if (TW.Confirm(new Rect(x, y, width, row), DisconnectId, who != null ? $"Disconnect {who}?" : "Disconnect every client?", "Yes, disconnect",
                     "Yes disconnects them; they can connect again with the same token. Cancel or 5 s keeps them. Esc = Cancel."))
                 {
                     McpProtocol.EndAll();
@@ -345,38 +743,90 @@ namespace DragNWash.ModFramework.Bridge
                 }
                 y += row + 6;
             }
-            if (_note.Length > 0)
-            {
-                GUI.Label(new Rect(x, y, inner, 44), _note, s.WrappedLabel);
-                y += 48;
-            }
-            GUI.Label(new Rect(x, y, inner, 60), "Setup for Claude Code (Copy setup puts it on the clipboard with the token): claude mcp add --transport http dragnwash http://127.0.0.1:" + _port.Value + "/mcp --header \"Authorization: Bearer <token>\". VS Code and Cursor take the same URL and header. The token is kept in your user profile, not in the game folder.", s.WrappedLabel);
-            y += 72;
-            GUI.Label(new Rect(x, y, inner, 26), $"CLIENTS ({sessions.Count})" + (PageDoor.SignedIn > 0 ? $"   PAGE: {PageDoor.SignedIn} signed in" : ""), s.Label);
-            y += 28;
             if (sessions.Count == 0)
             {
-                GUI.Label(new Rect(x, y, inner, 26), "None connected.", s.MutedLabel);
+                GUI.Label(new Rect(x, y, width, 26), "None connected.", s.MutedLabel);
                 y += 26;
             }
+            float nameWidth = Mathf.Min(320f, width * 0.45f);
+            float oneWidth = ButtonRow.Width("Disconnect");
             foreach (McpProtocol.Session c in sessions)
             {
-                GUI.Label(new Rect(x, y, inner, 26), $"{c.Client}  (MCP {c.Version}), {c.Calls} call(s), since {c.Started:HH:mm:ss}, last {c.LastUsed:HH:mm:ss}", s.MutedLabel);
-                y += 26;
+                string name = TW.Drawable(string.IsNullOrEmpty(c.Client) ? "a client" : c.Client);
+                GUI.Label(new Rect(x, y, nameWidth, row), TW.Elide(name, s.Label, nameWidth - 8), s.Label);
+                string counts = $"{c.Calls} call{(c.Calls == 1 ? "" : "s")}, last {c.LastUsed:HH:mm:ss}";
+                float countsWidth = Mathf.Max(0, width - nameWidth - oneWidth - 8);
+                GUI.Label(new Rect(x + nameWidth, y, countsWidth, row), TW.Elide(counts, s.MutedLabel, countsWidth), s.MutedLabel);
+                TW.Hint(new Rect(x, y, width - oneWidth - 8, row), $"{name} (MCP {c.Version}), since {c.Started:HH:mm:ss}, {counts}");
+                // No question: the same token lets it straight back in.
+                if (GUI.Button(new Rect(x + width - oneWidth, y + 2, oneWidth, row - 4), "Disconnect", s.Button))
+                {
+                    McpProtocol.EndSession(c.Id);
+                    TW.ShowNotice($"Disconnected {name}. It can connect again with the same token.", NoticeKind.Info, 6f);
+                }
+                y += row;
             }
+
             y += 8;
-            GUI.Label(new Rect(x, y, inner, 26), "LAST CALLS", s.Label);
+            GUI.Label(new Rect(x, y, width, 26), "LAST CALLS", s.Label);
             y += 28;
             if (calls.Count == 0)
             {
-                GUI.Label(new Rect(x, y, inner, 26), "None yet.", s.MutedLabel);
+                GUI.Label(new Rect(x, y, width, 26), "None yet.", s.MutedLabel);
+                y += 26;
             }
+            float timeWidth = s.MutedLabel.CalcSize(new GUIContent("00:00:00")).x + 12;
+            float clientWidth = Mathf.Min(240f, width * 0.3f);
+            float tagWidth = s.Tag.CalcSize(new GUIContent("failed")).x + 4;
             for (int i = calls.Count - 1; i >= 0; i--)
             {
                 McpProtocol.CallRecord c = calls[i];
-                GUI.Label(new Rect(x, y, inner, 26), $"{c.Time:HH:mm:ss}  {c.Client}: {c.Tool}{(c.Ok ? "" : "  (failed)")}", s.MutedLabel);
+                string client = TW.Drawable(c.Client ?? "");
+                GUI.Label(new Rect(x, y, timeWidth, 26), $"{c.Time:HH:mm:ss}", s.MutedLabel);
+                var clientRect = new Rect(x + timeWidth, y, clientWidth, 26);
+                string clientShown = TW.Elide(client, s.MutedLabel, clientWidth - 8);
+                GUI.Label(clientRect, clientShown, s.MutedLabel);
+                if (clientShown != client) TW.Hint(clientRect, client);
+                float toolX = x + timeWidth + clientWidth;
+                float toolRoom = Mathf.Max(0, width - (toolX - x) - (c.Ok ? 0 : tagWidth + 8));
+                string tool = TW.Elide(c.Tool ?? "", s.Label, toolRoom);
+                GUI.Label(new Rect(toolX, y, toolRoom, 26), tool, s.Label);
+                if (!c.Ok)
+                {
+                    // A failed call stands out: a red tag after the tool's name.
+                    float tagX = toolX + Mathf.Min(toolRoom, s.Label.CalcSize(new GUIContent(tool)).x) + 8;
+                    Color was = GUI.contentColor;
+                    GUI.contentColor = TW.ErrorColor;
+                    GUI.Label(new Rect(tagX, y, tagWidth, 26), "failed", s.Tag);
+                    GUI.contentColor = was;
+                }
                 y += 26;
             }
+            return y;
+        }
+
+        private void DrawTab(Rect area)
+        {
+            var s = TW.Styles;
+            TW.Fill(area, TW.InsetColor);
+            float x = 12, w = area.width - 24;
+            float inner = w - 20;
+            List<McpProtocol.Session> sessions = McpProtocol.AllSessions();
+            List<McpProtocol.CallRecord> calls = McpProtocol.RecentCalls();
+            TW.ApplyScroll(area, ref _scroll);
+            // As tall as the last draw came out: the panel and the rows wrap
+            // with the window's width, so no fixed sum is ever right.
+            _scroll = GUI.BeginScrollView(area, _scroll, new Rect(0, 0, inner, Mathf.Max(area.height, _contentHeight)), false, false);
+            float y = 8;
+            GUI.Label(new Rect(x, y, inner, 26), "BRIDGE: AI CLIENTS OVER MCP (READ-ONLY)", s.Label);
+            y += 32;
+            y = DrawStatus(x, y, inner) + 12;
+            string who = Connected(sessions);
+            if (_portChangedFrom != 0 && sessions.Any(c => c.Started >= _portChangedAt)) _portChangedFrom = 0;
+            y = DrawConnection(x, y, inner, who) + 16;
+            y = DrawCodeGraph(x, y, inner) + 16;
+            y = DrawClients(x, y, inner, sessions, calls, who);
+            _contentHeight = y + 12;
             GUI.EndScrollView();
         }
     }

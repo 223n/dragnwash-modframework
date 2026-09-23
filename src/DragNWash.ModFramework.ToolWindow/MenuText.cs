@@ -55,28 +55,59 @@ namespace DragNWash.ModFramework.ToolWindow
         private const char Undefined = '͸';
         private static int _size;
 
+        // Characters asked about inside OnGUI, checked on the next Update.
+        private static readonly HashSet<char> _unchecked = new HashSet<char>();
+
         private static bool Drawable(Font font, char c)
         {
             if (c < 128) return true;
             if (_drawable.TryGetValue(c, out bool ok)) return ok;
+            if (font.dynamic && Event.current != null)
+            {
+                // Checking rasterises into the font, and doing that while the
+                // window draws uploads its texture mid-frame (UUM-140564 on
+                // Direct3D 12): '?' this once, as the console does.
+                _unchecked.Add(c);
+                return false;
+            }
+            Check(font, new[] { c });
+            return _drawable[c];
+        }
+
+        // From the plugin's Update: what OnGUI could not check, all at once.
+        internal static void CheckQueued()
+        {
+            if (_unchecked.Count == 0) return;
+            var chars = new char[_unchecked.Count];
+            _unchecked.CopyTo(chars);
+            _unchecked.Clear();
+            if (MenuFont.Font != null) Check(MenuFont.Font, chars);
+        }
+
+        // One rasterisation for all of them, so a tab full of new text
+        // uploads the font's texture once, not once per character.
+        private static void Check(Font font, char[] chars)
+        {
             try
             {
                 if (!font.dynamic)
                 {
-                    ok = font.HasCharacter(c);
+                    foreach (char c in chars) _drawable[c] = font.HasCharacter(c);
+                    return;
                 }
-                else
+                font.RequestCharactersInTexture(new string(chars) + Undefined, _size, FontStyle.Normal);
+                bool boxed = font.GetCharacterInfo(Undefined, out CharacterInfo none, _size, FontStyle.Normal);
+                foreach (char c in chars)
                 {
-                    font.RequestCharactersInTexture(new string(new[] { c, Undefined }), _size, FontStyle.Normal);
-                    ok = font.GetCharacterInfo(c, out CharacterInfo info, _size, FontStyle.Normal)
-                         && info.advance > 0
-                         && !(font.GetCharacterInfo(Undefined, out CharacterInfo none, _size, FontStyle.Normal)
-                              && none.uvBottomLeft == info.uvBottomLeft && none.uvTopRight == info.uvTopRight);
+                    _drawable[c] = font.GetCharacterInfo(c, out CharacterInfo info, _size, FontStyle.Normal)
+                                   && info.advance > 0
+                                   && !(boxed && none.uvBottomLeft == info.uvBottomLeft && none.uvTopRight == info.uvTopRight);
                 }
             }
-            catch { ok = false; }
-            _drawable[c] = ok;
-            return ok;
+            catch
+            {
+                foreach (char c in chars) _drawable[c] = false;
+            }
         }
 
         private static void BeforeTemp(ref string t)

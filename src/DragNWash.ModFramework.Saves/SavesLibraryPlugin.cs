@@ -34,6 +34,8 @@ namespace DragNWash.ModFramework.Saves
                 "Keep a copy in BepInEx/SaveHistory every time the game writes a save. Copies are always taken before a mod changes a save.");
             _keep = Config.Bind("History", "Keep", 30,
                 "How many copies to keep per save slot.");
+            GameSaves.SetKeep(_keep.Value);
+            _keep.SettingChanged += (sender, args) => GameSaves.SetKeep(_keep.Value);
 
             SavesOperations.Register();
             GameSaves.HistoryFolder = Path.Combine(Paths.BepInExRootPath, "SaveHistory");

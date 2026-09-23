@@ -65,7 +65,7 @@ namespace DragNWash.ModFramework.Saves
         public const string Guid = "com.tomxv.dragnwash.modframework.saves";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.1.0";
+        public const string Version = "1.5.0";
 
         /// <summary>The game's save file name inside a slot folder.</summary>
         public const string SaveFileName = "savegame.dgn";
@@ -81,6 +81,15 @@ namespace DragNWash.ModFramework.Saves
 
         /// <summary>Folder the snapshots are kept in, one subfolder per slot.</summary>
         public static string HistoryFolder { get; internal set; }
+
+        /// <summary>
+        /// How many snapshots are kept per slot: the library's
+        /// <c>[History] Keep</c> setting. Once a slot has this many, each new
+        /// snapshot deletes the oldest one. A new snapshot is only taken when the
+        /// save differs from the newest one, so an edit or a restore while the
+        /// newest snapshot matches the save deletes nothing. Since 1.5.0.
+        /// </summary>
+        public static int Keep => _keep;
 
         /// <summary>Raised on the main thread when the game wrote a slot's save with new content (the slot name).</summary>
         public static event Action<string> SaveWritten;
@@ -201,13 +210,18 @@ namespace DragNWash.ModFramework.Saves
             return list;
         }
 
-        /// <summary>True when the snapshot holds exactly what the slot's save holds now.</summary>
+        /// <summary>
+        /// True when the snapshot holds what the slot's save holds now. A
+        /// snapshot from before the game update of 2026-09-14 matches the save
+        /// <see cref="Restore"/> made from it, which has the <c>{"version":1}</c>
+        /// entry added.
+        /// </summary>
         public static bool SnapshotMatchesSave(string slot, SaveSnapshot snapshot)
         {
             try
             {
                 string savePath = SavePath(slot);
-                return snapshot != null && File.Exists(savePath) && File.ReadAllText(savePath) == File.ReadAllText(snapshot.Path);
+                return snapshot != null && File.Exists(savePath) && File.ReadAllText(savePath) == ForPath(savePath, File.ReadAllText(snapshot.Path));
             }
             catch
             {
@@ -225,6 +239,10 @@ namespace DragNWash.ModFramework.Saves
             try
             {
                 string savePath = SavePath(slot);
+                // Read before the current save is snapshotted: with the history
+                // full, that snapshot makes room by deleting the oldest one, which
+                // may be the very one being restored.
+                string restored = ForPath(savePath, File.ReadAllText(snapshot.Path));
                 if (File.Exists(savePath))
                 {
                     string current = File.ReadAllText(savePath);
@@ -232,7 +250,6 @@ namespace DragNWash.ModFramework.Saves
                     TakeSnapshot(slot, savePath, current);
                 }
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(savePath));
-                string restored = ForPath(savePath, File.ReadAllText(snapshot.Path));
                 // Same bytes as the plain File.WriteAllText(path, text) this
                 // replaces: UTF-8, no byte-order mark.
                 SafeFile.Write(savePath, new UTF8Encoding(false), w => w.Write(restored));
@@ -343,6 +360,13 @@ namespace DragNWash.ModFramework.Saves
             return moved;
         }
 
+        // From the plugin's Awake and whenever the setting changes, so Keep is
+        // right even while history is off and Tick does not run.
+        internal static void SetKeep(int keep)
+        {
+            _keep = Mathf.Max(1, keep);
+        }
+
         // From the plugin's Update.
         internal static void Tick(int keep)
         {
@@ -351,7 +375,7 @@ namespace DragNWash.ModFramework.Saves
                 return;
             }
             _nextPoll = Time.unscaledTime + PollInterval;
-            _keep = Mathf.Max(1, keep);
+            SetKeep(keep);
 
             foreach (string slot in Slots())
             {
@@ -407,8 +431,16 @@ namespace DragNWash.ModFramework.Saves
                 return;
             }
 
-            string target = System.IO.Path.Combine(dir, DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".dgn");
-            File.Copy(savePath, target, overwrite: true);
+            // Named by the second it was taken. A second one in the same second
+            // (an edit, then the game saving) gets "-2", "-3": copying over the
+            // first would lose it.
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            string target = System.IO.Path.Combine(dir, stamp + ".dgn");
+            for (int n = 2; File.Exists(target); n++)
+            {
+                target = System.IO.Path.Combine(dir, stamp + "-" + n + ".dgn");
+            }
+            File.Copy(savePath, target);
             SavesLibraryPlugin.Log.LogInfo($"Snapshot of {slot} saved ({existing.Count + 1} kept, level {LevelOfFile(target)}).");
 
             for (int i = _keep - 1; i < existing.Count; i++)
@@ -456,12 +488,14 @@ namespace DragNWash.ModFramework.Saves
                 string savePath = SavePath(slot);
                 string current = File.ReadAllText(savePath);
                 LastContent[slot] = current;
-                TakeSnapshot(slot, savePath, current);
                 string edited = change(current);
+                // No snapshot for an edit that changes nothing: with the history
+                // full it would push the oldest one out for no reason.
                 if (edited == current)
                 {
                     return $"Nothing changed ({what}).";
                 }
+                TakeSnapshot(slot, savePath, current);
                 // Same bytes as the plain File.WriteAllText(path, text) this
                 // replaces: UTF-8, no byte-order mark.
                 SafeFile.Write(savePath, new UTF8Encoding(false), w => w.Write(edited));

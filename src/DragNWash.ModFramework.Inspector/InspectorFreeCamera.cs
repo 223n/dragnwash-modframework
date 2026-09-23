@@ -62,7 +62,9 @@ namespace DragNWash.ModFramework.Inspector
             _rig.tag = "MainCamera";
             main.enabled = false;
             Active = true;
-            TW.ShowNotice("Free camera: hold the right mouse button, W A S D move, Q E down and up, Shift fast, wheel speed. C or the button stops it.");
+            // The flying keys are fixed; the key that stops it is a setting, and may be none.
+            string key = InspectorShortcuts.Name(InspectorShortcuts.Shortcut.FreeCamera);
+            TW.ShowNotice("Free camera: hold the right mouse button, W A S D move, Q E down and up, Shift fast, wheel speed. " + (key.Length > 0 ? key + " or the button stops it." : "The button stops it."));
         }
 
         internal static void Stop()

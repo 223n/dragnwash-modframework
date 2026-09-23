@@ -186,13 +186,17 @@ namespace DragNWash.ModFramework.Inspector
         // The latest edit made here that still stands. A change another mod made
         // is passed over: "Undo last" is for this session's own edits, and a
         // graph's write is put back from its own row, or by stopping the graph.
-        internal static string Undo()
+        // Failed is true when there was an edit to undo and putting it back threw.
+        internal static string Undo(out bool failed)
         {
+            failed = false;
             for (int i = Entries.Count - 1; i >= 0; i--)
             {
                 if (!Entries[i].Reverted && Entries[i].Undo == null)
                 {
-                    return Revert(Entries[i]) ?? $"Reverted {Entries[i].Member}.";
+                    string problem = Revert(Entries[i]);
+                    failed = problem != null;
+                    return failed ? $"Couldn't undo {Entries[i].Member}: {problem}" : $"Undid {Entries[i].Member}: back to {InspectorModel.Format(Entries[i].Before)}.";
                 }
             }
             return "Nothing of your own to undo.";

@@ -5,15 +5,16 @@ using BepInEx;
 using BepInEx.Configuration;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace DragNWash.ModFramework.Mods
 {
     // Takes the next key pressed as a KeyboardShortcut for the selected setting,
-    // with whichever modifier keys are held. Lives on the Capture button while
-    // capturing and removes itself when done. Keys are read through BepInEx's
+    // with whichever modifier keys are held. Lives on the setting's Change
+    // button while capturing and removes itself when done; Esc cancels. Keys are read through BepInEx's
     // UnityInput, which works whether the game uses the old Input class or the
     // Input System (this game has the old one switched off).
-    internal sealed class ShortcutCapture : MonoBehaviour
+    internal sealed class ShortcutCapture : MonoBehaviour, IDeselectHandler
     {
         internal ModsMenu Menu;
         internal ConfigItem Item;
@@ -60,6 +61,12 @@ namespace DragNWash.ModFramework.Mods
                     {
                         continue;
                     }
+                    // Esc (the game's Back) stops taking a key instead of becoming one.
+                    if (key == KeyCode.Escape)
+                    {
+                        Cancel();
+                        return;
+                    }
                     KeyCode[] held = Modifiers.Where(m => UnityInput.Current.GetKey(m)).ToArray();
                     string before = Item?.SerializedText;
                     Item?.SetShortcut(new KeyboardShortcut(key, held));
@@ -72,6 +79,13 @@ namespace DragNWash.ModFramework.Mods
                 ModFramework.Log.LogWarning($"Could not read the keyboard for a shortcut: {ex.Message}");
                 Cancel();
             }
+        }
+
+        // The pad or the pointer moved on: the next key pressed is not for
+        // this setting (it may be typed into the search field).
+        public void OnDeselect(BaseEventData eventData)
+        {
+            Cancel();
         }
 
         internal void Cancel()

@@ -53,6 +53,65 @@ namespace DragNWash.ModFramework.Mods
             return All().Where(b => b.Shortcut.MainKey == own.MainKey && !ReferenceEquals(b.Entry, entry)).ToList();
         }
 
+        /// <summary>
+        /// A shortcut setting's shared key in one English line, for other
+        /// mods and the Inspector (ModFramework.SharedKeyNote), or null when
+        /// no other setting uses the key. The Mods screen shows the same thing
+        /// in parts a language pack can translate.
+        /// </summary>
+        internal static string Note(ConfigEntryBase entry)
+        {
+            List<string> names = NamesSharing(entry);
+            if (names == null)
+            {
+                return null;
+            }
+            string key = ((KeyboardShortcut)entry.BoxedValue).MainKey.ToString();
+            return key + " is also used by " + string.Join(", ", names) + ". " + Answer(names.Count);
+        }
+
+        /// <summary>
+        /// The settings that share the key of this one, each by the name it has
+        /// on its own page with its mod's name after it when that is another
+        /// mod, or null when none does.
+        /// </summary>
+        internal static List<string> NamesSharing(ConfigEntryBase entry)
+        {
+            List<Bound> others = SharingKeyWith(entry);
+            if (others.Count == 0)
+            {
+                return null;
+            }
+            string own = OwnerOf(entry);
+            return others.Select(b => ConfigItem.TitleOf(b.Entry) + (b.Guid == own ? "" : " (" + b.Mod + ")")).Distinct().ToList();
+        }
+
+        // Its own sentence, so a language pack can translate it whole.
+        internal static string Answer(int others)
+        {
+            return others == 1 ? ModsMenu.TextBothAnswer : ModsMenu.TextAllAnswer;
+        }
+
+        // The plugin whose config file holds the entry, or null.
+        private static string OwnerOf(ConfigEntryBase entry)
+        {
+            foreach (KeyValuePair<string, PluginInfo> pair in Chainloader.PluginInfos)
+            {
+                try
+                {
+                    if (entry.ConfigFile != null && ReferenceEquals(pair.Value?.Instance?.Config, entry.ConfigFile))
+                    {
+                        return pair.Key;
+                    }
+                }
+                catch (Exception)
+                {
+                    // A plugin that failed to start has no config to compare.
+                }
+            }
+            return null;
+        }
+
         /// <summary>Every keyboard shortcut every loaded plugin has a setting for.</summary>
         internal static List<Bound> All()
         {

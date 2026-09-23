@@ -30,6 +30,12 @@ namespace DragNWash.ModFramework.Inspector
 
         private static CodeGraphModel _index;
 
+        // Whether the index is made; reading the game's assemblies the first
+        // time takes a moment, which the Inspector shows as Busy (Index).
+        internal static bool Indexed => _index != null;
+
+        internal static void Index() => Get();
+
         private static CodeGraphModel Get()
         {
             if (_index != null) return _index;

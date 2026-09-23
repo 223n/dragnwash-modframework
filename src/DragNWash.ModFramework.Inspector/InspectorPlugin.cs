@@ -20,7 +20,7 @@ namespace DragNWash.ModFramework.Inspector
         public const string Guid = "com.tomxv.dragnwash.modframework.inspector";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.1.2";
+        public const string Version = "1.5.0";
 
         /// <summary>
         /// Selects <paramref name="target"/> in the Inspector tab and opens the
@@ -92,7 +92,9 @@ namespace DragNWash.ModFramework.Inspector
                 _layout = Config.Bind("Tab", "Layout", "",
                     new ConfigDescription("How the Inspector tab was left (view, panes, open folders). Saved when the window closes.", null, new HiddenSetting()));
                 InspectorTab.Layout = _layout.Value;
-                TW.OpenChanged += open => { if (!open) { InspectorPick.End(); if (InspectorBodies.Paused) InspectorBodies.Resume(); InspectorAnimators.ResumeAll(); SaveLayout(); } };
+                // The keys a player can change, on the Mods screen and in the tab's ? panel.
+                InspectorShortcuts.Bind(Config);
+                TW.OpenChanged += open => { if (!open) { InspectorTab.EndCapture(); InspectorPick.End(); if (InspectorBodies.Paused) InspectorBodies.Resume(); InspectorAnimators.ResumeAll(); SaveLayout(); } };
                 // The free camera is a developer tool too: off with the switch.
                 DeveloperTools.Changed += () => { if (!DeveloperTools.Enabled) { InspectorFreeCamera.Stop(); if (InspectorBodies.Paused) InspectorBodies.Resume(); InspectorAnimators.ResumeAll(); } };
             }

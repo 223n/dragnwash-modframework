@@ -113,7 +113,7 @@ namespace DragNWash.ModFramework.Inspector
             _page = 1;
             if (e == null)
             {
-                _status = $"{InspectorObjects.Describe(listed)} is not among the objects listed.";
+                Tell($"{InspectorObjects.Describe(listed)} is not among the objects listed.", NoticeKind.Warning);
                 return;
             }
             if (e.Hidden && !_showHidden)
@@ -138,7 +138,7 @@ namespace DragNWash.ModFramework.Inspector
             UnityEngine.Object o = InspectorObjects.Find(e);
             if (o == null)
             {
-                _status = $"{(string.IsNullOrEmpty(e.Name) ? "(no name)" : e.Name)} was destroyed since the list was made; Refresh lists the objects again.";
+                Tell($"{(string.IsNullOrEmpty(e.Name) ? "(no name)" : e.Name)} was destroyed since the list was made; Refresh lists the objects again.", NoticeKind.Warning);
                 return;
             }
             _assetObject = o as GameObject;
@@ -247,7 +247,14 @@ namespace DragNWash.ModFramework.Inspector
                         ToggleFolder(r.Key, query.Active);
                         _cursorFolder = r.Key;
                     }
-                    GUI.Label(new Rect(indent + 20, ry, inner - indent - 20, row), Drawable((r.Group == null ? name.ToUpperInvariant() : name) + "   " + count), r.Group == null ? _cell : _mutedCell);
+                    // The name is cut to leave the count in view.
+                    GUIStyle titleStyle = r.Group == null ? _cell : _mutedCell;
+                    string countText = "   " + count;
+                    float countWidth = TextWidth(countText, titleStyle);
+                    var titleRect = new Rect(indent + 20, ry, Mathf.Max(0, inner - indent - 20 - countWidth), row);
+                    GUIContent title = Fit(Drawable(r.Group == null ? name.ToUpperInvariant() : name), titleStyle, titleRect);
+                    GUI.Label(titleRect, title, titleStyle);
+                    GUI.Label(new Rect(titleRect.x + Mathf.Min(titleRect.width, TextWidth(title.text, titleStyle)), ry, countWidth, row), countText, titleStyle);
                     continue;
                 }
                 ObjectEntry e = r.Entry;
@@ -255,20 +262,24 @@ namespace DragNWash.ModFramework.Inspector
                 if (selected)
                 {
                     TW.Fill(new Rect(0, ry, inner, row), TW.PanelColor);
+                    TW.Fill(new Rect(0, ry, 2, row), TW.AccentColor);
                 }
                 string fact = InspectorObjects.Fact(e);
-                float factWidth = string.IsNullOrEmpty(fact) ? 0 : Mathf.Min(inner * 0.4f, _mutedCell.CalcSize(new GUIContent(Drawable(fact))).x + 8);
+                string factShown = string.IsNullOrEmpty(fact) ? "" : Drawable(fact);
+                float factWidth = factShown.Length == 0 ? 0 : Mathf.Min(inner * 0.4f, TextWidth(factShown, _mutedCell) + 8);
                 var label = new Rect(indent, ry, inner - indent - factWidth, row);
                 GUIStyle style = selected ? _accentCell : e.Gone || e.Hidden ? _mutedCell : _cell;
                 string text = string.IsNullOrEmpty(e.Name) ? "(no name) " + e.Type.Name
                     : e.Type.Kind == ObjectKind.OutsideScenes ? FitPath(e.Name, label.width, style) : e.Name;
-                if (GUI.Button(label, Drawable(text), style))
+                // Each column cut with "..." to its width, whole on the hint line.
+                if (GUI.Button(label, Fit(Drawable(text), style, new Rect(label.x, label.y, label.width - 6, label.height)), style))
                 {
                     SelectEntry(e);
                 }
                 if (factWidth > 0)
                 {
-                    GUI.Label(new Rect(inner - factWidth, ry, factWidth, row), Drawable(fact), _mutedCell);
+                    var factRect = new Rect(inner - factWidth + 4, ry, factWidth - 4, row);
+                    GUI.Label(factRect, Fit(factShown, _mutedCell, factRect), _mutedCell);
                 }
             }
             GUI.EndScrollView();
@@ -359,7 +370,17 @@ namespace DragNWash.ModFramework.Inspector
 
         // ---- Used by ------------------------------------------------------------------------------
 
+        // Looking goes through every loaded object and holds the game for a
+        // moment, so the tab says so first (RunBusy) and looks on the next frame.
         private static void RunUsedBy(UnityEngine.Object o)
+        {
+            RunBusy($"Looking where {InspectorObjects.Describe(o)} is used...", "Renderers, materials, sprites, sounds, animators and scripts' fields", () =>
+            {
+                if (o != null && o) LookUsedBy(o);
+            });
+        }
+
+        private static void LookUsedBy(UnityEngine.Object o)
         {
             _usedBy = InspectorObjects.UsedBy(o, InspectorObjects.HitCap, out _usedBySummary);
             _usedByFor = o.GetInstanceID();
@@ -376,22 +397,19 @@ namespace DragNWash.ModFramework.Inspector
         private static void DrawUsedBy(Rect pane, ToolWindowStyles s, float row)
         {
             TW.Fill(pane, TW.InsetColor);
-            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
+            float x = pane.x + 4, w = pane.width - 8;
             UnityEngine.Object o = _assetObject != null && _assetObject ? _assetObject : _target as UnityEngine.Object;
             if (o == null || !o || _usedBy == null || _usedByFor != o.GetInstanceID())
             {
                 _showUsedBy = false;
                 return;
             }
-            y = WrappedLine($"Used by: where {InspectorObjects.Describe(o)} is used. {_usedBySummary}", x, y, w, _mutedCell, row);
+            float y = PaneHeader(pane, "USED BY", InspectorObjects.Describe(o), () => _showUsedBy = false, s, row);
+            y = WrappedLine($"Where {InspectorObjects.Describe(o)} is used. {_usedBySummary}", x, y, w, _mutedCell, row);
             float bx = x;
             if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "Look again"), "Look again", false, s, row))
             {
                 RunUsedBy(o);
-            }
-            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "< Members"), "< Members", false, s, row))
-            {
-                _showUsedBy = false;
             }
             y += row + 4;
             if (_usedBy.Count == 0)
@@ -415,7 +433,7 @@ namespace DragNWash.ModFramework.Inspector
                 if (GUI.Button(new Rect(inner - 46, ry + 2, 44, row - 4), "Go", s.Button))
                 {
                     UnityEngine.Object holder = InspectorObjects.Find(hit.Id);
-                    if (holder == null) _status = $"{hit.Where} was destroyed since Used by looked.";
+                    if (holder == null) Tell($"{hit.Where} was destroyed since Used by looked.", NoticeKind.Error);
                     else Select(holder);
                 }
             }
@@ -430,7 +448,7 @@ namespace DragNWash.ModFramework.Inspector
                 return;
             }
             _sharedNoteShown = true;
-            _status = "A shared object: the change shows everywhere it is used (Used by lists where), until the game reloads it or quits. Nothing is saved.";
+            Tell("A shared object: the change shows everywhere it is used (Used by lists where), until the game reloads it or quits. Nothing is saved.", NoticeKind.Warning);
         }
 
         // ---- the Assets tab, when the Assets library is loaded ------------------------------------
@@ -461,7 +479,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             else
             {
-                _status = $"Texture {texture.name}: the Assets library is not loaded.";
+                Tell($"Texture {texture.name}: the Assets library is not loaded.", NoticeKind.Warning);
             }
         }
 

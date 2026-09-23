@@ -36,6 +36,8 @@ $fromManaged = @(
     'UnityEngine.JSONSerializeModule.dll',
     'Unity.TextMeshPro.dll',
     'Unity.InputSystem.dll',
+    'Unity.RenderPipelines.Core.Runtime.dll',
+    'Unity.RenderPipelines.Universal.Runtime.dll',
     'Naelstrof.UnityScriptableSettings.dll',
     'Unity.Localization.dll',
     'YarnSpinner.dll',

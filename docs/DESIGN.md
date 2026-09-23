@@ -2,7 +2,7 @@
 
 [日本語](DESIGN.ja.md)
 
-Status: September 2026. The core is released as 1.4.0, with the libraries at Tool window 1.2.0, Dialogue 1.2.0, Assets 1.2.0, Text 1.1.0, Flags and saves 1.1.0, Inspector 1.1.0, Overrides 0.1.0 and Bridge 0.1.0. Graphs 0.1.0 is on `main` and not released yet. Parts marked planned or future are not done yet. Open an issue to discuss any part of it.
+Status: September 2026. The newest release is 1.5.0, and from 1.5.0 on the core and every library share that number. Parts marked planned or future are not done yet. Open an issue to discuss any part of it.
 
 The features this memo once listed as designs are built: [Mod reload (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload), the [Inspector (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector), the [Console (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Console), [Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets) and [Dialogue (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue) all shipped in 1.2.0 or earlier, and their wiki pages describe them as they are now. What is designed but not built is in [ROADMAP.md](ROADMAP.md).
 
@@ -110,7 +110,7 @@ ModFramework.Register(new ModInfo
 });
 ```
 
-Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes an On/Off button, numbers, enums and lists of accepted values get `<` and `>` steps, and anything else is shown with a note to edit the config file), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
+Settings shown on the Mods screen come from the mod's BepInEx config entries (`ConfigEntry<bool>` becomes a switch, a number with a range gets a slider with - and +, other numbers get - and + and a box to type in, enums and lists of accepted values get a button for each choice, or - and + when there are more than four or they don't fit, text and shortcuts get a box to type in, a shortcut also gets a Change button that takes the next key you press, and anything else is shown with a note to edit the config file), so a mod gets a settings page without writing UI. The Settings API can add rows to the game's own Options screen as well.
 
 ### Update notices
 

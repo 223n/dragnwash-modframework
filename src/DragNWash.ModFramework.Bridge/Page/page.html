@@ -46,7 +46,12 @@ button:focus-visible, input:focus-visible, a:focus-visible, .node:focus-visible 
 button[disabled] { opacity: .45; cursor: default; }
 button[aria-pressed="true"], button[aria-expanded="true"], button.primary { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 button.danger { border-color: var(--error); color: var(--error); }
-#status { color: var(--muted); font-size: 12px; margin-left: auto; }
+/* The status line is a band under the header, marked by a 3px bar like the
+   Tool window's notices: accent when all is well, the error colour when not.
+   It is exactly as wide as the header, so nothing shares its line, and a long
+   name in it wraps instead of pushing the page sideways. */
+#status { flex: 0 0 calc(100% + 32px); order: 99; margin: 0 -16px -8px; padding: 4px 16px 4px 13px; background: var(--panel); border-top: 1px solid var(--line); border-left: 3px solid var(--accent); color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
+#status.bad { border-left-color: var(--error); color: var(--error); }
 main { display: grid; grid-template-columns: 240px 1fr 6px var(--right, 650px); min-height: 0; }
 /* A view that is not on screen is out of the way: display beats hidden. */
 main[hidden] { display: none; }
@@ -107,7 +112,12 @@ pre.il .blk.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(-
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 /* ---- the graphs editor ---------------------------------------------------- */
-.view-tab[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+/* View switches look like the Tool window's tabs: the one showing sits on the
+   ground with an accent line on top, so it is told apart by more than a shade. */
+.view-tab { background: transparent; border-color: transparent; border-radius: 0; color: var(--muted); }
+.view-tab:hover { border-color: transparent; color: var(--text); }
+.view-tab[aria-pressed="true"] { background: var(--ground); border-color: transparent; color: var(--text); box-shadow: inset 0 2px 0 var(--accent); }
+#graphList li[aria-current="true"] { background: var(--ground); border-radius: 0; box-shadow: inset 2px 0 0 var(--accent); }
 #graphsView { display: grid; grid-template-columns: 240px 1fr 6px 320px; grid-template-areas: "list stage split side"; min-height: 0; }
 #gList { grid-area: list; }
 #gStage { grid-area: stage; }
@@ -343,7 +353,7 @@ dialog.ask .row { display: flex; gap: 8px; justify-content: flex-end; margin-top
     if (text != null) e.textContent = text;
     return e;
   }
-  function setStatus(text, bad) { status.textContent = text; status.style.color = bad ? "var(--error)" : ""; }
+  function setStatus(text, bad) { status.textContent = text; status.classList.toggle("bad", !!bad); }
 
   // Inside the Code Graph app (CodeGraph.exe, WebView2): it follows where the page is, and signs
   // in again when the game went away and came back. In a browser, these do nothing.
@@ -872,13 +882,23 @@ dialog.ask .row { display: flex; gap: 8px; justify-content: flex-end; margin-top
       return;
     }
     for (const g of graphs) {
-      const li = el("li", { tabindex: "0" });
+      const li = el("li", { tabindex: "0", "data-key": g.mod_guid + "/" + g.file });
       li.append(el("div", null, g.file));
       const gone = (g.state || "").startsWith("its file is gone");
       li.append(el("div", { class: gone ? "error" : "muted", style: "font-size:12px" }, g.mod + " · " + g.state));
       li.onclick = () => openGraph(g);
       li.onkeydown = e => { if (e.key === "Enter") openGraph(g); };
       ul.append(li);
+    }
+    markOpen();
+  }
+
+  // The graph that is open is marked in the list, the way the Tool window marks its tab.
+  function markOpen() {
+    const key = open && open.file ? open.modGuid + "/" + open.file : null;
+    for (const li of $("graphList").children) {
+      if (li.dataset.key && li.dataset.key === key) li.setAttribute("aria-current", "true");
+      else li.removeAttribute("aria-current");
     }
   }
 
@@ -935,6 +955,7 @@ dialog.ask .row { display: flex; gap: 8px; justify-content: flex-end; margin-top
   function draw() {
     try { drawBlocks(); } catch (e) { wrong("the blocks could not be drawn", e); }
     try { drawHandlerPick(); } catch (e) { wrong("the handler list could not be drawn", e); }
+    markOpen();
   }
 
   // Which handler Run starts. A graph with one handler says its name and

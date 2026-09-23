@@ -2,7 +2,7 @@
 
 [English](DESIGN.md)
 
-状態: 2026 年 9 月。中核は 1.4.0、ライブラリは Tool window 1.2.0、Dialogue 1.2.0、Assets 1.2.0、Text 1.1.0、Flags and saves 1.1.0、Inspector 1.1.0、Overrides 0.1.0、Bridge 0.1.0 としてリリースしました。Graphs 0.1.0 は `main` にありますが、まだリリースしていません。予定や将来と書いた部分はまだ実装していません。どの部分についても、Issue で議論してください。
+状態: 2026 年 9 月。いちばん新しいリリースは 1.5.0 で、1.5.0 からは中核と全部のライブラリが同じ番号です。予定や将来と書いた部分はまだ実装していません。どの部分についても、Issue で議論してください。
 
 このメモが設計として挙げていた機能は、いずれも実装済みです。[Mod reload (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Mod-reload-ja)、[Inspector (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Inspector-ja)、[Console (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Console-ja)、[Assets (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Assets-ja)、[Dialogue (wiki)](https://github.com/TomXV/dragnwash-modframework/wiki/Dialogue-ja) はすべて 1.2.0 までに入っていて、いまどう動くかは各 wiki ページにあります。設計だけで未実装のものは [ROADMAP.ja.md](ROADMAP.ja.md) にまとめています。
 
@@ -110,7 +110,7 @@ ModFramework.Register(new ModInfo
 });
 ```
 
-Mods 画面に出る設定は、その Mod の BepInEx の設定項目から作ります（`ConfigEntry<bool>` はオン・オフのボタン、数値・enum・選べる値の決まった項目は `<` `>` で切り替え、それ以外は設定ファイルで変えるよう案内を表示）。UI を書かなくても設定ページができます。Settings API を使えば、ゲーム自身の Options 画面に行を足すこともできます。
+Mods 画面に出る設定は、その Mod の BepInEx の設定項目から作ります（`ConfigEntry<bool>` はスイッチ、範囲のある数値はスライダーと - と +、ほかの数値は - と + と入力欄、enum や選べる値の決まった項目は選択肢ごとのボタン（5 つ以上か、入りきらなければ - と +）、文字列やショートカットは入力欄になります。ショートカットには、次に押したキーを取る Change ボタンも付きます。それ以外は設定ファイルで変えるよう案内を出します）。UI を書かなくても設定ページができます。Settings API を使えば、ゲーム自身の Options 画面に行を足すこともできます。
 
 ### 更新のお知らせ
 

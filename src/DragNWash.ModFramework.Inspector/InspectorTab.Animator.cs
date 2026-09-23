@@ -44,14 +44,14 @@ namespace DragNWash.ModFramework.Inspector
         {
             TW.Fill(pane, TW.InsetColor);
             var animator = (Component)_target;
-            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
+            float x = pane.x + 4, w = pane.width - 8;
+            float y = PaneHeader(pane, "LAYERS", InspectorAnimators.ControllerName(animator), () => _showLayers = false, s, row);
             bool paused = InspectorAnimators.IsPaused(animator);
             int layers = InspectorAnimators.LayerCount(animator);
             GUI.Label(new Rect(x, y, w, row), Drawable($"Layers of {InspectorAnimators.ControllerName(animator)}: {layers}{(paused ? ". Drag a slider to put a layer's state at that point." : ". Pause to move them by hand.")}"), _mutedCell);
             y += row;
             float bx = x;
             AnimatorButtons(animator, ref bx, ref y, x, w, s, row);
-            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "< Members"), "< Members", false, s, row)) _showLayers = false;
             y += row + 4;
             if (!string.IsNullOrEmpty(_animatorNote))
             {
@@ -130,7 +130,8 @@ namespace DragNWash.ModFramework.Inspector
         {
             TW.Fill(pane, TW.InsetColor);
             var animator = (Component)_target;
-            float x = pane.x + 4, y = pane.y + 2, w = pane.width - 8;
+            float x = pane.x + 4, w = pane.width - 8;
+            float y = PaneHeader(pane, "CLIPS", InspectorAnimators.ControllerName(animator), () => { _showClips = false; _swapFrom = null; }, s, row);
             y = DrawPreview(animator, x, y, w, s, row);
             List<UnityEngine.Object> clips = _swapFrom != null ? InspectorAnimators.LoadedClips() : InspectorAnimators.ClipsOf(animator);
             var shown = new List<UnityEngine.Object>();
@@ -153,14 +154,13 @@ namespace DragNWash.ModFramework.Inspector
                     _swapFrom = null;
                 }
             }
-            if (FlowButton(ref bx, ref y, x, w, ButtonWidth(s, "< Members"), "< Members", false, s, row))
+            if (bx > x)
             {
-                _showClips = false;
-                _swapFrom = null;
+                y += row + 4;
             }
-            y += row + 4;
             var filterRect = new Rect(x, y, w, row);
-            _clipsFilter = TW.FilterField(filterRect, _clipsFilter, "Filter by name", s);
+            GUI.SetNextControlName("DnWInspectClipsFilter");
+            _clipsFilter = FilterField(filterRect, _clipsFilter, "Filter by name", s);
             y += row + 4;
             if (!string.IsNullOrEmpty(_animatorNote))
             {

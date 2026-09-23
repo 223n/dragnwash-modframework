@@ -29,6 +29,7 @@ namespace DragNWash.ModFramework.Inspector
             public int Overloads;         // methods of the type with this name: more than one needs the parameter types
             public bool Inherited;
             public Patches Patches;
+            public string Shown;          // the signature line as drawn, made the first time it is
         }
 
         private static Type _type;
@@ -430,6 +431,16 @@ namespace DragNWash.ModFramework.Inspector
                 }
             }
             lines.Add(r => GUI.Label(r, "Methods", _accent)); heights.Add(row);
+            // The signatures start after the Graph button's column only when a
+            // method listed has one (the game's own code); otherwise right after IL.
+            bool graphColumn = false;
+            foreach (MethodRow m in _methods)
+            {
+                if (m.Inherited && !_showInherited) continue;
+                if (!m.Method.IsPublic && !_showPrivateMethods && m.Patches == null) continue;
+                if (InspectorCodeGraph.IsGameType(m.Method.DeclaringType)) { graphColumn = true; break; }
+            }
+            float signatureX = graphColumn ? 234 : 170;
             foreach (MethodRow m in _methods)
             {
                 if (m.Inherited && !_showInherited) continue;
@@ -457,7 +468,14 @@ namespace DragNWash.ModFramework.Inspector
                     {
                         OpenGraph("m:" + InspectorCodeGraph.Id(mr.Method));
                     }
-                    GUI.Label(new Rect(r.x + 234, r.y, r.width - 234, row), TW.Drawable(mr.Signature + (mr.Overloads > 1 ? "   (" + mr.Overloads + " overloads)" : "") + (mr.Inherited ? "   (" + mr.Method.DeclaringType.Name + ")" : "")), mr.Patches != null ? _accent : (mr.Method.IsPublic ? _cell : _muted));
+                    if (mr.Shown == null)
+                    {
+                        mr.Shown = mr.Signature + (mr.Overloads > 1 ? "   (" + mr.Overloads + " overloads)" : "") + (mr.Inherited ? "   (" + mr.Method.DeclaringType.Name + ")" : "");
+                    }
+                    // Cut with "..." when too long; the whole signature on the hint line.
+                    GUIStyle signatureStyle = mr.Patches != null ? _accent : (mr.Method.IsPublic ? _cell : _muted);
+                    var signatureRect = new Rect(r.x + signatureX, r.y, r.width - signatureX, row);
+                    GUI.Label(signatureRect, InspectorTab.Fit(TW.Drawable(mr.Shown), signatureStyle, signatureRect), signatureStyle);
                 });
                 heights.Add(row);
                 if (m.Patches != null)
@@ -496,6 +514,9 @@ namespace DragNWash.ModFramework.Inspector
         }
 
         // The code graph opens in the browser through the Bridge (docs/CODE_GRAPH.md), when it is installed and on.
+        // The first time, the game's code is read before the page opens, under
+        // Busy, so the wait shows here instead of as a frozen game and a page
+        // that does not answer.
         private static void OpenGraph(string focus)
         {
             if (Operations.Find("bridge.page.open") == null)
@@ -503,6 +524,20 @@ namespace DragNWash.ModFramework.Inspector
                 TW.ShowNotice("The graph needs the Bridge library, on (its tab in this window).", NoticeKind.Warning);
                 return;
             }
+            if (!InspectorCodeGraph.Indexed)
+            {
+                InspectorTab.RunBusy("Reading the game's code...", "Only the first time; the graph opens after", () =>
+                {
+                    InspectorCodeGraph.Index();
+                    OpenGraphPage(focus);
+                });
+                return;
+            }
+            OpenGraphPage(focus);
+        }
+
+        private static void OpenGraphPage(string focus)
+        {
             OperationResult r = Operations.CallNow("bridge.page.open", new Dictionary<string, object> { ["focus"] = focus }, "inspector");
             if (r.Ok) TW.ShowNotice("The graph opens in your browser.", NoticeKind.Info, 6f);
             else TW.ShowNotice(r.Error, NoticeKind.Error);

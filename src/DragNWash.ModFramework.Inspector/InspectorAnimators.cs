@@ -482,7 +482,7 @@ namespace DragNWash.ModFramework.Inspector
         // Replaces a clip of the animator's controller with another (null puts
         // the game's back), through a new AnimatorOverrideController built on
         // the game's controller with the swaps made so far. The controller in
-        // use is kept in History, so Revert goes back one swap. Setting a
+        // use is kept in History, so Undo goes back one swap. Setting a
         // controller restarts the animator's state machine.
         internal static string Swap(Component animator, UnityEngine.Object clip, UnityEngine.Object replacement, string where)
         {

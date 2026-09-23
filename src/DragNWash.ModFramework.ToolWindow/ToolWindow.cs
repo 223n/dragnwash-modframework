@@ -20,11 +20,14 @@ namespace DragNWash.ModFramework.ToolWindow
     /// <c>[BepInDependency(ToolWindow.Guid, BepInDependency.DependencyFlags.HardDependency)]</c>.
     /// </para>
     /// <para>
-    /// On Direct3D 12, rasterizing a character the window font has not drawn yet
-    /// uploads a texture, and an upload while the game is presenting a frame can
-    /// crash the game (Unity UUM-140564). Prepare every non-ASCII character a tab
-    /// shows with <see cref="PrepareCharacters"/> from Awake or Update, never
-    /// from the draw callback.
+    /// On Direct3D 12, a texture upload at the wrong moment can crash the game
+    /// (Unity UUM-140564), and drawing a character for the first time adds it
+    /// to a font atlas that has to be uploaded. The core uploads those atlases
+    /// once per frame, so the window can draw any text; a non-ASCII character
+    /// the window has not shown before comes out as "?" for one frame. Still
+    /// pass the non-ASCII characters a tab shows to
+    /// <see cref="PrepareCharacters"/> from Awake or Update, never from the
+    /// draw callback: without the core's batching they are rasterized then.
     /// </para>
     /// </remarks>
     public static class ToolWindow
@@ -33,7 +36,7 @@ namespace DragNWash.ModFramework.ToolWindow
         public const string Guid = "com.tomxv.dragnwash.modframework.toolwindow";
 
         /// <summary>Library version. Keep in sync with the csproj.</summary>
-        public const string Version = "1.2.0";
+        public const string Version = "1.5.0";
 
         /// <summary>Height of one row of controls, in pixels.</summary>
         public const float RowHeight = 30f;
@@ -74,8 +77,12 @@ namespace DragNWash.ModFramework.ToolWindow
         /// <summary>The styles controls in a tab should use. Only valid inside a draw callback.</summary>
         public static ToolWindowStyles Styles { get; } = new ToolWindowStyles();
 
-        /// <summary>The font the window draws with, or null for the IMGUI skin's font.</summary>
-        public static Font Font => MenuFont.Font;
+        /// <summary>
+        /// The font the window draws with, or null for the IMGUI skin's font. It is
+        /// made when the window first opens; read before that from Awake or Update,
+        /// it is made then, and from a draw callback it is null until the next frame.
+        /// </summary>
+        public static Font Font => MenuFont.Needed();
 
         /// <summary>Font size used by every style.</summary>
         public static int FontSize => MenuFont.Size;
@@ -196,10 +203,9 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         /// <summary>
-        /// The text as the window can draw it now: characters the window font has
-        /// not rasterised yet come out as '?' (and are prepared for later frames
-        /// where that is safe). For text a tab did not know in advance, such as
-        /// object names.
+        /// The text as the window can draw it now: characters not prepared yet
+        /// come out as '?' (and are prepared for later frames where that is
+        /// safe). For text a tab did not know in advance, such as object names.
         /// </summary>
         public static string Drawable(string text)
         {
@@ -343,7 +349,7 @@ namespace DragNWash.ModFramework.ToolWindow
         /// </summary>
         /// <param name="row">One row of controls, as wide as the tab allows.</param>
         /// <param name="id">As given to <see cref="AskConfirm"/>.</param>
-        /// <param name="question">One line saying how much and what happens, e.g. "Clear 12 edits? They stay applied, Revert is gone."</param>
+        /// <param name="question">One line saying how much and what happens, e.g. "Clear 12 edits? They stay applied, and you can't undo them after."</param>
         /// <param name="yes">The Yes button's text, e.g. "Yes, clear".</param>
         /// <param name="hint">For the hint line, e.g. "Yes clears the history; Cancel or 5 s keeps it. Esc = Cancel."; a general one when null.</param>
         public static bool Confirm(Rect row, string id, string question, string yes = "Yes", string hint = null)
@@ -380,7 +386,7 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         // "..." where the window font has no ellipsis, and "v" where it has no
-        // small down-pointing triangle; set at startup.
+        // small down-pointing triangle; set when the font is made.
         internal static string Ellipsis = "...";
         internal static string DownArrow = "v";
 
@@ -409,9 +415,11 @@ namespace DragNWash.ModFramework.ToolWindow
         }
 
         /// <summary>
-        /// Rasterizes these characters into the window font now, so drawing them
-        /// later uploads nothing. Call from Awake or Update. Called from a draw
-        /// callback, the characters are prepared on the next Update instead.
+        /// Prepares these characters for the window: <see cref="Drawable"/> draws
+        /// them as they are from then on. On Direct3D 12 without the core's atlas
+        /// batching they are also rasterized into the window font now, so drawing
+        /// them later uploads nothing. Call from Awake or Update. Called from a
+        /// draw callback, the characters are prepared on the next Update instead.
         /// </summary>
         public static void PrepareCharacters(string characters)
         {
@@ -420,11 +428,13 @@ namespace DragNWash.ModFramework.ToolWindow
 
         /// <summary>
         /// True when every character of <paramref name="text"/> has a glyph in the
-        /// window font. Characters it cannot draw are shown as "?".
+        /// window font. Characters it cannot draw are shown as "?". From a draw
+        /// callback, a character not checked before counts as not drawable for
+        /// that one frame, and is checked on the next Update.
         /// </summary>
         public static bool CanDraw(string text)
         {
-            return MenuText.CanDraw(MenuFont.Font, MenuFont.Size, text);
+            return MenuText.CanDraw(MenuFont.Needed(), MenuFont.Size, text);
         }
 
         /// <summary>Fills a rectangle with a colour.</summary>
@@ -456,6 +466,60 @@ namespace DragNWash.ModFramework.ToolWindow
                 GUI.Label(new Rect(rect.x + 6, rect.y, rect.width - 6, rect.height), placeholder, s.MutedLabel);
             }
             return next;
+        }
+
+        /// <summary>
+        /// Draws a button in a row of buttons that wraps: the button goes at
+        /// <paramref name="bx"/> on <paramref name="y"/>, as wide as its label
+        /// needs (at least 60 px, or <paramref name="minWidth"/>), and when it
+        /// would run past <paramref name="x"/> + <paramref name="width"/> it
+        /// starts a new row at <paramref name="x"/>, <see cref="RowHeight"/> + 2
+        /// lower. Afterwards <paramref name="bx"/> is where the next one goes and
+        /// <paramref name="y"/> is the top of the row it is on, so a narrow
+        /// window keeps every button reachable instead of cutting the last ones
+        /// off. Start a row with <c>bx = x</c>, and after the last button move
+        /// <c>y</c> down by <see cref="RowHeight"/> yourself. A selected button
+        /// is drawn with <see cref="ToolWindowStyles.SelectedButton"/> and the
+        /// accent line under it, the way a view switch shows the view that is
+        /// showing. Returns true on the event it is pressed. Since 1.5.0.
+        /// </summary>
+        /// <param name="bx">Where the button goes; moved past it (and 6 px on).</param>
+        /// <param name="y">Top of the current row; moved down when the button wraps.</param>
+        /// <param name="x">Left edge of the rows.</param>
+        /// <param name="width">Width of the rows.</param>
+        /// <param name="label">Button text, ASCII (see <see cref="PrepareCharacters"/>).</param>
+        /// <param name="selected">True for the view that is showing, or a switch that is on.</param>
+        /// <param name="minWidth">
+        /// At least this wide. For a button whose label changes (Turn on / Turn
+        /// off), pass the width of the longer label so the row doesn't jump.
+        /// </param>
+        public static bool FlowButton(ref float bx, ref float y, float x, float width, string label, bool selected = false, float minWidth = 0f)
+        {
+            return FlowButton(ref bx, ref y, x, width, new GUIContent(label), selected, minWidth);
+        }
+
+        /// <summary>
+        /// As <see cref="FlowButton(ref float, ref float, float, float, string, bool, float)"/>,
+        /// with a <c>GUIContent</c> whose tooltip shows on the hint line while
+        /// the pointer is on the button. Since 1.5.0.
+        /// </summary>
+        public static bool FlowButton(ref float bx, ref float y, float x, float width, GUIContent content, bool selected = false, float minWidth = 0f)
+        {
+            ToolWindowStyles s = Styles;
+            float w = Mathf.Max(Mathf.Max(60f, minWidth), s.Button.CalcSize(content).x + 14f);
+            if (bx > x && bx + w > x + width)
+            {
+                bx = x;
+                y += RowHeight + 2f;
+            }
+            var rect = new Rect(bx, y, w, RowHeight);
+            bool clicked = GUI.Button(rect, content, selected ? s.SelectedButton : s.Button);
+            if (selected)
+            {
+                Underline(rect);
+            }
+            bx += w + 6f;
+            return clicked;
         }
 
         /// <summary>

@@ -18,11 +18,11 @@ namespace DragNWash.ModFramework.Inspector
     // See https://github.com/TomXV/dragnwash-modframework/wiki/Inspector.
     //
     // Split by feature into InspectorTab.<Feature>.cs beside this file (Menus,
-    // Animator, Bodies, Scenes, Export, History, Hierarchy, Members, Console;
-    // also InspectorObjectsPane.cs and InspectorKeys.cs). This file keeps the
-    // shared state, styles setup, the main Draw() entry and the small helpers
-    // (FlowButton, ButtonWidth, WrappedLine, MemberId, WhereLabel, Drawable)
-    // the other files call into.
+    // Animator, Bodies, Scenes, Export, History, Hierarchy, Members, Console,
+    // KeysPanel; also InspectorObjectsPane.cs, InspectorKeys.cs and
+    // InspectorShortcuts.cs). This file keeps the shared state, styles setup,
+    // the main Draw() entry and the small helpers (FlowButton, ButtonWidth,
+    // WrappedLine, MemberId, WhereLabel, Drawable) the other files call into.
     internal static partial class InspectorTab
     {
         internal const string Title = "Inspector";
@@ -37,6 +37,14 @@ namespace DragNWash.ModFramework.Inspector
         private static string _search = "";
         private static string _searched;
         private static List<Node> _results;
+        // What the last search found beyond its first 500, and whether its t: named a component type.
+        private static bool _resultsMore, _resultsTypeKnown = true;
+        // A t: search waits until the typing stops: each one looks through
+        // every object of the type.
+        private static string _searchTyped = "";
+        private static float _searchChangedAt;
+        private const float TypeSearchWait = 0.4f;
+        private const int SearchMax = 500;
         private static bool _dirty = true;
         // Set when the selection changed from outside the tree (pick, Go, Parent,
         // console): the tree scrolls to show it on its next draw.
@@ -70,7 +78,7 @@ namespace DragNWash.ModFramework.Inspector
                 return;
             }
             _tab = TW.AddTab(TW.Guid, Title, Draw, 45);
-            TW.PrepareCharacters(IconHierarchy + IconPick + IconHighlight + IconParent + IconMove + IconRotate + IconScale + IconResetTransform + IconHistory + IconRefresh + IconCamera + IconBones + IconWire + IconEditMesh + "\u25BE");
+            TW.PrepareCharacters(IconHierarchy + IconPick + IconHighlight + IconParent + IconMove + IconRotate + IconScale + IconResetTransform + IconHistory + IconRefresh + IconCamera + IconBones + IconWire + IconEditMesh + "\u25BE\u2026" + MarkCheck + MarkOn + MarkOff);
             GameEvents.OnSceneLoaded(TW.Guid, (scene, mode) => { _dirty = true; InspectorObjects.MarkStale(); });
             GameEvents.OnSceneUnloaded(TW.Guid, scene => { _dirty = true; InspectorObjects.MarkStale(); });
             TW.AddCommand(TW.Guid, "inspect",
@@ -130,6 +138,11 @@ namespace DragNWash.ModFramework.Inspector
         private static void SetTarget(object target)
         {
             _target = target;
+            if (target?.GetType() != _memberFilterType)
+            {
+                _memberFilter = "";
+                _memberFilterType = target?.GetType();
+            }
             // A new selection shows its members, not the history that was open.
             _showHistory = false;
             _showBodies = false;
@@ -217,6 +230,7 @@ namespace DragNWash.ModFramework.Inspector
             float row = TW.RowHeight, pad = TW.Padding;
             float x = area.x + pad, y = area.y + pad, w = area.width - 2 * pad;
             Event ev = Event.current;
+            RunBusyWork(ev);
 
             // A button paints its hover look wherever the pointer is, even under
             // a menu. While the pointer is over an open menu, everything painted
@@ -266,6 +280,8 @@ namespace DragNWash.ModFramework.Inspector
             {
                 _focusedControl = GUI.GetNameOfFocusedControl() ?? "";
             }
+            // A chip of the "?" panel that waits for a key takes every key press first.
+            CaptureKeys(ev);
             // Enter applies the draft of the focused row. Keys are handled before
             // the fields are drawn (see ConsoleTab for why), and the character
             // half of the key is swallowed in the same frame.
@@ -311,41 +327,38 @@ namespace DragNWash.ModFramework.Inspector
                     // The character, whichever key makes it on this keyboard.
                     _showKeys = !_showKeys;
                 }
-                else switch (ev.keyCode)
+                else if (IsFixedKey(ev.keyCode, ctrl))
                 {
-                    case KeyCode.C: if (!ctrl) InspectorFreeCamera.Toggle(); else handled = false; break;
-                    case KeyCode.B: if (!ctrl) InspectorBones.Show = !InspectorBones.Show; else handled = false; break;
-                    case KeyCode.N: if (!ctrl) InspectorMesh.Wireframe = !InspectorMesh.Wireframe; else handled = false; break;
-                    case KeyCode.M: if (!ctrl) { if (InspectorMesh.Editing) InspectorMesh.StopEditing(); else InspectorMesh.Editing = true; } else handled = false; break;
-                    case KeyCode.W: if (!ctrl) ToggleGizmo(InspectorGizmo.GizmoMode.Move); else handled = false; break;
-                    case KeyCode.E: if (!ctrl) ToggleGizmo(InspectorGizmo.GizmoMode.Rotate); else handled = false; break;
-                    case KeyCode.R: if (!ctrl) ToggleGizmo(InspectorGizmo.GizmoMode.Scale); else handled = false; break;
-                    case KeyCode.Q: if (!ctrl) InspectorGizmo.Mode = InspectorGizmo.GizmoMode.None; else handled = false; break;
-                    case KeyCode.P: if (!ctrl) { if (InspectorPick.Picking) InspectorPick.End(); else InspectorPick.Begin(); } else handled = false; break;
-                    case KeyCode.H: if (!ctrl) InspectorPick.Highlight = !InspectorPick.Highlight; else handled = false; break;
-                    case KeyCode.T: if (!ctrl) { bool shown = _objectsMode ? (_showObjectList = !_showObjectList) : (_showHierarchy = !_showHierarchy); if (narrowWindow(area)) _page = shown ? 0 : 1; } else handled = false; break;
-                    case KeyCode.Z: if (ctrl) _status = InspectorHistory.Undo(); else handled = false; break;
-                    case KeyCode.UpArrow:
-                        if (ctrl && SelectedObject != null && SelectedObject.transform.parent != null) Select(SelectedObject.transform.parent.gameObject);
-                        else handled = !ctrl && ListKey(KeyCode.UpArrow);
-                        break;
-                    case KeyCode.DownArrow:
-                    case KeyCode.LeftArrow:
-                    case KeyCode.RightArrow:
-                    case KeyCode.Home:
-                    case KeyCode.End:
-                    case KeyCode.PageUp:
-                    case KeyCode.PageDown:
-                        handled = !ctrl && ListKey(ev.keyCode);
-                        break;
-                    case KeyCode.Escape:
-                        if (_menuRow != null) _menuRow = null;
-                        else if (_showKeys) _showKeys = false;
-                        else if (InspectorPick.Picking) InspectorPick.End();
-                        else if (InspectorGizmo.Mode != InspectorGizmo.GizmoMode.None) InspectorGizmo.Mode = InspectorGizmo.GizmoMode.None;
-                        else handled = false;
-                        break;
-                    default: handled = false; break;
+                    // The keys that mean the same in every tool come before
+                    // the ones a setting names.
+                    switch (ev.keyCode)
+                    {
+                        case KeyCode.Z: UndoLast(); break;
+                        case KeyCode.UpArrow:
+                            if (ctrl && SelectedObject != null && SelectedObject.transform.parent != null) Select(SelectedObject.transform.parent.gameObject);
+                            else handled = !ctrl && ListKey(KeyCode.UpArrow);
+                            break;
+                        case KeyCode.Escape:
+                            if (_menuRow != null) _menuRow = null;
+                            else if (_showKeys) _showKeys = false;
+                            else if (InspectorPick.Picking) InspectorPick.End();
+                            else if (InspectorGizmo.Mode != InspectorGizmo.GizmoMode.None) InspectorGizmo.Mode = InspectorGizmo.GizmoMode.None;
+                            else handled = false;
+                            break;
+                        default:
+                            handled = !ctrl && ListKey(ev.keyCode);
+                            break;
+                    }
+                }
+                else
+                {
+                    // The changeable keys (InspectorShortcuts), as the settings have them.
+                    List<InspectorShortcuts.Shortcut> pressed = InspectorShortcuts.Pressed(ev);
+                    foreach (InspectorShortcuts.Shortcut shortcut in pressed)
+                    {
+                        RunShortcut(shortcut, area);
+                    }
+                    handled = pressed.Count > 0;
                 }
                 if (handled)
                 {
@@ -405,13 +418,13 @@ namespace DragNWash.ModFramework.Inspector
             bx += 6;
             if (_objectsMode)
             {
-                Tool(IconHierarchy, "List", "Show or hide the list", _showObjectList, () => { _showObjectList = !_showObjectList; if (narrow) _page = _showObjectList ? 0 : 1; });
+                Tool(IconHierarchy, "List", "Show or hide the list" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Tree), _showObjectList, () => { _showObjectList = !_showObjectList; if (narrow) _page = _showObjectList ? 0 : 1; });
             }
             else
             {
-                Tool(IconHierarchy, "Tree", "Show or hide the hierarchy", _showHierarchy, () => { _showHierarchy = !_showHierarchy; if (narrow) _page = _showHierarchy ? 0 : 1; });
+                Tool(IconHierarchy, "Tree", "Show or hide the hierarchy" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Tree), _showHierarchy, () => { _showHierarchy = !_showHierarchy; if (narrow) _page = _showHierarchy ? 0 : 1; });
             }
-            Tool(IconPick, "Pick", "Pick: click an object in the game", InspectorPick.Picking, () => { if (InspectorPick.Picking) InspectorPick.End(); else InspectorPick.Begin(); });
+            Tool(IconPick, "Pick", "Pick: click an object in the game" + InspectorShortcuts.Suffix(InspectorShortcuts.Shortcut.Pick), InspectorPick.Picking, () => { if (InspectorPick.Picking) InspectorPick.End(); else InspectorPick.Begin(); });
             if (!_objectsMode && SelectedObject != null && SelectedObject.transform.parent != null)
             {
                 Tool(IconParent, "Parent", "Select the parent", false, () => Select(SelectedObject.transform.parent.gameObject));
@@ -427,7 +440,7 @@ namespace DragNWash.ModFramework.Inspector
             Tool(IconHistory, InspectorHistory.Count > 0 ? "History " + InspectorHistory.Count : "History", "History of edits", _showHistory, () => { _showHistory = !_showHistory; _showBodies = false; _showScenes = false; _showUsedBy = false; });
             Tool(IconRefresh, "Refresh", _objectsMode ? "List the loaded objects again and reread the members" : "Rebuild the tree and reread the members", false, () => { _dirty = true; _members = null; _header = null; if (_objectsMode) RefreshObjects(); });
             bx += 6;
-            Tool("?", "?", "The keyboard shortcuts (? or Esc closes them)", _showKeys, () => _showKeys = !_showKeys);
+            Tool("?", "?", "The keyboard shortcuts, and changing them (? or Esc closes them)", _showKeys, () => _showKeys = !_showKeys);
             if (x + w - bx < 140)
             {
                 bx = x;
@@ -435,7 +448,9 @@ namespace DragNWash.ModFramework.Inspector
             }
             var searchRect = new Rect(bx, y, x + w - bx, row);
             // Each view keeps its own search; Objects' takes t:Type too.
-            string searchNext = TW.FilterField(searchRect, _objectsMode ? _objectsSearch : _search, _objectsMode ? "Search (t:Material for one type)" : "Search", s);
+            // Named, so typing in it sets off no shortcut.
+            GUI.SetNextControlName("DnWInspectSearch");
+            string searchNext = FilterField(searchRect, _objectsMode ? _objectsSearch : _search, _objectsMode ? "Search (t:Material for one type)" : "Search (t:Rigidbody for one component)", s);
             if (_objectsMode) _objectsSearch = searchNext;
             else _search = searchNext;
             y += row + 6;
@@ -509,11 +524,22 @@ namespace DragNWash.ModFramework.Inspector
                 _tree = InspectorModel.BuildTree(Expanded);
                 _dirty = false;
             }
-            if (_search != _searched)
+            if (_search != _searchTyped)
+            {
+                _searchTyped = _search;
+                _searchChangedAt = Time.realtimeSinceStartup;
+                // In a narrow window the results are a page of their own: typing goes there.
+                if (narrow && !string.IsNullOrEmpty(_search))
+                {
+                    _showHierarchy = true;
+                    _page = 0;
+                }
+            }
+            if (_search != _searched && !(Time.realtimeSinceStartup - _searchChangedAt < TypeSearchWait && InspectorModel.IsTypeSearch(_search)))
             {
                 _searched = _search;
                 if (InspectorDebugView.Mode == InspectorDebugView.Scope.Filter) InspectorDebugView.Filter = _search ?? "";
-                _results = string.IsNullOrEmpty(_search) ? null : InspectorModel.Search(_search);
+                SetSearchResults(_search);
                 _scrollTree = Vector2.zero;
                 if (_results != null) _showHierarchy = true;
             }
@@ -544,79 +570,22 @@ namespace DragNWash.ModFramework.Inspector
                     ev.mousePosition = _pointer;
                     _pointerHidden = false;
                 }
-                // The keys panel under the menus, which open over it.
+                // The keys panel under the menus, which open over it; under
+                // an open menu it is told the pointer is elsewhere, so it
+                // shows no hover look and takes no pad press.
+                Vector2 pointer = ev.mousePosition;
+                if ((_menuRow != null && _menuBoxShown.Contains(pointer)) || (_toolMenu != null && _toolMenuBoxShown.Contains(pointer)))
+                {
+                    ev.mousePosition = new Vector2(-100000f, -100000f);
+                }
                 DrawKeys(area, s);
+                ev.mousePosition = pointer;
                 DrawMenu(area, s, row);
                 DrawToolMenu(area, s, row);
             }
         }
 
-        // ---- the keys ("?") and the debug view's legend -------------------------------
-
-        private static bool _showKeys;
-        private static Rect _keysBoxShown;
-        private static GUIStyle _keyCell;
-        private static readonly string[][] Keys =
-        {
-            new[] { "Arrows", "move in the list" },
-            new[] { "Left / Right", "close / open a node" },
-            new[] { "W / E / R", "move / rotate / scale gizmo" },
-            new[] { "Q", "gizmo off" },
-            new[] { "P", "pick an object in the game" },
-            new[] { "H", "highlight" },
-            new[] { "T", "tree on / off" },
-            new[] { "C", "free camera" },
-            new[] { "B", "bones" },
-            new[] { "N", "wireframe" },
-            new[] { "M", "edit mesh (experimental)" },
-            new[] { "Ctrl+Z", "undo the last edit" },
-            new[] { "Ctrl+Up", "select the parent" },
-            new[] { "Esc", "leave pick mode / close a menu" },
-        };
-
-        // The keyboard shortcuts, in a panel on the right under the toolbar,
-        // until ? or Esc. Lies over the panes like a menu: its input is taken
-        // before they are drawn, and it is painted after them.
-        private static void DrawKeys(Rect area, ToolWindowStyles s)
-        {
-            if (!_showKeys)
-            {
-                return;
-            }
-            Event ev = Event.current;
-            // The heading, the keys and the closing line; the lines draw closer
-            // together where the tab is short, so the last keys are not cut off.
-            const float edges = 10 + 4 + 6 + 8;
-            int lines = 1 + Keys.Length + 1;
-            float width = Mathf.Min(420f, area.width - 8);
-            float top = _toolbarRect.yMax + 2;
-            float room = area.yMax - top - 4;
-            float lineH = Mathf.Clamp(Mathf.Floor((room - edges) / lines), 18f, 22f);
-            float height = Mathf.Min(edges + lines * lineH, room);
-            var box = new Rect(Mathf.Max(area.x + 4, area.xMax - TW.Padding - width), top, width, height);
-            _keysBoxShown = box;
-            if (ev.type != EventType.Repaint)
-            {
-                Swallow(ev, box);
-                return;
-            }
-            MenuFrame(box);
-            TW.Fill(box, TW.PanelColor);
-            GUI.BeginGroup(box);
-            float x = 12, w = box.width - 24, y = 10;
-            GUI.Label(new Rect(x, y, w, lineH), TW.Elide("KEYS   (while no field has the keyboard)", _cell, w), _cell);
-            y += lineH + 4;
-            const float keyWidth = 100f;
-            foreach (string[] k in Keys)
-            {
-                GUI.Label(new Rect(x, y, keyWidth, lineH), k[0], _keyCell);
-                GUI.Label(new Rect(x + keyWidth + 8, y, w - keyWidth - 8, lineH), TW.Elide(k[1], _mutedCell, w - keyWidth - 8), _mutedCell);
-                y += lineH;
-            }
-            y += 6;
-            GUI.Label(new Rect(x, y, w, lineH), TW.Elide("Press ? or Esc to close.    Experimental. Edits are not saved.", s.Hint, w), s.Hint);
-            GUI.EndGroup();
-        }
+        // ---- the debug view's legend -----------------------------------------------------
 
         // The debug view's colours by name, each with the letter its tags on
         // the game carry, so they can be told apart without the colour.
@@ -712,15 +681,42 @@ namespace DragNWash.ModFramework.Inspector
             return string.IsNullOrEmpty(where) ? what : where + " : " + what;
         }
 
+        // The band over a view that stands in for the members (History,
+        // Rigidbodies, Scenes and levels, Layers, Clips, Used by, Code):
+        // "< Members" on its left, always in the same place, then the view's
+        // name and a few words about it. Returns the y under it.
+        private static float PaneHeader(Rect pane, string title, string detail, Action back, ToolWindowStyles s, float row)
+        {
+            var band = new Rect(pane.x, pane.y, pane.width, row + 6);
+            TW.Fill(band, TW.PanelColor);
+            TW.Fill(new Rect(band.x, band.yMax - 1, band.width, 1), new Color(TW.MutedColor.r, TW.MutedColor.g, TW.MutedColor.b, 0.35f));
+            float bw = ButtonWidth(s, "< Members");
+            if (GUI.Button(new Rect(band.x + 4, band.y + 3, bw, row), new GUIContent("< Members", "Back to the members"), s.Button))
+            {
+                back();
+            }
+            float tx = band.x + 4 + bw + 10, tw = band.xMax - 4 - tx;
+            float titleWidth = Mathf.Min(tw, _cell.CalcSize(new GUIContent(title)).x + 2);
+            GUI.Label(new Rect(tx, band.y + 3, titleWidth, row), title, _cell);
+            if (!string.IsNullOrEmpty(detail) && tw - titleWidth > 30)
+            {
+                string shown = Drawable(detail);
+                var rect = new Rect(tx + titleWidth + 8, band.y + 3, tw - titleWidth - 8, row);
+                GUI.Label(rect, new GUIContent(TW.Elide(shown, _mutedCell, rect.width), shown), _mutedCell);
+            }
+            return band.yMax + 4;
+        }
+
         // Buttons laid out left to right, onto a new line when the pane is too narrow.
-        private static bool FlowButton(ref float bx, ref float y, float x, float w, float width, string label, bool on, ToolWindowStyles s, float row)
+        // The tip, when given, shows on the hint line while the pointer is on the button.
+        private static bool FlowButton(ref float bx, ref float y, float x, float w, float width, string label, bool on, ToolWindowStyles s, float row, string tip = null)
         {
             if (bx > x && bx + width > x + w)
             {
                 bx = x;
                 y += row + 2;
             }
-            bool clicked = GUI.Button(new Rect(bx, y, width, row), label, on ? s.SelectedButton : s.Button);
+            bool clicked = GUI.Button(new Rect(bx, y, width, row), new GUIContent(label, tip), on ? s.SelectedButton : s.Button);
             bx += width + 6;
             return clicked;
         }
@@ -741,10 +737,118 @@ namespace DragNWash.ModFramework.Inspector
             return y + h;
         }
 
+        // ---- results and waits ---------------------------------------------------------
+
+        // The outcome of something the person did, in the footer's notice
+        // strip: the status line is hidden behind the breadcrumb while Scene
+        // has a selection, so a result put there could go unseen. Errors red,
+        // warnings yellow, the rest in the accent colour.
+        private static void Tell(string text, NoticeKind kind = NoticeKind.Info)
+        {
+            TW.ShowNotice(Drawable(text), kind, kind == NoticeKind.Info ? 6f : 8f);
+        }
+
+        // Work that holds the game for a moment (Used by's look through every
+        // object, the first reading of the game's code): the tab shows Busy
+        // first and runs it once the window has drawn that, so the wait says
+        // what it is instead of looking like a freeze.
+        private static Action _busyWork;
+        private static string _busyWhat, _busyDetail;
+        private static int _busyPaints, _busyFrame;
+
+        internal static void RunBusy(string what, string detail, Action work)
+        {
+            _busyWork = work;
+            _busyWhat = what;
+            _busyDetail = detail;
+            _busyPaints = 0;
+            _busyFrame = Time.frameCount;
+        }
+
+        // Busy is drawn from the frame after the tab first asks for it, so
+        // the work waits for a second paint: by then the window shows it.
+        // Work asked for before the window closed or the tab changed is
+        // dropped: done on coming back, it would come out of nowhere.
+        private static void RunBusyWork(Event ev)
+        {
+            if (_busyWork == null)
+            {
+                return;
+            }
+            if (Time.frameCount - _busyFrame > 1)
+            {
+                _busyWork = null;
+                return;
+            }
+            _busyFrame = Time.frameCount;
+            // An object's name can hold characters the window font lacks.
+            TW.Busy(Drawable(_busyWhat), _busyDetail == null ? null : Drawable(_busyDetail));
+            if (ev.type == EventType.Repaint)
+            {
+                _busyPaints++;
+                return;
+            }
+            if (_busyPaints < 2)
+            {
+                return;
+            }
+            Action work = _busyWork;
+            _busyWork = null;
+            // What throws here must not stop the whole window's drawing.
+            try
+            {
+                work();
+            }
+            catch (Exception ex)
+            {
+                InspectorPlugin.Log.LogWarning($"[inspector] {_busyWhat} failed: {ex}");
+                Tell($"That didn't work: {(ex.InnerException ?? ex).Message}", NoticeKind.Error);
+            }
+        }
+
         // ---- helpers -------------------------------------------------------------------
         private static string Drawable(string text)
         {
             return TW.Drawable(text ?? "");
+        }
+
+        // TW.FilterField with its placeholder kept to one line, cut with "..."
+        // where the field is narrower than it (the placeholder's style wraps).
+        private static string FilterField(Rect rect, string value, string placeholder, ToolWindowStyles s)
+        {
+            float room = rect.width - 12;
+            if (TextWidth(placeholder, s.MutedLabel) > room)
+            {
+                placeholder = TW.Elide(placeholder, s.MutedLabel, room);
+            }
+            return TW.FilterField(rect, value, placeholder, s);
+        }
+
+        // Text widths already measured, by text and font: a long list is drawn
+        // several times a frame, and most of its lines fit and need no cutting.
+        private static readonly Dictionary<(string, Font, int, FontStyle), float> TextWidths = new Dictionary<(string, Font, int, FontStyle), float>();
+
+        internal static float TextWidth(string text, GUIStyle style)
+        {
+            var key = (text, style.font, style.fontSize, style.fontStyle);
+            if (!TextWidths.TryGetValue(key, out float width))
+            {
+                if (TextWidths.Count > 8192) TextWidths.Clear();
+                width = style.CalcSize(new GUIContent(text)).x;
+                TextWidths[key] = width;
+            }
+            return width;
+        }
+
+        // Text (already Drawable) cut with "..." to fit rect; when it was cut
+        // and the pointer is on rect, the whole text is the tip for the hint line.
+        internal static GUIContent Fit(string text, GUIStyle style, Rect rect)
+        {
+            if (string.IsNullOrEmpty(text) || TextWidth(text, style) <= rect.width)
+            {
+                return new GUIContent(text ?? "");
+            }
+            return new GUIContent(TW.Elide(text, style, rect.width), rect.Contains(Event.current.mousePosition) ? text : null);
         }
     }
 }

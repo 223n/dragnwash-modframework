@@ -108,6 +108,112 @@ namespace DragNWash.ModFramework.Inspector
             return found;
         }
 
+        // The Scene view's search: words for the name, as Search, and
+        // "t:Rigidbody" for the objects with a component of that type (or of
+        // a type made from it), as in Objects. More is true when there were
+        // more than max; typeKnown is false when no component type has the name.
+        internal static List<Node> SearchScene(string search, int max, out bool more, out bool typeKnown)
+        {
+            more = false;
+            typeKnown = true;
+            SplitSearch(search, out string words, out string type);
+            if (type == null)
+            {
+                List<Node> named = Search(words, max + 1);
+                more = named.Count > max;
+                if (more) named.RemoveAt(named.Count - 1);
+                return named;
+            }
+            var found = new List<Node>();
+            List<Type> types = ComponentTypes(type);
+            typeKnown = types.Count > 0;
+            var seen = new HashSet<int>();
+            foreach (Type componentType in types)
+            {
+                // A type Unity can't look for (an open generic one) is passed over,
+                // not thrown on in the middle of drawing.
+                UnityEngine.Object[] all;
+                try { all = Resources.FindObjectsOfTypeAll(componentType); }
+                catch (Exception) { continue; }
+                foreach (UnityEngine.Object o in all)
+                {
+                    Transform t = o is Component c && c != null ? c.transform : null;
+                    if (t == null || !t.gameObject.scene.IsValid() || t.hideFlags != HideFlags.None)
+                    {
+                        continue;
+                    }
+                    if (words.Length > 0 && t.name.IndexOf(words, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+                    if (!seen.Add(t.GetInstanceID()))
+                    {
+                        continue;
+                    }
+                    if (found.Count >= max)
+                    {
+                        more = true;
+                        break;
+                    }
+                    found.Add(new Node { Transform = t, Name = t.name, Depth = 0, Path = PathOf(t), Active = t.gameObject.activeInHierarchy });
+                }
+                if (more)
+                {
+                    break;
+                }
+            }
+            found.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.OrdinalIgnoreCase));
+            return found;
+        }
+
+        // "t:Type" out of the search text; the other words stay, joined by a space.
+        internal static void SplitSearch(string search, out string words, out string type)
+        {
+            type = null;
+            var rest = new List<string>();
+            foreach (string word in (search ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (word.StartsWith("t:", StringComparison.OrdinalIgnoreCase) && word.Length > 2) type = word.Substring(2);
+                else rest.Add(word);
+            }
+            words = string.Join(" ", rest.ToArray());
+        }
+
+        internal static bool IsTypeSearch(string search)
+        {
+            SplitSearch(search, out _, out string type);
+            return type != null;
+        }
+
+        // Every loaded component type by its short name, made the first time
+        // a t: search needs it: reading every assembly's types takes a moment.
+        private static Dictionary<string, List<Type>> _componentTypes;
+
+        private static List<Type> ComponentTypes(string name)
+        {
+            if (_componentTypes == null)
+            {
+                _componentTypes = new Dictionary<string, List<Type>>(StringComparer.OrdinalIgnoreCase);
+                foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+                    try { types = assembly.GetTypes(); }
+                    catch (ReflectionTypeLoadException ex) { types = ex.Types; }
+                    catch (Exception) { continue; }
+                    foreach (Type t in types)
+                    {
+                        if (t == null || t.ContainsGenericParameters || !typeof(Component).IsAssignableFrom(t)) continue;
+                        if (!_componentTypes.TryGetValue(t.Name, out List<Type> list))
+                        {
+                            _componentTypes[t.Name] = list = new List<Type>();
+                        }
+                        list.Add(t);
+                    }
+                }
+            }
+            return _componentTypes.TryGetValue(name, out List<Type> found) ? found : new List<Type>();
+        }
+
         internal static string PathOf(Transform t)
         {
             if (t == null)
@@ -168,6 +274,7 @@ namespace DragNWash.ModFramework.Inspector
             public Type Type;
             public bool IsPrivate;
             public bool CanWrite;
+            public string Kind;      // "field" or "property" for a type's own members, else null
             public Func<object, object> Get;
             public Action<object, object> Set;
             public string Failure;   // the last exception from Get or Set, shown on the row
@@ -204,7 +311,7 @@ namespace DragNWash.ModFramework.Inspector
                         FieldInfo field = f;
                         members.Add(new Member
                         {
-                            Name = f.Name, Type = f.FieldType, IsPrivate = isPrivate, CanWrite = !f.IsInitOnly && !f.IsLiteral,
+                            Name = f.Name, Type = f.FieldType, IsPrivate = isPrivate, CanWrite = !f.IsInitOnly && !f.IsLiteral, Kind = "field",
                             Get = o => field.GetValue(o), Set = (o, v) => field.SetValue(o, v),
                         });
                     }
@@ -223,7 +330,7 @@ namespace DragNWash.ModFramework.Inspector
                         MethodInfo setter = p.GetSetMethod(true);
                         members.Add(new Member
                         {
-                            Name = p.Name, Type = p.PropertyType, IsPrivate = isPrivate || !getter.IsPublic, CanWrite = setter != null && !setter.IsStatic,
+                            Name = p.Name, Type = p.PropertyType, IsPrivate = isPrivate || !getter.IsPublic, CanWrite = setter != null && !setter.IsStatic, Kind = "property",
                             Get = o => prop.GetValue(o, null), Set = (o, v) => prop.SetValue(o, v, null),
                         });
                     }

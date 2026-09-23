@@ -23,6 +23,53 @@ namespace DragNWash.ModFramework.Inspector
             }
             return path;
         }
+        // What the search found: how many, nothing, or that there were more
+        // than it shows. Null while there is no search.
+        private static string SearchLine()
+        {
+            if (string.IsNullOrEmpty(_search))
+            {
+                return null;
+            }
+            if (_search != _searched || _results == null)
+            {
+                return "Looking...";
+            }
+            return _foundLine;
+        }
+
+        // SearchLine's words for the last search, made once when it runs
+        // instead of on every draw.
+        private static string _foundLine;
+
+        private static void SetSearchResults(string search)
+        {
+            _results = string.IsNullOrEmpty(search) ? null : InspectorModel.SearchScene(search, SearchMax, out _resultsMore, out _resultsTypeKnown);
+            _foundLine = _results == null ? null : FoundLine();
+        }
+
+        private static string FoundLine()
+        {
+            InspectorModel.SplitSearch(_searched, out string words, out string type);
+            if (type != null && !_resultsTypeKnown)
+            {
+                return $"No component type is called \"{type}\".";
+            }
+            int n = _results.Count;
+            if (n == 0)
+            {
+                return type == null ? $"Nothing matches \"{words}\"."
+                    : words.Length > 0 ? $"Nothing with a {type} matches \"{words}\"." : $"Nothing has a {type}.";
+            }
+            if (_resultsMore)
+            {
+                return $"The first {SearchMax} are shown; type more to narrow it.";
+            }
+            string objects = n == 1 ? "1 object" : n + " objects";
+            if (type == null) return $"{objects} {(n == 1 ? "matches" : "match")} \"{words}\"";
+            return words.Length > 0 ? $"{objects} with a {type} {(n == 1 ? "matches" : "match")} \"{words}\"" : $"{objects} {(n == 1 ? "has" : "have")} a {type}";
+        }
+
         // Room kept for a name in the tree, and the width of one level.
         private const float TreeNameRoom = 120;
         private const float MaxStep = 18;
@@ -36,7 +83,16 @@ namespace DragNWash.ModFramework.Inspector
             // (a destroyed Transform, not a heading), so search again.
             if (_results != null && _results.Exists(n => !ReferenceEquals(n.Transform, null) && n.Transform == null))
             {
-                _results = InspectorModel.Search(_search ?? "");
+                SetSearchResults(_searched ?? "");
+            }
+            // Over the results, a line saying what the search found, or that it found nothing.
+            string found = SearchLine();
+            if (found != null)
+            {
+                var line = new Rect(pane.x + 4, pane.y + 2, pane.width - 8, row);
+                found = Drawable(found);
+                GUI.Label(line, new GUIContent(TW.Elide(found, _mutedCell, line.width), found), _mutedCell);
+                pane = new Rect(pane.x, pane.y + row + 4, pane.width, pane.height - row - 4);
             }
             List<Node> nodes = _results ?? _tree ?? new List<Node>();
             float inner = pane.width - 20;
@@ -120,13 +176,20 @@ namespace DragNWash.ModFramework.Inspector
                         var label = new Rect(indent + 20, ry, inner - indent - 20, row);
                         if (selected)
                         {
+                            // The selection: a lighter ground and the accent line on its left.
                             TW.Fill(new Rect(0, ry, inner, row), TW.PanelColor);
+                            TW.Fill(new Rect(0, ry, 2, row), TW.AccentColor);
                         }
                         GUIStyle cellStyle = selected ? _accentCell : (n.Active ? _cell : _mutedCell);
                         // A search result's path, cut from the front when it is too
                         // wide, so the object's own name stays in view.
                         string text = _results != null ? FitPath(n.Path, label.width, cellStyle) : n.Name;
-                        if (GUI.Button(label, Drawable(text), cellStyle))
+                        // A name still too wide ends in "..."; whatever was cut
+                        // shows whole on the hint line while the pointer is on it.
+                        string whole = Drawable(_results != null ? n.Path : n.Name);
+                        string shown = TW.Elide(Drawable(text), cellStyle, label.width);
+                        string tip = shown != whole && label.Contains(Event.current.mousePosition) ? whole : null;
+                        if (GUI.Button(label, new GUIContent(shown, tip), cellStyle))
                         {
                             SelectObject(n.Transform.gameObject);
                             _page = 1;

@@ -470,23 +470,7 @@ namespace DragNWash.ModFramework.ToolWindow
         // frame; without it they stay '?'.
         private static readonly HashSet<char> Prepared = new HashSet<char>();
         private static readonly StringBuilder Pending = new StringBuilder();
-        private static readonly bool NeverPrepare = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12 && !UploadsBatched();
-
-        // Its own method, so a core without the property (older than this Tool
-        // window) is caught here instead of failing the whole class.
-        private static bool UploadsBatched()
-        {
-            try
-            {
-                return BatchedFromCore();
-            }
-            catch (MissingMemberException)
-            {
-                return false;
-            }
-        }
-
-        private static bool BatchedFromCore() => GameInfo.FontAtlasUploadsBatched;
+        private static readonly bool NeverPrepare = SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D12 && !MenuFont.UploadsBatched();
 
         internal static string Drawable(string text)
         {

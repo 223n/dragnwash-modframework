@@ -14,7 +14,7 @@ namespace DragNWash.ModFramework.Assets
         private static IDisposable _tab;
         // One line per row: the window's label styles wrap, and a long texture
         // name in a narrow window ran into the rows below it.
-        private static GUIStyle _cell, _mutedCell, _accentCell;
+        private static GUIStyle _cell, _mutedCell, _accentCell, _warnCell, _warnSmall, _warnWrapped;
 
         private static void EnsureCells(ToolWindowStyles s)
         {
@@ -27,22 +27,85 @@ namespace DragNWash.ModFramework.Assets
             _accentCell = new GUIStyle(_cell);
             _accentCell.normal.textColor = TW.AccentColor;
             _accentCell.hover.textColor = TW.AccentColor;
+            _warnCell = new GUIStyle(_cell);
+            _warnCell.normal.textColor = TW.WarningColor;
+            _warnCell.hover.textColor = TW.WarningColor;
+            _warnSmall = new GUIStyle(s.Hint) { fontStyle = FontStyle.Bold };
+            _warnSmall.normal.textColor = TW.WarningColor;
+            _warnWrapped = new GUIStyle(s.WrappedLabel);
+            _warnWrapped.normal.textColor = TW.WarningColor;
         }
         private static List<TextureInfo> _textures;
+        // What the mark column says about a texture: which mod's replacement it
+        // is, or that it is the game's original with a replacement in its place.
+        private static Dictionary<TextureInfo, string> _marks = new Dictionary<TextureInfo, string>();
+        private static List<TextureInfo> _texturesShown;
+        private static string _texturesShownFilter;
         private static string _filter = "";
         private static Vector2 _scroll;
-        private static string _status = "Press List to walk the loaded textures.";
+        private static string _status = "";
         private static bool _showReplacements;
+        // A list asked for (on first opening, List again, after Apply or a
+        // reload) is made on a later frame, after one frame of "Listing
+        // textures...", since walking every texture can take a moment.
+        private static int _listAskedFrame = -1;
+        private static bool _listedOnce, _listSaysCount = true;
+        private static bool _sceneChanged;
 
         // The Inspector's Go on a texture: list, filter to the name, open the tab.
         internal static void ShowTexture(string textureName)
         {
-            _textures = AssetCatalog.Textures();
+            ListNow();
             _filter = textureName ?? "";
             _showReplacements = false;
             _scroll = Vector2.zero;
-            _status = $"{_textures.Count} texture(s) loaded; showing \"{_filter}\".";
+            _status = $"{Plural(_textures.Count, "texture", "textures")} loaded; showing \"{_filter}\".";
             TW.Open("Assets");
+        }
+
+        // sayCount: the status line then says how many are loaded; after Apply
+        // or a reload it keeps saying what those did.
+        private static void AskForList(bool sayCount = true)
+        {
+            _listAskedFrame = Time.frameCount;
+            _listSaysCount = sayCount;
+        }
+
+        private static void ListNow()
+        {
+            _listAskedFrame = -1;
+            _listedOnce = true;
+            _sceneChanged = false;
+            _textures = AssetCatalog.Textures();
+            _texturesShown = null;
+            var byTexture = new Dictionary<Texture2D, TextureReplacement>();
+            foreach (TextureReplacement r in AssetReplacements.All)
+            {
+                if (r.Texture != null) byTexture[r.Texture] = r;
+            }
+            _marks = new Dictionary<TextureInfo, string>();
+            TextureInfo stillSelected = null;
+            foreach (TextureInfo t in _textures)
+            {
+                if (t.Replaced)
+                {
+                    _marks[t] = byTexture.TryGetValue(t.Texture, out TextureReplacement r) ? "from " + r.Mod : "replacement, not in use";
+                }
+                else if (AssetReplacements.EffectiveFor(t.Name) != null)
+                {
+                    _marks[t] = "original, replaced";
+                }
+                if (_selected != null && ReferenceEquals(t.Texture, _selected.Texture))
+                {
+                    stillSelected = t;
+                }
+            }
+            _selected = stillSelected;
+            if (_listSaysCount)
+            {
+                _status = $"{Plural(_textures.Count, "texture", "textures")} loaded.";
+            }
+            _listSaysCount = true;
         }
 
         // The Inspector library, when it is loaded: a texture row's Inspect
@@ -67,6 +130,12 @@ namespace DragNWash.ModFramework.Assets
                 return;
             }
             _tab = TW.AddTab(GameFonts.Guid, "Assets", Draw, 50);
+            AssetReplacements.AfterWatchReload = WatchReloaded;
+            // A list made before a scene change no longer shows what is loaded.
+            GameEvents.OnSceneLoaded(GameFonts.Guid, (scene, mode) =>
+            {
+                if (_textures != null) _sceneChanged = true;
+            });
             TW.AddCommand(GameFonts.Guid, "assets", "assets textures [filter] | assets replacements | assets apply | assets reload", Command,
                 args => args.Length == 1 ? new[] { "textures", "replacements", "apply", "reload" } : new string[0]);
         }
@@ -128,29 +197,79 @@ namespace DragNWash.ModFramework.Assets
             if (AssetReplacements.Reloading)
             {
                 TW.Busy("Reloading files...", AssetReplacements.ReloadingName == null ? null
-                    : $"{AssetReplacements.ReloadingName}  ({AssetReplacements.ReloadingDone + 1} of {AssetReplacements.ReloadingTotal})");
+                    : TW.Drawable($"{AssetReplacements.ReloadingName}  ({AssetReplacements.ReloadingDone + 1} of {AssetReplacements.ReloadingTotal})"));
+            }
+            // The first time the tab shows, it lists the textures by itself.
+            if (!_listedOnce && _listAskedFrame < 0)
+            {
+                AskForList();
+            }
+            if (_listAskedFrame >= 0)
+            {
+                if (Time.frameCount > _listAskedFrame)
+                {
+                    ListNow();
+                }
+                else
+                {
+                    TW.Busy("Listing textures...");
+                }
             }
 
-            if (GUI.Button(new Rect(x, y, 90, row), "List", s.Button))
+            // First row: which list shows, like tabs, with how many each has,
+            // and the filter in what is left of the row (or on a row of its own).
+            // Second row: what to do. Both wrap in a narrow window.
+            EnsureRows();
+            float bx = x;
+            string texturesLabel = _textures != null ? $"Textures ({Count(_textures.Count)})" : "Textures";
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent(texturesLabel, "Every texture loaded right now. Click a name to see it."), !_showReplacements))
             {
-                _textures = AssetCatalog.Textures();
-                _status = $"{_textures.Count} texture(s) loaded.";
-                _selected = null;
+                _showReplacements = false;
             }
-            if (GUI.Button(new Rect(x + 100, y, 170, row), "Apply replacements", s.Button))
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent($"Replacements ({Count(_rows.Count)})", "The PNGs mods ship, and where each one is in use."), _showReplacements))
+            {
+                _showReplacements = true;
+            }
+            // How many of them are yellow or red in the list, beside its switch.
+            if (_toCheck > 0)
+            {
+                string check = $"{Count(_toCheck)} to check";
+                float cw = _warnSmall.CalcSize(new GUIContent(check)).x;
+                if (bx + cw <= x + w)
+                {
+                    var checkRect = new Rect(bx, y, cw, row);
+                    GUI.Label(checkRect, check, _warnSmall);
+                    TW.Hint(checkRect, "Replacements that aren't in use or didn't load. They're yellow or red under Replacements.");
+                    bx += cw + 8;
+                }
+            }
+            if (x + w - bx < 140)
+            {
+                bx = x;
+                y += row + 2;
+            }
+            // The text field blends into the panel; an underline and a placeholder show where it is.
+            _filter = TW.FilterField(new Rect(bx, y, x + w - bx, row), _filter, _showReplacements ? "Filter by name or mod" : "Filter by name", s);
+            y += row + 6;
+
+            bx = x;
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("List again", "Lists the textures loaded right now.")))
+            {
+                AskForList();
+            }
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("Apply replacements", "Puts the replacements into materials and sprites that still show the original. Uploads nothing, so it's always safe.")))
             {
                 int n = AssetReplacements.ApplyNow();
-                _status = $"Replacements applied in {n} place(s).";
-                _textures = null;
-            }
-            if (GUI.Button(new Rect(x + 280, y, 150, row), _showReplacements ? "Show textures" : "Show replacements", s.Button))
-            {
-                _showReplacements = !_showReplacements;
-                _scroll = Vector2.zero;
+                _status = n == 0 ? "Everything was already in place." : $"Put replacements into {Plural(n, "more place", "more places")}.";
+                TW.ShowNotice(_status, NoticeKind.Info, 4f);
+                AskForList(false);
             }
             bool wasEnabled = GUI.enabled;
             GUI.enabled = !AssetReplacements.ReloadDisabled && !AssetReplacements.Reloading;
-            if (GUI.Button(new Rect(x + 440, y, 110, row), "Reload files", s.Button))
+            string reloadTip = GameFonts.RuntimeUploadsAreSafe
+                ? "Reads the PNGs you changed again and swaps them in."
+                : "Reads the PNGs you changed again and swaps them in. -force-d3d11 makes this safe.";
+            if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("Reload files", reloadTip)))
             {
                 if (AssetsLibraryPlugin.Instance != null)
                 {
@@ -163,27 +282,30 @@ namespace DragNWash.ModFramework.Assets
                 }
             }
             GUI.enabled = wasEnabled;
-            // The text field blends into the panel; an underline and a placeholder show where it is.
-            var filterRect = new Rect(x + 560, y, Mathf.Max(80, w - 560), row);
-            _filter = TW.FilterField(filterRect, _filter, "Filter by name", s);
-            y += row + 8;
+            y += row + 6;
 
-            string summary = $"{AssetReplacements.All.Count} replacement(s) from mods";
-            if (AssetReplacements.ConflictCount > 0)
+            string statusLine = _status;
+            if (!string.IsNullOrEmpty(_filter))
             {
-                summary += $", {AssetReplacements.ConflictCount} overridden by another mod";
+                statusLine = _showReplacements
+                    ? $"Showing {Count(ShownRows().Count)} of {Plural(_rows.Count, "replacement", "replacements")}."
+                    : _textures != null ? $"Showing {Count(ShownTextures().Count)} of {Plural(_textures.Count, "texture", "textures")}." : _status;
             }
-            GUI.Label(new Rect(x, y, w, row), _status + "    |    " + summary, s.MutedLabel);
+            GUI.Label(new Rect(x, y, w, row), TW.Elide(TW.Drawable(statusLine), s.MutedLabel, w), s.MutedLabel);
             y += row;
-            string reloadNote = AssetReplacements.ReloadDisabled
-                ? "Reload files: " + AssetReplacements.ReloadDisabledReason
-                : GameFonts.RuntimeUploadsAreSafe
-                    ? "Reload files re-reads changed PNGs and uploads them; Apply replacements only re-points materials and sprites."
-                    : "Reload files uploads textures while the game runs, which can crash it on Direct3D 12; Apply replacements is always safe. Work with -force-d3d11 to reload freely.";
-            // Wraps on narrow windows; take as many rows as it needs.
-            float noteHeight = Mathf.Max(row, s.WrappedLabel.CalcHeight(new GUIContent(reloadNote), w));
-            GUI.Label(new Rect(x, y, w, noteHeight), reloadNote, s.WrappedLabel);
-            y += noteHeight + 4;
+            // What the buttons do is on the hint line; only a warning stays in
+            // sight: why Reload files is off and how to have it back, or that
+            // it can crash Direct3D 12. Nothing on Direct3D 11.
+            string reloadNote = AssetReplacements.ReloadDisabled ? ReloadOffNote()
+                : !GameFonts.RuntimeUploadsAreSafe ? "Direct3D 12: Reload files can crash the game. Apply replacements is always safe."
+                : null;
+            if (reloadNote != null)
+            {
+                // Wraps on narrow windows; take as many rows as it needs.
+                float noteHeight = Mathf.Max(row, _warnWrapped.CalcHeight(new GUIContent(reloadNote), w));
+                GUI.Label(new Rect(x, y, w, noteHeight), reloadNote, _warnWrapped);
+                y += noteHeight + 4;
+            }
 
             var view = new Rect(x, y, w, area.yMax - pad - y);
             if (_showReplacements)
@@ -216,21 +338,109 @@ namespace DragNWash.ModFramework.Assets
 
         private static TextureInfo _selected;
 
-        // After Reload files: the count on the status line, and a notice - a
-        // warning when a file did not load, which the replacements list then shows.
-        private static void Reloaded(IReadOnlyList<ReloadResult> results)
+        // 1,234 whatever the game's culture, and the word that goes with the number.
+        private static string Count(int n) => n.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+        private static string Plural(int n, string one, string many) => $"{Count(n)} {(n == 1 ? one : many)}";
+
+        private const string AssetsSettings = "Options > Mods > Drag'n Wash ModFramework: Assets";
+
+        // Why Reload files is off, said so a person knows how to have it back.
+        private static string ReloadOffNote()
         {
-            int n = 0, bad = 0;
+            string reason = AssetReplacements.ReloadDisabledReason;
+            if (reason == AssetsLibraryPlugin.CrashedReason)
+                return $"Reload files is off because the game crashed during the last reload. Turn AllowReload back on in {AssetsSettings} to try again.";
+            if (reason == AssetsLibraryPlugin.ConfigOffReason)
+                return $"Reload files is switched off. Turn AllowReload on in {AssetsSettings} to use it.";
+            if (reason == AssetsLibraryPlugin.ToolsOffReason)
+                return "Reload files needs the developer tools. Turn them on in Options > Mods > Drag'n Wash ModFramework.";
+            if (reason != null && reason.StartsWith("refused", StringComparison.Ordinal))
+                return $"Reload files is off after {ReloadGuard.CrashCount} crashes during a reload on Direct3D 12. Start the game with -force-d3d11, or turn AllowReload off and on again in {AssetsSettings}.";
+            return "Reload files is off: " + (reason ?? "switched off");
+        }
+
+        private static void Tally(IReadOnlyList<ReloadResult> results, out int reloaded, out int bad, out string oneName)
+        {
+            reloaded = 0;
+            bad = 0;
+            oneName = null;
             foreach (ReloadResult r in results)
             {
-                if (r.Status == "reloaded") n++;
-                else if (r.Status != "unchanged") bad++;
+                if (r.Status == "reloaded")
+                {
+                    reloaded++;
+                    oneName = r.Name;
+                }
+                else if (r.Status != "unchanged")
+                {
+                    bad++;
+                }
             }
-            _status = $"Reloaded {n} file(s)" + (bad > 0 ? $", {bad} with problems (see Show replacements)" : "") + ".";
-            _showReplacements = bad > 0 || _showReplacements;
-            _textures = null;
-            TW.ShowNotice(_status, bad > 0 ? NoticeKind.Warning : NoticeKind.Info, bad > 0 ? 12f : 6f);
         }
+
+        // A PNG added after the game started is not read by Reload files; say
+        // so, since otherwise nothing at all seems to happen.
+        private static bool SayNewFiles(List<string> fresh)
+        {
+            if (fresh.Count == 0)
+            {
+                return false;
+            }
+            string names = string.Join(", ", fresh.GetRange(0, Math.Min(3, fresh.Count)).ToArray()) + (fresh.Count > 3 ? ", ..." : "");
+            TW.ShowNotice(TW.Drawable($"{Plural(fresh.Count, "new file", "new files")} found ({names}). New files are read when the game starts, so restart to use {(fresh.Count == 1 ? "it" : "them")}."),
+                NoticeKind.Warning, 12f);
+            return true;
+        }
+
+        // After Reload files: what happened on the status line, and a notice -
+        // a warning when a file did not load, which the replacements list then
+        // shows, or when there are files it could not read because they are new.
+        private static void Reloaded(IReadOnlyList<ReloadResult> results)
+        {
+            Tally(results, out int n, out int bad, out _);
+            List<string> newFiles = AssetReplacements.NewFiles();
+            int fresh = newFiles.Count;
+            string said = n == 0 && bad == 0 ? "Nothing changed on disk."
+                : bad == 0 ? $"Reloaded {Plural(n, "file", "files")}."
+                : n > 0 ? $"Reloaded {Plural(n, "file", "files")}, {Count(bad)} with a problem (see Replacements)."
+                : $"{Plural(bad, "file", "files")} couldn't be reloaded (see Replacements).";
+            _status = said + (fresh > 0 ? $" {Plural(fresh, "new file", "new files")} found." : "");
+            _showReplacements = bad > 0 || _showReplacements;
+            AskForList(false);
+            if (n > 0 || bad > 0 || fresh == 0)
+            {
+                TW.ShowNotice(said, bad > 0 ? NoticeKind.Warning : NoticeKind.Info, bad > 0 ? 12f : 6f);
+            }
+            SayNewFiles(newFiles);
+        }
+
+        // After a watcher (WatchFiles, Direct3D 11) reloaded what changed on disk.
+        private static void WatchReloaded(IReadOnlyList<ReloadResult> results)
+        {
+            Tally(results, out int n, out int bad, out string oneName);
+            if (n > 0 || bad > 0)
+            {
+                string said = bad > 0 ? $"Files changed on disk: {Count(n)} reloaded, {Count(bad)} with a problem (see Replacements)."
+                    : n == 1 ? $"{oneName}.png changed on disk and was reloaded."
+                    : $"{Count(n)} files changed on disk and were reloaded.";
+                _status = TW.Drawable(said);
+                TW.ShowNotice(_status, bad > 0 ? NoticeKind.Warning : NoticeKind.Info, bad > 0 ? 12f : 6f);
+                if (_textures != null)
+                {
+                    AskForList(false);
+                }
+            }
+            // The watcher runs on every save in the folder; a new file is named
+            // once, not on each save after it.
+            var unsaid = new List<string>();
+            foreach (string file in AssetReplacements.NewFiles())
+            {
+                if (NewFilesSaid.Add(file)) unsaid.Add(file);
+            }
+            SayNewFiles(unsaid);
+        }
+
+        private static readonly HashSet<string> NewFilesSaid = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // The texture as it is on the GPU, scaled to fit, with its facts. Drawing
         // a loaded texture uploads nothing, so this is safe on Direct3D 12.
@@ -239,8 +449,8 @@ namespace DragNWash.ModFramework.Assets
             TW.Fill(pane, TW.PanelColor);
             TextureInfo t = _selected;
             float x = pane.x + 6, y = pane.y + 4, w = pane.width - 12;
-            GUI.Label(new Rect(x, y, w - 60, row), t.Name, _cell);
-            if (GUI.Button(new Rect(pane.xMax - 58, y + 2, 52, row - 4), "Close", s.Button))
+            GUI.Label(new Rect(x, y, w - 72, row), TW.Elide(TW.Drawable(t.Name), _cell, w - 72), _cell);
+            if (GUI.Button(new Rect(pane.xMax - 70, y, 64, row), "Close", s.Button))
             {
                 _selected = null;
                 return;
@@ -263,95 +473,355 @@ namespace DragNWash.ModFramework.Assets
             GUI.DrawTexture(fit, t.Texture, ScaleMode.StretchToFill, true);
         }
 
+        // The textures the filter lets through, worked out again only when the
+        // list or the filter changed.
+        private static List<TextureInfo> ShownTextures()
+        {
+            if (_texturesShown == null || _texturesShownFilter != _filter)
+            {
+                _texturesShownFilter = _filter;
+                _texturesShown = new List<TextureInfo>();
+                foreach (TextureInfo t in _textures)
+                {
+                    if (string.IsNullOrEmpty(_filter) || t.Name.IndexOf(_filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        _texturesShown.Add(t);
+                    }
+                }
+            }
+            return _texturesShown;
+        }
+
         private static void DrawTextures(Rect view, ToolWindowStyles s, float row)
         {
             if (_textures == null)
             {
-                GUI.Label(view, "Nothing listed yet.", s.MutedLabel);
+                GUI.Label(view, "Listing textures...", s.MutedLabel);
                 return;
             }
-            var shown = new List<TextureInfo>();
-            foreach (TextureInfo t in _textures)
+            // Made before a scene change: say so, with the way to fix it.
+            if (_sceneChanged)
             {
-                if (string.IsNullOrEmpty(_filter) || t.Name.IndexOf(_filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                var band = new Rect(view.x, view.y, view.width, row);
+                Band(band, TW.WarningColor);
+                const string again = "List again";
+                float bw = Mathf.Max(60, s.Button.CalcSize(new GUIContent(again)).x + 14);
+                string text = "The scene changed since this list was made.";
+                GUI.Label(new Rect(band.x + 10, band.y, band.width - bw - 20, row), TW.Elide(text, _cell, band.width - bw - 20), _cell);
+                if (GUI.Button(new Rect(band.xMax - bw - 4, band.y + 3, bw, row - 6), again, s.Button))
                 {
-                    shown.Add(t);
+                    AskForList();
                 }
+                view.y += row + 6;
+                view.height -= row + 6;
             }
-            float inner = view.width - 20;
-            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, inner, Mathf.Max(view.height, shown.Count * row)), false, false);
-            float ry = 0;
-            foreach (TextureInfo t in shown)
+            List<TextureInfo> shown = ShownTextures();
+            if (shown.Count == 0)
             {
-                if (ry + row >= _scroll.y && ry <= _scroll.y + view.height)
+                GUI.Label(new Rect(view.x, view.y, view.width, row), TW.Elide(TW.Drawable($"No texture's name has \"{_filter}\" in it."), s.MutedLabel, view.width), s.MutedLabel);
+                return;
+            }
+            // Name, size and format, users, the mark, Inspect. A narrow list
+            // leaves the users out, and the size too when the name would get
+            // too little room (the preview says it).
+            float inner = view.width - 20;
+            bool wide = inner >= 580;
+            const float gap = 8;
+            float inspectW = InspectMethod() != null ? 80 : 0;
+            float sizeW = wide ? 128 : 110, usersW = wide ? 118 : 0, markW = wide ? 160 : 130;
+            float nameW = inner - (sizeW + gap) - (usersW > 0 ? usersW + gap : 0) - (markW + gap) - (inspectW > 0 ? inspectW + gap : 0);
+            if (nameW < 90 && !wide)
+            {
+                nameW += sizeW + gap;
+                sizeW = 0;
+            }
+            // The gamepad stick and d-pad scroll it too (Steam Deck).
+            TW.ApplyScroll(view, ref _scroll);
+            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, inner, Mathf.Max(view.height, shown.Count * row)), false, false);
+            // Only the rows in sight are drawn.
+            int first = Mathf.Clamp((int)(_scroll.y / row), 0, shown.Count);
+            int last = Mathf.Min(shown.Count, first + Mathf.CeilToInt(view.height / row) + 1);
+            for (int i = first; i < last; i++)
+            {
+                TextureInfo t = shown[i];
+                float ry = i * row;
+                bool selected = ReferenceEquals(t, _selected);
+                if (selected)
                 {
-                    bool selected = ReferenceEquals(t, _selected);
-                    if (selected)
+                    TW.Fill(new Rect(0, ry, inner, row), TW.PanelColor);
+                }
+                _marks.TryGetValue(t, out string mark);
+                bool original = mark != null && !t.Replaced;
+                // The name is a button: it selects the texture for the preview.
+                // A long one is cut, and shown whole on the hint line. The
+                // original of a replaced texture is dimmed beside its replacement.
+                var nameRect = new Rect(0, ry, nameW, row);
+                GUIStyle nameStyle = selected ? _accentCell : original ? _mutedCell : _cell;
+                string fullName = TW.Drawable(t.Name);
+                string name = TW.Elide(fullName, nameStyle, nameRect.width);
+                if (name != fullName) TW.Hint(nameRect, fullName);
+                if (GUI.Button(nameRect, name, nameStyle))
+                {
+                    _selected = selected ? null : t;
+                }
+                float cx = nameW + gap;
+                if (sizeW > 0)
+                {
+                    GUI.Label(new Rect(cx, ry, sizeW, row), TW.Elide($"{t.Width}x{t.Height} {t.Format}", _mutedCell, sizeW), _mutedCell);
+                    cx += sizeW + gap;
+                }
+                if (usersW > 0)
+                {
+                    GUI.Label(new Rect(cx, ry, usersW, row), TW.Elide($"{t.MaterialUsers} mat, {t.Sprites} sprite", _mutedCell, usersW), _mutedCell);
+                    cx += usersW + gap;
+                }
+                if (mark != null)
+                {
+                    var markRect = new Rect(cx, ry, markW, row);
+                    GUIStyle markStyle = t.Replaced ? _accentCell : _mutedCell;
+                    string fullMark = TW.Drawable(mark);
+                    GUI.Label(markRect, TW.Elide(fullMark, markStyle, markW), markStyle);
+                    if (Event.current != null && markRect.Contains(Event.current.mousePosition))
                     {
-                        TW.Fill(new Rect(0, ry, inner, row), TW.PanelColor);
-                    }
-                    // The name is a button: it selects the texture for the preview.
-                    // A long one is cut, and shown whole on the hint line.
-                    var nameRect = new Rect(0, ry, inner * 0.45f - 6, row);
-                    string name = TW.Elide(t.Name, _cell, nameRect.width);
-                    if (name != t.Name) TW.Hint(nameRect, t.Name);
-                    if (GUI.Button(nameRect, name, selected ? _accentCell ?? _cell : _cell))
-                    {
-                        _selected = selected ? null : t;
-                    }
-                    GUI.Label(new Rect(inner * 0.45f, ry, inner * 0.2f - 6, row), $"{t.Width}x{t.Height} {t.Format}", _mutedCell);
-                    GUI.Label(new Rect(inner * 0.65f, ry, inner * 0.2f - 6, row), $"{t.MaterialUsers} mat, {t.Sprites} sprite", _mutedCell);
-                    if (t.Replaced)
-                    {
-                        GUI.Label(new Rect(inner * 0.85f, ry, inner * 0.15f - 70, row), "replacement", _mutedCell);
-                    }
-                    if (InspectMethod() != null && GUI.Button(new Rect(inner - 66, ry + 2, 66, row - 4), "Inspect", s.Button))
-                    {
-                        // The Inspector's Objects view, whose Used by lists its materials and sprites.
-                        InspectMethod().Invoke(null, new object[] { t.Texture });
+                        TW.Hint(original
+                            ? "The game's own texture. Wherever a material or sprite used it, a mod's replacement is in now."
+                            : $"A mod's replacement ({fullMark}), in place of the game's texture of the same name.");
                     }
                 }
-                ry += row;
+                if (inspectW > 0 && GUI.Button(new Rect(inner - inspectW, ry + 2, inspectW, row - 4), "Inspect", s.Button))
+                {
+                    // The Inspector's Objects view, whose Used by lists its materials and sprites.
+                    InspectMethod().Invoke(null, new object[] { t.Texture });
+                }
             }
             GUI.EndScrollView();
         }
 
-        private static void DrawReplacements(Rect view, ToolWindowStyles s, float row)
+        // ---- the replacements list ------------------------------------------------------
+
+        // What a replacement row says about its file: in use, not in use though
+        // nothing is broken (yellow), switched off (dim), or unreadable (red).
+        private enum RowState { InUse, NotUsedYet, Loses, Off, Failed }
+
+        private sealed class ReplacementRow
         {
+            public string Name, Mod, Status, Hint;
+            public RowState State;
+            public bool Loser;
+        }
+
+        // Built again only when the replacements changed (AssetReplacements.Revision),
+        // and filtered again only when the filter changed too, not on every draw.
+        private static List<ReplacementRow> _rows = new List<ReplacementRow>();
+        private static int _rowsRevision = -1;
+        private static int _toCheck;
+        private static List<ReplacementRow> _rowsShown;
+        private static string _rowsShownFilter;
+        private static Vector2 _scrollReplacements;
+
+        private static void EnsureRows()
+        {
+            if (_rowsRevision == AssetReplacements.Revision)
+            {
+                return;
+            }
+            _rowsRevision = AssetReplacements.Revision;
+            _rowsShown = null;
             var all = new List<TextureReplacement>(AssetReplacements.All);
             all.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-            if (all.Count == 0)
+            // A mod that lost a clash only shows up in the winner's Overrides; it
+            // gets a row of its own (unless it has one), so its author finds it
+            // by filtering for the mod.
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (TextureReplacement r in all)
+            {
+                seen.Add(r.Name + "|" + r.Mod);
+            }
+            HashSet<string> loaded = null;
+            var rows = new List<ReplacementRow>();
+            int toCheck = 0;
+            foreach (TextureReplacement r in all)
+            {
+                var row = new ReplacementRow { Name = r.Name, Mod = r.Language != null ? $"{r.Mod} ({r.Language})" : r.Mod };
+                TextureReplacement now = AssetReplacements.EffectiveFor(r.Name);
+                if (r.Problem != null)
+                {
+                    row.State = RowState.Failed;
+                    row.Status = "Not reloaded: " + r.Problem;
+                    row.Hint = $"The file couldn't be read again, so the picture from before stays. {r.Problem}";
+                }
+                else if (AssetReplacements.IsSwitchedOff(r))
+                {
+                    row.State = RowState.Off;
+                    row.Status = "Off: this mod's language pictures are switched off";
+                    row.Hint = "The mod has switched its language pictures off, usually with a setting of its own.";
+                }
+                else if (now != null && now != r)
+                {
+                    row.State = RowState.Loses;
+                    row.Status = $"Not used: {now.Mod} wins";
+                    row.Hint = now.Language != null && r.Language == null
+                        ? $"While the language is {now.Language}, the picture from {now.Mod} is used instead."
+                        : $"{now.Mod} also ships \"{r.Name}\", and its file is the one used.";
+                }
+                else if (r.Applied == 0)
+                {
+                    if (loaded == null)
+                    {
+                        loaded = LoadedTextureNames();
+                    }
+                    row.State = RowState.NotUsedYet;
+                    row.Status = "Not used yet";
+                    row.Hint = loaded.Contains(r.Name)
+                        ? $"A texture called \"{r.Name}\" is loaded, but nothing has taken this picture yet. Try Apply replacements."
+                        : $"No loaded texture is called \"{r.Name}\". Check the file name, or open the scene that uses it.";
+                }
+                else
+                {
+                    row.State = RowState.InUse;
+                    row.Status = $"In {Plural(r.Applied, "place", "places")}";
+                    row.Hint = r.Texture != null ? $"{r.Texture.width}x{r.Texture.height}, {r.Path}" : r.Path;
+                }
+                rows.Add(row);
+                if (row.State != RowState.InUse && row.State != RowState.Off)
+                {
+                    toCheck++;
+                }
+                string winner = (now ?? r).Mod;
+                foreach (string loser in r.Overrides)
+                {
+                    if (seen.Add(r.Name + "|" + loser))
+                    {
+                        rows.Add(new ReplacementRow
+                        {
+                            Name = r.Name, Mod = loser, Loser = true, State = RowState.Loses,
+                            Status = $"Not used: {winner} wins",
+                            Hint = $"{winner} also ships \"{r.Name}\", and its file is the one used.",
+                        });
+                        toCheck++;
+                    }
+                }
+            }
+            _rows = rows;
+            _toCheck = toCheck;
+        }
+
+        // Names of the game's own textures that are loaded, for "Not used yet".
+        private static HashSet<string> LoadedTextureNames()
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Texture2D t in Resources.FindObjectsOfTypeAll<Texture2D>())
+            {
+                if (t != null && !string.IsNullOrEmpty(t.name) && !AssetReplacements.IsReplacement(t))
+                {
+                    names.Add(t.name);
+                }
+            }
+            return names;
+        }
+
+        private static List<ReplacementRow> ShownRows()
+        {
+            if (_rowsShown == null || _rowsShownFilter != _filter)
+            {
+                _rowsShownFilter = _filter;
+                _rowsShown = new List<ReplacementRow>();
+                foreach (ReplacementRow r in _rows)
+                {
+                    if (string.IsNullOrEmpty(_filter) || r.Name.IndexOf(_filter, StringComparison.OrdinalIgnoreCase) >= 0 || r.Mod.IndexOf(_filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        _rowsShown.Add(r);
+                    }
+                }
+            }
+            return _rowsShown;
+        }
+
+        // A line on the panel colour with a 3 px bar on its left, as the window's notices look.
+        private static void Band(Rect rect, Color bar)
+        {
+            TW.Fill(rect, TW.PanelColor);
+            TW.Fill(new Rect(rect.x, rect.y, 3, rect.height), bar);
+        }
+
+        private static void DrawReplacements(Rect view, ToolWindowStyles s, float row)
+        {
+            // Direct3D 12 can't load the new language's pictures while the game runs.
+            if (AssetReplacements.PendingLanguage != null)
+            {
+                var band = new Rect(view.x, view.y, view.width, row);
+                Band(band, TW.WarningColor);
+                string text = TW.Drawable($"Pictures for \"{AssetReplacements.PendingLanguage}\" apply after a restart (Direct3D 12).");
+                GUI.Label(new Rect(band.x + 10, band.y, band.width - 14, row), TW.Elide(text, _cell, band.width - 14), _cell);
+                view.y += row + 6;
+                view.height -= row + 6;
+            }
+            if (_rows.Count == 0)
             {
                 GUI.Label(view, "No mod ships texture replacements (BepInEx/plugins/<Mod>/assets/textures/<name>.png).", s.WrappedLabel);
                 return;
             }
-            float inner = view.width - 20;
-            _scroll = GUI.BeginScrollView(view, _scroll, new Rect(0, 0, inner, Mathf.Max(view.height, all.Count * row)), false, false);
-            float ry = 0;
-            foreach (TextureReplacement r in all)
+            List<ReplacementRow> shown = ShownRows();
+            if (shown.Count == 0)
             {
-                var nameRect = new Rect(0, ry, inner * 0.4f - 6, row);
-                string name = TW.Elide(r.Name, _cell, nameRect.width);
-                if (name != r.Name) TW.Hint(nameRect, r.Name);
-                GUI.Label(nameRect, name, _cell);
-                string mod = r.Language != null ? $"{r.Mod} ({r.Language})" : r.Mod;
-                GUI.Label(new Rect(inner * 0.4f, ry, inner * 0.3f - 6, row), TW.Elide(mod, _mutedCell, inner * 0.3f - 6), _mutedCell);
-                string note = $"{r.Texture.width}x{r.Texture.height}, in {r.Applied} place(s)";
-                if (r.Overrides.Count > 0)
+                GUI.Label(new Rect(view.x, view.y, view.width, row), TW.Elide(TW.Drawable($"No replacement's name or mod has \"{_filter}\" in it."), s.MutedLabel, view.width), s.MutedLabel);
+                return;
+            }
+            // Name, mod and state; a narrow window leaves the mod out.
+            float inner = view.width - 20;
+            bool wide = inner >= 580;
+            const float gap = 8;
+            float nameW, modW, statusW;
+            if (wide)
+            {
+                float avail = inner - 2 * gap;
+                nameW = avail / 3f;
+                modW = avail * 0.8f / 3f;
+                statusW = avail - nameW - modW;
+            }
+            else
+            {
+                nameW = (inner - gap) / 2f;
+                modW = 0;
+                statusW = inner - gap - nameW;
+            }
+            TW.ApplyScroll(view, ref _scrollReplacements);
+            _scrollReplacements = GUI.BeginScrollView(view, _scrollReplacements, new Rect(0, 0, inner, Mathf.Max(view.height, shown.Count * row)), false, false);
+            // Only the rows in sight are drawn.
+            int first = Mathf.Clamp((int)(_scrollReplacements.y / row), 0, shown.Count);
+            int last = Mathf.Min(shown.Count, first + Mathf.CeilToInt(view.height / row) + 1);
+            for (int i = first; i < last; i++)
+            {
+                ReplacementRow r = shown[i];
+                float ry = i * row;
+                float cx = 0;
+                GUIStyle nameStyle = r.Loser ? _mutedCell : _cell;
+                string name = TW.Drawable(r.Name);
+                string shownName = TW.Elide(name, nameStyle, nameW);
+                GUI.Label(new Rect(cx, ry, nameW, row), shownName, nameStyle);
+                cx += nameW + gap;
+                if (wide)
                 {
-                    note += " - overrides " + string.Join(", ", r.Overrides);
+                    GUI.Label(new Rect(cx, ry, modW, row), TW.Elide(TW.Drawable(r.Mod), _mutedCell, modW), _mutedCell);
+                    cx += modW + gap;
                 }
-                if (r.Problem != null)
+                GUIStyle statusStyle = r.State == RowState.Failed ? s.Danger
+                    : r.State == RowState.Off ? _mutedCell
+                    : r.State == RowState.InUse ? _cell
+                    : _warnCell;
+                string status = TW.Drawable(r.Status);
+                string shownStatus = TW.Elide(status, statusStyle, statusW);
+                GUI.Label(new Rect(cx, ry, statusW, row), shownStatus, statusStyle);
+                // The row explains itself on the hint line, with whatever was cut
+                // off; the text is only put together for the row pointed at.
+                var rowRect = new Rect(0, ry, inner, row);
+                if (Event.current != null && rowRect.Contains(Event.current.mousePosition))
                 {
-                    note = "NOT reloaded: " + r.Problem;
+                    string hint = r.Hint;
+                    if (shownStatus != status) hint = r.Status + ". " + hint;
+                    if (shownName != name || !wide) hint = $"{r.Name} ({r.Mod}): {hint}";
+                    TW.Hint(TW.Drawable(hint));
                 }
-                // What did not load is red, and whole on the hint line.
-                var noteRect = new Rect(inner * 0.7f, ry, inner * 0.3f, row);
-                GUIStyle noteStyle = r.Problem != null ? s.Danger : _mutedCell;
-                string shownNote = TW.Elide(note, noteStyle, noteRect.width);
-                if (shownNote != note) TW.Hint(noteRect, note);
-                GUI.Label(noteRect, shownNote, noteStyle);
-                ry += row;
             }
             GUI.EndScrollView();
         }
