@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "My Mod",
   "version": "1.0.0",
   "website": "https://github.com/me/mymod",
@@ -37,5 +37,14 @@
       ],
       "default": "Normal"
     }
-  ]
+  ],
+  "framework": {
+    "version": "1.4.3",
+    "sha256": "03306e48a5f4230b4f3da75c6fe2cfd49231899c481c3f80fef9a21f95191dda",
+    "size": 848424,
+    "needs": {
+      "DragNWash.ModFramework": "1.2.0",
+      "DragNWash.ModFramework.Text": "1.0.0"
+    }
+  }
 }

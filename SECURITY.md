@@ -58,9 +58,12 @@ touches the outside world:
 - **The installer**
   - **What it does:** it picks a game folder, downloads the official BepInEx
     5.4.23.5 release and checks it against a SHA-256 pinned in the source
-    before unpacking it, and it reads a mod's `mod-install.json`.
+    before unpacking it, and it reads a mod's `mod-install.json`. When that
+    file pins a ModFramework release (schema 2) and the game folder lacks it,
+    it downloads that release's zip from an address it builds from the version
+    alone, and uses it only when its size and SHA-256 match the file.
   - **A real bug:** a path that escapes the folder it should stay in, or a way
-    to make it accept a different archive.
+    to make it accept a different archive or download from another address.
 - **Update notices**
   - **What they do:** they ask `api.github.com` once a day for the latest
     release of a mod that names its repository, send nothing about the player

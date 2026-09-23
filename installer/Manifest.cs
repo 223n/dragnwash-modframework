@@ -37,6 +37,13 @@ namespace DragNWash.Installer
 
         [DataMember(Name = "choices")] public ModChoice[] Choices;
 
+        // Schema 2: the ModFramework release the mod was built against, fetched when
+        // the zip does not bundle the framework. Null in schema 1.
+        [DataMember(Name = "framework", EmitDefaultValue = false)] public FrameworkPin Framework;
+
+        // The newest schema this installer reads.
+        internal const int NewestSchema = 2;
+
         internal static ModManifest Load(string path)
         {
             var settings = new DataContractJsonSerializerSettings { UseSimpleDictionaryFormat = true };
@@ -68,9 +75,22 @@ namespace DragNWash.Installer
         // inside the mod's own folders and files.
         private void Validate()
         {
-            if (Schema != 1)
+            if (Schema < 1 || Schema > NewestSchema)
             {
-                throw new InvalidDataException($"{FileName}: schema {Schema} is not supported by this installer (it reads schema 1). Use the installer from the mod's release.");
+                throw new InvalidDataException($"{FileName}: schema {Schema} is not supported by this installer (it reads schema 1 and 2). Use the installer from the mod's release.");
+            }
+            if (Schema == 1 && Framework != null)
+            {
+                // An installer that reads schema 1 would skip the block and leave the mod without its framework.
+                throw new InvalidDataException($"{FileName}: \"framework\" needs schema 2.");
+            }
+            if (Schema == 2)
+            {
+                if (Framework == null)
+                {
+                    throw new InvalidDataException($"{FileName}: schema 2 needs a \"framework\" block.");
+                }
+                Framework.Validate();
             }
             if (string.IsNullOrWhiteSpace(Name))
             {
@@ -140,6 +160,88 @@ namespace DragNWash.Installer
                 file.StartsWith("BepInEx", StringComparison.OrdinalIgnoreCase) || file.StartsWith(Paths.FrameworkConfigPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException($"{FileName}: \"{file}\" is not a config file name this installer accepts.");
+            }
+        }
+    }
+
+    // The "framework" block of schema 2: one published ModFramework release, pinned by
+    // its version and its zip's SHA-256 and size, and the lowest version of each part
+    // the mod needs. The address is never read from here: the installer builds it
+    // from the version (Paths.FrameworkUrl), so an edited manifest cannot point it
+    // anywhere else.
+    [DataContract]
+    internal sealed class FrameworkPin
+    {
+        // No framework zip is near this; anything bigger is not one.
+        internal const long MaxSize = 20L * 1024 * 1024;
+
+        [DataMember(Name = "version")] public string Version;
+        [DataMember(Name = "sha256")] public string Sha256;
+        [DataMember(Name = "size")] public long Size;
+
+        // Plugin folder under BepInEx/plugins, as in the release zip → the lowest
+        // version of it the mod works with. The core may be left out; it is always
+        // installed. Libraries not named here are not installed.
+        [DataMember(Name = "needs")] public Dictionary<string, string> Needs;
+
+        private static readonly Regex VersionText = new Regex(@"^[0-9]{1,5}(\.[0-9]{1,5}){1,3}$");
+        private static readonly Regex Hash = new Regex(@"^[0-9a-f]{64}$");
+        private static readonly Regex Part = new Regex(@"^DragNWash\.ModFramework(\.[A-Za-z][A-Za-z0-9]{0,39})?$");
+
+        internal System.Version Pinned => System.Version.Parse(Version);
+
+        internal string ZipName => $"DragNWash.ModFramework-{Version}.zip";
+
+        // The lowest version of a part the mod needs; 0.0 for the core when it is not named.
+        internal System.Version Minimum(string part)
+        {
+            foreach (var pair in Needs)
+            {
+                if (string.Equals(pair.Key, part, StringComparison.OrdinalIgnoreCase))
+                {
+                    return System.Version.Parse(pair.Value);
+                }
+            }
+            return new System.Version(0, 0);
+        }
+
+        // The needed libraries, without the core.
+        internal List<string> Libraries()
+        {
+            return Needs.Keys.Where(k => !string.Equals(k, Paths.FrameworkPrefix, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        internal void Validate()
+        {
+            string where = ModManifest.FileName + ": framework";
+            if (Version == null || !VersionText.IsMatch(Version) || !System.Version.TryParse(Version, out _))
+            {
+                throw new InvalidDataException($"{where}.version \"{Version}\" is not a version such as 1.4.3.");
+            }
+            if (Sha256 == null || !Hash.IsMatch(Sha256))
+            {
+                throw new InvalidDataException($"{where}.sha256 must be the zip's SHA-256 as 64 lowercase hexadecimal digits.");
+            }
+            if (Size <= 0 || Size > MaxSize)
+            {
+                throw new InvalidDataException($"{where}.size must be the zip's size in bytes, above 0 and at most 20 MB.");
+            }
+            Needs = Needs ?? new Dictionary<string, string>();
+            if (Needs.Keys.GroupBy(k => k, StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1))
+            {
+                throw new InvalidDataException($"{where}.needs names a folder twice.");
+            }
+            foreach (var pair in Needs)
+            {
+                if (!Part.IsMatch(pair.Key) || string.Equals(pair.Key, Paths.FrameworkPrefix + ".Preloader", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException($"{where}.needs: \"{pair.Key}\" is not a ModFramework plugin folder (DragNWash.ModFramework or DragNWash.ModFramework.<Library>).");
+                }
+                if (pair.Value == null || !VersionText.IsMatch(pair.Value) || !System.Version.TryParse(pair.Value, out _))
+                {
+                    throw new InvalidDataException($"{where}.needs: \"{pair.Key}\" needs a version such as 1.0.0, not \"{pair.Value}\".");
+                }
             }
         }
     }
