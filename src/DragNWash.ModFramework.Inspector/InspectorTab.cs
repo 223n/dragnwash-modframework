@@ -450,7 +450,7 @@ namespace DragNWash.ModFramework.Inspector
             // Each view keeps its own search; Objects' takes t:Type too.
             // Named, so typing in it sets off no shortcut.
             GUI.SetNextControlName("DnWInspectSearch");
-            string searchNext = TW.FilterField(searchRect, _objectsMode ? _objectsSearch : _search, _objectsMode ? "Search (t:Material for one type)" : "Search (t:Rigidbody for one component)", s);
+            string searchNext = FilterField(searchRect, _objectsMode ? _objectsSearch : _search, _objectsMode ? "Search (t:Material for one type)" : "Search (t:Rigidbody for one component)", s);
             if (_objectsMode) _objectsSearch = searchNext;
             else _search = searchNext;
             y += row + 6;
@@ -810,6 +810,18 @@ namespace DragNWash.ModFramework.Inspector
         private static string Drawable(string text)
         {
             return TW.Drawable(text ?? "");
+        }
+
+        // TW.FilterField with its placeholder kept to one line, cut with "..."
+        // where the field is narrower than it (the placeholder's style wraps).
+        private static string FilterField(Rect rect, string value, string placeholder, ToolWindowStyles s)
+        {
+            float room = rect.width - 12;
+            if (TextWidth(placeholder, s.MutedLabel) > room)
+            {
+                placeholder = TW.Elide(placeholder, s.MutedLabel, room);
+            }
+            return TW.FilterField(rect, value, placeholder, s);
         }
 
         // Text widths already measured, by text and font: a long list is drawn

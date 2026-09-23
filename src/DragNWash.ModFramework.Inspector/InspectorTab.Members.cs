@@ -265,7 +265,7 @@ namespace DragNWash.ModFramework.Inspector
             string count = string.IsNullOrEmpty(_memberFilter) ? "" : $"{matched} of {total}";
             float countWidth = count.Length > 0 ? _mutedCell.CalcSize(new GUIContent(count)).x + 8 : 0;
             GUI.SetNextControlName(MemberFilterControl);
-            _memberFilter = TW.FilterField(new Rect(x, y, w - countWidth, row), _memberFilter, "Filter members", s);
+            _memberFilter = FilterField(new Rect(x, y, w - countWidth, row), _memberFilter, "Filter members", s);
             if (count.Length > 0)
             {
                 GUI.Label(new Rect(x + w - countWidth + 8, y, countWidth - 8, row), count, _mutedCell);

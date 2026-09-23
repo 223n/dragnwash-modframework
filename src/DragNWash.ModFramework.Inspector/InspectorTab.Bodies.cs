@@ -100,7 +100,7 @@ namespace DragNWash.ModFramework.Inspector
             y += row + 4;
             var filterRect = new Rect(x, y, w, row);
             GUI.SetNextControlName("DnWInspectBodiesFilter");
-            _bodiesFilter = TW.FilterField(filterRect, _bodiesFilter, "Filter by name or type", s);
+            _bodiesFilter = FilterField(filterRect, _bodiesFilter, "Filter by name or type", s);
             y += row + 4;
             var view = new Rect(x, y, w, pane.yMax - y - 2);
             float inner = view.width - 20;

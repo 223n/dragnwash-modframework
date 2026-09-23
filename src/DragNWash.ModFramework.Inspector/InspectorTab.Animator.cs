@@ -160,7 +160,7 @@ namespace DragNWash.ModFramework.Inspector
             }
             var filterRect = new Rect(x, y, w, row);
             GUI.SetNextControlName("DnWInspectClipsFilter");
-            _clipsFilter = TW.FilterField(filterRect, _clipsFilter, "Filter by name", s);
+            _clipsFilter = FilterField(filterRect, _clipsFilter, "Filter by name", s);
             y += row + 4;
             if (!string.IsNullOrEmpty(_animatorNote))
             {
