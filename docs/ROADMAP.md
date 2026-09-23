@@ -6,7 +6,7 @@ Where Drag'n Wash ModFramework is going. Plans change; dates are given only when
 
 The yardsticks stay the same: every mod runs safely together, and each part stays small enough that someone else can carry it on.
 
-## Pre-release: 1.5.0 (2026-09-23)
+## Released: 1.5.0 (2026-09-23)
 
 The core, the preloader patcher and every library go to 1.5.0; from here on they share one number. See [CHANGELOG.md](../CHANGELOG.md) for the whole list.
 
