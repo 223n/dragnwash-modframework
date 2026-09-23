@@ -173,6 +173,22 @@ namespace DragNWash.ModFramework.Assets
         // but no longer apply, as if their folders were off.
         private static readonly HashSet<TextureReplacement> Suspended = new HashSet<TextureReplacement>();
 
+        // Every PNG looked at while loading, read or not, winner or not: a
+        // file that is not among them was added after the game started.
+        private static readonly HashSet<string> SeenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private static void Seen(string file)
+        {
+            try
+            {
+                SeenFiles.Add(System.IO.Path.GetFullPath(file));
+            }
+            catch (Exception)
+            {
+                SeenFiles.Add(file);
+            }
+        }
+
         private static TextureReplacement Load(string file, string mod)
         {
             string name = System.IO.Path.GetFileNameWithoutExtension(file);
@@ -219,6 +235,7 @@ namespace DragNWash.ModFramework.Assets
                 Array.Sort(files, StringComparer.OrdinalIgnoreCase);
                 foreach (string file in files)
                 {
+                    Seen(file);
                     TextureReplacement replacement = Load(file, mod);
                     if (replacement == null)
                     {

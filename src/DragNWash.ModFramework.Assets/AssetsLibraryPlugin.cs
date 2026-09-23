@@ -72,7 +72,9 @@ namespace DragNWash.ModFramework.Assets
         // Reloading uploads textures while the game runs, which Direct3D 12 can
         // crash on; the guard notices a crash at the next start and switches
         // reloading off until the player turns it back on.
-        private const string ToolsOffReason = "developer tools are off (Options > Mods > Drag'n Wash ModFramework)";
+        internal const string ToolsOffReason = "developer tools are off (Options > Mods > Drag'n Wash ModFramework)";
+        internal const string CrashedReason = "switched off: the game crashed during the last reload";
+        internal const string ConfigOffReason = "switched off in the config ([Reload] AllowReload)";
 
         private void SetUpReload()
         {
@@ -93,7 +95,7 @@ namespace DragNWash.ModFramework.Assets
             if (!AllowReload.Value)
             {
                 AssetReplacements.ReloadDisabled = true;
-                AssetReplacements.ReloadDisabledReason = crashed ? "switched off: the game crashed during the last reload" : "switched off in the config ([Reload] AllowReload)";
+                AssetReplacements.ReloadDisabledReason = crashed ? CrashedReason : ConfigOffReason;
             }
             else if (refused)
             {
@@ -158,7 +160,7 @@ namespace DragNWash.ModFramework.Assets
                 else
                 {
                     AssetReplacements.ReloadDisabled = true;
-                    AssetReplacements.ReloadDisabledReason = "switched off in the config ([Reload] AllowReload)";
+                    AssetReplacements.ReloadDisabledReason = ConfigOffReason;
                 }
             };
         }

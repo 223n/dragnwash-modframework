@@ -14,7 +14,7 @@ namespace DragNWash.ModFramework.Assets
         private static IDisposable _tab;
         // One line per row: the window's label styles wrap, and a long texture
         // name in a narrow window ran into the rows below it.
-        private static GUIStyle _cell, _mutedCell, _accentCell, _warnCell, _warnSmall;
+        private static GUIStyle _cell, _mutedCell, _accentCell, _warnCell, _warnSmall, _warnWrapped;
 
         private static void EnsureCells(ToolWindowStyles s)
         {
@@ -32,6 +32,8 @@ namespace DragNWash.ModFramework.Assets
             _warnCell.hover.textColor = TW.WarningColor;
             _warnSmall = new GUIStyle(s.Hint) { fontStyle = FontStyle.Bold };
             _warnSmall.normal.textColor = TW.WarningColor;
+            _warnWrapped = new GUIStyle(s.WrappedLabel);
+            _warnWrapped.normal.textColor = TW.WarningColor;
         }
         private static List<TextureInfo> _textures;
         // What the mark column says about a texture: which mod's replacement it
@@ -128,6 +130,7 @@ namespace DragNWash.ModFramework.Assets
                 return;
             }
             _tab = TW.AddTab(GameFonts.Guid, "Assets", Draw, 50);
+            AssetReplacements.AfterWatchReload = WatchReloaded;
             // A list made before a scene change no longer shows what is loaded.
             GameEvents.OnSceneLoaded(GameFonts.Guid, (scene, mode) =>
             {
@@ -194,7 +197,7 @@ namespace DragNWash.ModFramework.Assets
             if (AssetReplacements.Reloading)
             {
                 TW.Busy("Reloading files...", AssetReplacements.ReloadingName == null ? null
-                    : $"{AssetReplacements.ReloadingName}  ({AssetReplacements.ReloadingDone + 1} of {AssetReplacements.ReloadingTotal})");
+                    : TW.Drawable($"{AssetReplacements.ReloadingName}  ({AssetReplacements.ReloadingDone + 1} of {AssetReplacements.ReloadingTotal})"));
             }
             // The first time the tab shows, it lists the textures by itself.
             if (!_listedOnce && _listAskedFrame < 0)
@@ -257,7 +260,8 @@ namespace DragNWash.ModFramework.Assets
             if (TW.FlowButton(ref bx, ref y, x, w, new GUIContent("Apply replacements", "Puts the replacements into materials and sprites that still show the original. Uploads nothing, so it's always safe.")))
             {
                 int n = AssetReplacements.ApplyNow();
-                _status = $"Replacements applied in {n} place(s).";
+                _status = n == 0 ? "Everything was already in place." : $"Put replacements into {Plural(n, "more place", "more places")}.";
+                TW.ShowNotice(_status, NoticeKind.Info, 4f);
                 AskForList(false);
             }
             bool wasEnabled = GUI.enabled;
@@ -289,15 +293,19 @@ namespace DragNWash.ModFramework.Assets
             }
             GUI.Label(new Rect(x, y, w, row), TW.Elide(TW.Drawable(statusLine), s.MutedLabel, w), s.MutedLabel);
             y += row;
-            string reloadNote = AssetReplacements.ReloadDisabled
-                ? "Reload files: " + AssetReplacements.ReloadDisabledReason
-                : GameFonts.RuntimeUploadsAreSafe
-                    ? "Reload files re-reads changed PNGs and uploads them; Apply replacements only re-points materials and sprites."
-                    : "Reload files uploads textures while the game runs, which can crash it on Direct3D 12; Apply replacements is always safe. Work with -force-d3d11 to reload freely.";
-            // Wraps on narrow windows; take as many rows as it needs.
-            float noteHeight = Mathf.Max(row, s.WrappedLabel.CalcHeight(new GUIContent(reloadNote), w));
-            GUI.Label(new Rect(x, y, w, noteHeight), reloadNote, s.WrappedLabel);
-            y += noteHeight + 4;
+            // What the buttons do is on the hint line; only a warning stays in
+            // sight: why Reload files is off and how to have it back, or that
+            // it can crash Direct3D 12. Nothing on Direct3D 11.
+            string reloadNote = AssetReplacements.ReloadDisabled ? ReloadOffNote()
+                : !GameFonts.RuntimeUploadsAreSafe ? "Direct3D 12: Reload files can crash the game. Apply replacements is always safe."
+                : null;
+            if (reloadNote != null)
+            {
+                // Wraps on narrow windows; take as many rows as it needs.
+                float noteHeight = Mathf.Max(row, _warnWrapped.CalcHeight(new GUIContent(reloadNote), w));
+                GUI.Label(new Rect(x, y, w, noteHeight), reloadNote, _warnWrapped);
+                y += noteHeight + 4;
+            }
 
             var view = new Rect(x, y, w, area.yMax - pad - y);
             if (_showReplacements)
@@ -334,21 +342,105 @@ namespace DragNWash.ModFramework.Assets
         private static string Count(int n) => n.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
         private static string Plural(int n, string one, string many) => $"{Count(n)} {(n == 1 ? one : many)}";
 
-        // After Reload files: the count on the status line, and a notice - a
-        // warning when a file did not load, which the replacements list then shows.
-        private static void Reloaded(IReadOnlyList<ReloadResult> results)
+        private const string AssetsSettings = "Options > Mods > Drag'n Wash ModFramework: Assets";
+
+        // Why Reload files is off, said so a person knows how to have it back.
+        private static string ReloadOffNote()
         {
-            int n = 0, bad = 0;
+            string reason = AssetReplacements.ReloadDisabledReason;
+            if (reason == AssetsLibraryPlugin.CrashedReason)
+                return $"Reload files is off because the game crashed during the last reload. Turn AllowReload back on in {AssetsSettings} to try again.";
+            if (reason == AssetsLibraryPlugin.ConfigOffReason)
+                return $"Reload files is switched off. Turn AllowReload on in {AssetsSettings} to use it.";
+            if (reason == AssetsLibraryPlugin.ToolsOffReason)
+                return "Reload files needs the developer tools. Turn them on in Options > Mods > Drag'n Wash ModFramework.";
+            if (reason != null && reason.StartsWith("refused", StringComparison.Ordinal))
+                return $"Reload files is off after {ReloadGuard.CrashCount} crashes during a reload on Direct3D 12. Start the game with -force-d3d11, or turn AllowReload off and on again in {AssetsSettings}.";
+            return "Reload files is off: " + (reason ?? "switched off");
+        }
+
+        private static void Tally(IReadOnlyList<ReloadResult> results, out int reloaded, out int bad, out string oneName)
+        {
+            reloaded = 0;
+            bad = 0;
+            oneName = null;
             foreach (ReloadResult r in results)
             {
-                if (r.Status == "reloaded") n++;
-                else if (r.Status != "unchanged") bad++;
+                if (r.Status == "reloaded")
+                {
+                    reloaded++;
+                    oneName = r.Name;
+                }
+                else if (r.Status != "unchanged")
+                {
+                    bad++;
+                }
             }
-            _status = $"Reloaded {n} file(s)" + (bad > 0 ? $", {bad} with problems (see Show replacements)" : "") + ".";
+        }
+
+        // A PNG added after the game started is not read by Reload files; say
+        // so, since otherwise nothing at all seems to happen.
+        private static bool SayNewFiles(List<string> fresh)
+        {
+            if (fresh.Count == 0)
+            {
+                return false;
+            }
+            string names = string.Join(", ", fresh.GetRange(0, Math.Min(3, fresh.Count)).ToArray()) + (fresh.Count > 3 ? ", ..." : "");
+            TW.ShowNotice(TW.Drawable($"{Plural(fresh.Count, "new file", "new files")} found ({names}). New files are read when the game starts, so restart to use {(fresh.Count == 1 ? "it" : "them")}."),
+                NoticeKind.Warning, 12f);
+            return true;
+        }
+
+        // After Reload files: what happened on the status line, and a notice -
+        // a warning when a file did not load, which the replacements list then
+        // shows, or when there are files it could not read because they are new.
+        private static void Reloaded(IReadOnlyList<ReloadResult> results)
+        {
+            Tally(results, out int n, out int bad, out _);
+            List<string> newFiles = AssetReplacements.NewFiles();
+            int fresh = newFiles.Count;
+            string said = n == 0 && bad == 0 ? "Nothing changed on disk."
+                : bad == 0 ? $"Reloaded {Plural(n, "file", "files")}."
+                : n > 0 ? $"Reloaded {Plural(n, "file", "files")}, {Count(bad)} with a problem (see Replacements)."
+                : $"{Plural(bad, "file", "files")} couldn't be reloaded (see Replacements).";
+            _status = said + (fresh > 0 ? $" {Plural(fresh, "new file", "new files")} found." : "");
             _showReplacements = bad > 0 || _showReplacements;
             AskForList(false);
-            TW.ShowNotice(_status, bad > 0 ? NoticeKind.Warning : NoticeKind.Info, bad > 0 ? 12f : 6f);
+            if (n > 0 || bad > 0 || fresh == 0)
+            {
+                TW.ShowNotice(said, bad > 0 ? NoticeKind.Warning : NoticeKind.Info, bad > 0 ? 12f : 6f);
+            }
+            SayNewFiles(newFiles);
         }
+
+        // After a watcher (WatchFiles, Direct3D 11) reloaded what changed on disk.
+        private static void WatchReloaded(IReadOnlyList<ReloadResult> results)
+        {
+            Tally(results, out int n, out int bad, out string oneName);
+            if (n > 0 || bad > 0)
+            {
+                string said = bad > 0 ? $"Files changed on disk: {Count(n)} reloaded, {Count(bad)} with a problem (see Replacements)."
+                    : n == 1 ? $"{oneName}.png changed on disk and was reloaded."
+                    : $"{Count(n)} files changed on disk and were reloaded.";
+                _status = TW.Drawable(said);
+                TW.ShowNotice(_status, bad > 0 ? NoticeKind.Warning : NoticeKind.Info, bad > 0 ? 12f : 6f);
+                if (_textures != null)
+                {
+                    AskForList(false);
+                }
+            }
+            // The watcher runs on every save in the folder; a new file is named
+            // once, not on each save after it.
+            var unsaid = new List<string>();
+            foreach (string file in AssetReplacements.NewFiles())
+            {
+                if (NewFilesSaid.Add(file)) unsaid.Add(file);
+            }
+            SayNewFiles(unsaid);
+        }
+
+        private static readonly HashSet<string> NewFilesSaid = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // The texture as it is on the GPU, scaled to fit, with its facts. Drawing
         // a loaded texture uploads nothing, so this is safe on Direct3D 12.

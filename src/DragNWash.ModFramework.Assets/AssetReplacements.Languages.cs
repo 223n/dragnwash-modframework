@@ -224,6 +224,7 @@ namespace DragNWash.ModFramework.Assets
             int loaded = 0;
             foreach (string file in files)
             {
+                Seen(file);
                 // A picture the language (or an earlier fallback) has already wins.
                 if (taken.Contains(System.IO.Path.GetFileNameWithoutExtension(file)))
                 {

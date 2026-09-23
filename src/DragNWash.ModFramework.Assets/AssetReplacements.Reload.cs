@@ -154,6 +154,61 @@ namespace DragNWash.ModFramework.Assets
             return changed;
         }
 
+        // PNGs in the replacement folders that were not there when the game
+        // started (plain ones, and the loaded language's with its fallbacks).
+        // Reload only reads files it knows, so these wait for a restart. Only
+        // looks at the folders; nothing is read.
+        internal static List<string> NewFiles()
+        {
+            var found = new List<string>();
+            var dirs = new List<string>();
+            try
+            {
+                string root = BepInEx.Paths.PluginPath;
+                if (!string.IsNullOrEmpty(root) && Directory.Exists(root))
+                {
+                    foreach (string modDir in Directory.GetDirectories(root))
+                    {
+                        dirs.Add(System.IO.Path.Combine(modDir, "assets", "textures"));
+                    }
+                }
+                if (!string.IsNullOrEmpty(_loadedLanguage))
+                {
+                    foreach (LanguageFolder f in LanguageFolders)
+                    {
+                        dirs.Add(LanguageDir(f, _loadedLanguage));
+                        foreach (string fallback in FallbacksOf(f, _loadedLanguage))
+                        {
+                            dirs.Add(LanguageDir(f, fallback));
+                        }
+                    }
+                }
+                foreach (string dir in dirs)
+                {
+                    if (!Directory.Exists(dir))
+                    {
+                        continue;
+                    }
+                    foreach (string file in Directory.GetFiles(dir, "*.png"))
+                    {
+                        if (!SeenFiles.Contains(System.IO.Path.GetFullPath(file)))
+                        {
+                            found.Add(System.IO.Path.GetFileName(file));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AssetsLibraryPlugin.Log.LogWarning($"Looking for new texture files failed: {ex.Message}");
+            }
+            found.Sort(StringComparer.OrdinalIgnoreCase);
+            return found;
+        }
+
+        // The Assets tab, when it is there: told what a watcher's reload did.
+        internal static Action<IReadOnlyList<ReloadResult>> AfterWatchReload;
+
         private static string NamesOf(List<TextureReplacement> changed)
         {
             var names = new List<string>();
@@ -354,7 +409,8 @@ namespace DragNWash.ModFramework.Assets
             _reloadRequested = false;
             _reloadRequestedAt = 0f;
             int n = 0;
-            foreach (ReloadResult r in ReloadFiles())
+            IReadOnlyList<ReloadResult> results = ReloadFiles();
+            foreach (ReloadResult r in results)
             {
                 if (r.Status == "reloaded")
                 {
@@ -362,6 +418,14 @@ namespace DragNWash.ModFramework.Assets
                 }
             }
             AssetsLibraryPlugin.Log.LogMessage($"Texture files changed on disk: {n} replacement(s) reloaded.");
+            try
+            {
+                AfterWatchReload?.Invoke(results);
+            }
+            catch (Exception ex)
+            {
+                AssetsLibraryPlugin.Log.LogError($"After reloading changed texture files: {ex}");
+            }
         }
     }
 }
