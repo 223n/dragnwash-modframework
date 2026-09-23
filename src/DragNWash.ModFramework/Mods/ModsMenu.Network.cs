@@ -57,7 +57,7 @@ namespace DragNWash.ModFramework.Mods
             }
             foreach (NetworkUse use in uses)
             {
-                Line(content, Escape(use.Host), size * 1.1f, FontStyles.Bold, ModsLook.Accent, 0f);
+                Line(content, Escape(use.Host), size * 1.1f, FontStyles.Bold, ModsLook.AccentText, 0f);
                 Pair(content, TextWhatFor, use.Purpose, size);
                 Pair(content, TextWhatIsSent, use.Sends, size);
                 Pair(content, TextTurnOff, use.TurnOff, size);

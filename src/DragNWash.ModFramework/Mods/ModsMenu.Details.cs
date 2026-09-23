@@ -165,7 +165,7 @@ namespace DragNWash.ModFramework.Mods
             }
             if (!string.IsNullOrEmpty(entry.Website))
             {
-                ModsLook.Text(text, "Website", Escape(entry.Website), 19f, ModsLook.Accent, FontStyles.Normal, false);
+                ModsLook.Text(text, "Website", Escape(entry.Website), 19f, ModsLook.AccentText, FontStyles.Normal, false);
             }
 
             RectTransform state = ModsLook.Rect(header, "State");
@@ -343,7 +343,7 @@ namespace DragNWash.ModFramework.Mods
             string buttonText = null, UnityAction onClick = null, bool spinner = false)
         {
             RectTransform band = ModsLook.Rect(parent, name);
-            ModsLook.Shape(band.gameObject, ModsLook.Rounded, ModsLook.Inset, 8f).raycastTarget = false;
+            ModsLook.Shape(band.gameObject, ModsLook.Rounded, ModsLook.Card, 8f).raycastTarget = false;
             HorizontalLayoutGroup row = band.gameObject.AddComponent<HorizontalLayoutGroup>();
             row.padding = new RectOffset(20, 12, 10, 10);
             row.spacing = 12f;
@@ -385,7 +385,7 @@ namespace DragNWash.ModFramework.Mods
             TMP_Text head = null;
             if (label != null)
             {
-                head = ModsLook.Text(text, "Label", label, size, color, FontStyles.Bold, false);
+                head = ModsLook.Text(text, "Label", label, size, ModsLook.Readable(color), FontStyles.Bold, false);
             }
             float headWidth = head != null ? ModsLook.Width(head) : 0f;
             bool beside = head == null || headWidth <= width * 0.45f;
@@ -675,7 +675,7 @@ namespace DragNWash.ModFramework.Mods
                 RectTransform chip = ModsLook.Rect(holder, "Chip");
                 chip.anchorMin = chip.anchorMax = new Vector2(0f, 1f);
                 chip.pivot = new Vector2(0f, 1f);
-                ModsLook.Shape(chip.gameObject, ModsLook.Pill, ModsLook.Inset, height / 2f).raycastTarget = false;
+                ModsLook.Shape(chip.gameObject, ModsLook.Pill, ModsLook.Card, height / 2f).raycastTarget = false;
                 TMP_Text label = ModsLook.Text(chip, "Label", Escape(text), 19f, ModsLook.Label, FontStyles.Normal, false);
                 label.alignment = TextAlignmentOptions.Center;
                 float w = Mathf.Min(width, ModsLook.Width(label) + 30f);

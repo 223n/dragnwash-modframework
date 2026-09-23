@@ -245,7 +245,7 @@ namespace DragNWash.ModFramework.Mods
             }
             if (item.RequiresRestart)
             {
-                ModsLook.Text(text, "Restart", TextRestart, 18f, ModsLook.Accent, FontStyles.Italic, true);
+                ModsLook.Text(text, "Restart", TextRestart, 18f, ModsLook.AccentText, FontStyles.Italic, true);
             }
             // What the reset button goes back to, while the value is another.
             RectTransform defaultLine = ModsLook.Rect(text, "Default");
@@ -381,7 +381,7 @@ namespace DragNWash.ModFramework.Mods
         private static RectTransform RowFrame(RectTransform content, string name)
         {
             RectTransform row = ModsLook.Rect(content, name);
-            ModsLook.Shape(row.gameObject, ModsLook.Rounded, ModsLook.Inset, 10f).raycastTarget = false;
+            ModsLook.Shape(row.gameObject, ModsLook.Rounded, ModsLook.Card, 10f).raycastTarget = false;
             VerticalLayoutGroup column = row.gameObject.AddComponent<VerticalLayoutGroup>();
             column.padding = new RectOffset(20, 14, 12, 12);
             column.spacing = 8f;
@@ -621,6 +621,10 @@ namespace DragNWash.ModFramework.Mods
             // it wakes, which must be set by then.
             box.gameObject.SetActive(false);
             Image background = ModsLook.Shape(box.gameObject, ModsLook.Rounded, Color.white, 10f);
+            // A thin edge, so the see-through field still reads as a box.
+            RectTransform edge = ModsLook.Rect(box, "Edge");
+            ModsLook.Stretch(edge);
+            ModsLook.Shape(edge.gameObject, ModsLook.Outline, ModsLook.FieldEdge, 8f).raycastTarget = false;
 
             RectTransform area = ModsLook.Rect(box, "Text Area");
             ModsLook.Stretch(area, 12f, 4f, 12f, 4f);
@@ -643,7 +647,7 @@ namespace DragNWash.ModFramework.Mods
             field.customCaretColor = true;
             field.caretColor = ModsLook.Label;
             field.selectionColor = new Color(ModsLook.Accent.r, ModsLook.Accent.g, ModsLook.Accent.b, 0.4f);
-            ModsLook.Colors(field, ModsLook.Panel, ModsLook.Hover, ModsLook.Panel);
+            ModsLook.Colors(field, ModsLook.Field, ModsLook.Hover, ModsLook.Field);
             // The pad passing over it does not start typing (on the Steam Deck
             // that would open the keyboard); A does.
             field.shouldActivateOnSelect = false;
@@ -714,11 +718,11 @@ namespace DragNWash.ModFramework.Mods
             }
             RectTransform tag = ModsLook.Rect(row, "Saved");
             tag.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-            ModsLook.Shape(tag.gameObject, ModsLook.Pill, ModsLook.Panel, 13f).raycastTarget = false;
+            ModsLook.Shape(tag.gameObject, ModsLook.Pill, ModsLook.Inset, 13f).raycastTarget = false;
             RectTransform edge = ModsLook.Rect(tag, "Edge");
             ModsLook.Stretch(edge);
             ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, ModsLook.Accent, 13f).raycastTarget = false;
-            TMP_Text label = ModsLook.Text(tag, "Label", TextSaved, 17f, ModsLook.Accent, FontStyles.Bold, false);
+            TMP_Text label = ModsLook.Text(tag, "Label", TextSaved, 17f, ModsLook.AccentText, FontStyles.Bold, false);
             label.alignment = TextAlignmentOptions.Center;
             tag.anchorMin = tag.anchorMax = new Vector2(1f, 1f);
             tag.pivot = new Vector2(1f, 0.5f);

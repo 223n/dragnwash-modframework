@@ -263,9 +263,9 @@ namespace DragNWash.ModFramework.Mods
         // anchored by fractions of it, so they keep their shares when the window
         // is resized (fixed offsets measured at build time did not).
         //
-        // Each side sits on a solid panel in the Tool window's colours: over
-        // the game's see-through panel, how readable the text was depended on
-        // the picture behind the menu.
+        // Each side sits on a panel of its own, a dark tint the game shows
+        // through a little. The game's see-through panel under the whole menu
+        // left how readable the text was to the picture behind it.
         private static void SplitForDetails(Transform panel, ModsMenu menu)
         {
             var scroll = (RectTransform)panel.Find("Scroll View");
@@ -286,10 +286,8 @@ namespace DragNWash.ModFramework.Mods
 
             // The list's panel starts right of the Back button's pointing hand,
             // as the rows do.
-            RectTransform listCard = ModsLook.Rect(split, "ListPanel");
-            Fill(listCard, 0f, 0.45f);
+            RectTransform listCard = Card(split, "List", 0f, 0.45f);
             listCard.offsetMin = new Vector2(ModsMenu.ListPanelLeft, 0f);
-            ModsLook.Shape(listCard.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
 
             // A notch of the wheel moves about a row (the game's view moved 6),
             // and the scrollbar is thin and dark like the rest of the panel.
@@ -321,14 +319,31 @@ namespace DragNWash.ModFramework.Mods
             listTop.offsetMax = Vector2.zero;
             menu.ListTop = listTop;
 
-            RectTransform detailsCard = ModsLook.Rect(split, "DetailsPanel");
-            Fill(detailsCard, 0.47f, 1f);
-            ModsLook.Shape(detailsCard.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
+            Card(split, "Details", 0.47f, 1f);
 
             var details = (RectTransform)new GameObject("Details", typeof(RectTransform)).transform;
             details.SetParent(split, false);
             Fill(details, 0.47f, 1f);
             menu.Details = details;
+        }
+
+        // A panel: the tint, and a faint line around it.
+        private static RectTransform Card(RectTransform split, string name, float left, float right)
+        {
+            RectTransform card = ModsLook.Rect(split, name + "Panel");
+            Fill(card, left, right);
+            ModsLook.Shape(card.gameObject, ModsLook.Rounded, ModsLook.Panel, 18f).raycastTarget = false;
+
+            RectTransform line = ModsLook.Rect(card, "Edge");
+            ModsLook.Stretch(line);
+            Image edge = ModsLook.Shape(line.gameObject, ModsLook.PanelEdge, ModsLook.Hairline, 18f);
+            edge.raycastTarget = false;
+            if (ModsLook.PanelEdge == null)
+            {
+                // A square line would stick out of the rounded corners.
+                edge.enabled = false;
+            }
+            return card;
         }
 
         private static void Fill(RectTransform rect, float left, float right)

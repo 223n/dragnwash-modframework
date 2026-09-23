@@ -223,7 +223,7 @@ namespace DragNWash.ModFramework.Mods
             field.customCaretColor = true;
             field.caretColor = ModsLook.Label;
             field.selectionColor = new Color(ModsLook.Accent.r, ModsLook.Accent.g, ModsLook.Accent.b, 0.4f);
-            ModsLook.Colors(field, ModsLook.Inset, ModsLook.Hover, ModsLook.Inset);
+            ModsLook.Colors(field, ModsLook.Field, ModsLook.Hover, ModsLook.Field);
             // The pad passing over it does not start typing (on the Steam Deck
             // that would open the keyboard): A does, or Y (FocusSearch).
             field.shouldActivateOnSelect = false;
@@ -308,11 +308,11 @@ namespace DragNWash.ModFramework.Mods
             Image face = ModsLook.Shape(chip.gameObject, ModsLook.Pill, Color.white, 20f);
             Button button = chip.gameObject.AddComponent<Button>();
             button.targetGraphic = face;
-            ModsLook.Colors(button, chosen ? ModsLook.Inset : ModsLook.Clear, ModsLook.Hover, ModsLook.Raised);
+            ModsLook.Colors(button, chosen ? ModsLook.Card : ModsLook.Clear, ModsLook.Hover, ModsLook.Raised);
 
             RectTransform edge = ModsLook.Rect(chip, "Edge");
             ModsLook.Stretch(edge);
-            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, chosen ? ModsLook.Accent : ModsLook.Border, 20f).raycastTarget = false;
+            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, chosen ? ModsLook.Accent : ModsLook.ChipEdge, 20f).raycastTarget = false;
 
             TMP_Text label = ModsLook.Text(chip, "Label", text, 19f, chosen ? ModsLook.Label : ModsLook.Muted, FontStyles.Bold, false);
             TMP_Text number = ModsLook.Text(chip, "Count", count.ToString(), 19f,
@@ -849,7 +849,7 @@ namespace DragNWash.ModFramework.Mods
         {
             if (Button != null)
             {
-                ModsLook.Colors(Button, shown ? ModsLook.Inset : ModsLook.Clear, ModsLook.Hover, ModsLook.Raised);
+                ModsLook.Colors(Button, shown ? ModsLook.Card : ModsLook.Clear, ModsLook.Hover, ModsLook.Raised);
             }
             if (Bar != null)
             {

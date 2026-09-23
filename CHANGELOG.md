@@ -91,6 +91,12 @@ Versions of the core and of each library are separate, and follow semantic versi
 - The notes on a mod's details (going online without saying so, a new version, conflicts, what it uses) are never dropped any more. Before, the panel had room for two or three lines, and a long label like "Went online without saying so:" could use two of them, so the update or conflict notes after it disappeared without a word. Now, when there are more notes than lines, the lines get thinner and the text a little smaller so every note fits.
 - The `<` and `>` buttons of a number setting with a range move by a round step now: about a twentieth of the range, rounded down to 1, 2 or 5 times a power of ten, and the value goes to the next multiple of it. Graphs' FrameBudgetMs (0.1 to 8) used to move by 0.395, so one press from 1 gave 1.395; now it moves by 0.2 and gives 1.2.
 
+### Mods screen: frosted glass
+
+- The list and the details sit on see-through dark panels now, with a faint light line around each, instead of solid ones, so the game shows behind them a little. Rows, notes, settings, the chosen filter and chips are darker see-through cards on top, and the search and value fields have a thin edge.
+- Small grey text and the accent colour where it's text (a website, "New version available:", "Saved") are a little lighter, so they stay easy to read over the brightest picture behind the menu, the white title logo. The switches, bars and lines keep the accent as it was.
+- How see-through things are was matched to the design mock in the game's own colour blending, which lets much more through than a browser does at the same numbers.
+
 ### Tool window: its font is made when you first open it
 
 - The F1 window's font used to be picked and filled at startup. Now it's made the first time the window opens. That makes every start about 0.1 s faster, and up to about 1.5 s on a PC that was just switched on, because finding the font means reading the list of every installed font from disk. The "Window font: ..." line is written to the log when the font is made. With developer tools off, the window never opens, so that time is simply gone.

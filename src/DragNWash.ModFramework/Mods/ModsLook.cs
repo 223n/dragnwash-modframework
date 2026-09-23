@@ -15,24 +15,141 @@ namespace DragNWash.ModFramework.Mods
     // core cannot depend on a library.
     internal static class ModsLook
     {
-        internal static readonly Color Panel = new Color(0.09f, 0.11f, 0.15f);
+        // Solid: a switch's knob, the letters on an icon, a chosen button's
+        // text, and a tag that hangs over a row's edge.
         internal static readonly Color Inset = new Color(0.055f, 0.07f, 0.10f);
         internal static readonly Color Accent = new Color(0.32f, 0.78f, 0.72f);
-        internal static readonly Color Muted = new Color(0.60f, 0.66f, 0.73f);
         internal static readonly Color Error = new Color(0.96f, 0.45f, 0.40f);
         internal static readonly Color Warning = new Color(0.93f, 0.75f, 0.30f);
         internal static readonly Color Label = new Color(0.91f, 0.94f, 0.97f);
         internal static readonly Color Border = new Color(0.17f, 0.20f, 0.27f);
 
-        // A button's face, and a row or tab under the pointer or the pad.
-        internal static readonly Color Raised = new Color(0.165f, 0.196f, 0.26f);
+        // A row or tab under the pointer or the pad.
         internal static readonly Color Hover = new Color(0.12f, 0.145f, 0.195f);
 
-        // A switch that is off: its track and its knob.
-        internal static readonly Color TrackOff = new Color(0.23f, 0.26f, 0.32f);
+        // A switch that is off: its knob.
         internal static readonly Color KnobOff = new Color(0.77f, 0.80f, 0.85f);
 
         internal static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
+
+        // The rest depends on what is behind the panels (UseLook): the game's
+        // picture as it is (tint only), or blurred (glass).
+
+        // The list's and the details' panels.
+        internal static Color Panel;
+
+        // A card on a panel (a note's band, a setting's row, the chosen row,
+        // filter and chip), and a field (the search, a setting's value).
+        internal static Color Card;
+        internal static Color Field;
+
+        // Small text, and the accent when it is text rather than a line.
+        internal static Color Muted;
+        internal static Color AccentText;
+
+        // A button's face.
+        internal static Color Raised;
+
+        // A switch that is off: its track.
+        internal static Color TrackOff;
+
+        // A filter's edge while it isn't chosen, a field's edge, and the
+        // faint line around each panel.
+        internal static Color ChipEdge;
+        internal static Color FieldEdge;
+        internal static Color Hairline;
+
+        // Goes up by one each time the colours above change, so an open
+        // screen knows to build itself again.
+        internal static int Revision;
+
+        internal static bool Glass { get; private set; }
+
+        static ModsLook()
+        {
+            UseLook(false);
+        }
+
+        // The colours for panels the game shows through, blurred (glass) or
+        // not (tint only), after the Mods screen mock (design-mods-glass).
+        //
+        // The mock's alphas are a browser's, which blends in gamma space. The
+        // game blends in linear space, where the same alpha lets much more of
+        // what is behind through, so each is converted to one that looks the
+        // same there (Opaque, Light). Colours need no converting: Unity turns
+        // a UI colour into linear by itself.
+        //
+        // Small text is lighter than the Tool window's, and the accent as
+        // text lighter than the accent as a line, so both keep 4.5:1 or more
+        // over the brightest picture behind (the white title logo).
+        internal static void UseLook(bool glass)
+        {
+            Glass = glass;
+            if (glass)
+            {
+                Panel = Gamma(18, 24, 35, Opaque(0.59f));
+                Card = Gamma(6, 9, 14, Opaque(0.45f));
+                Field = Gamma(3, 5, 9, Opaque(0.55f));
+                Muted = Gamma(0xc0, 0xca, 0xd5, 1f);
+                AccentText = Gamma(0x7f, 0xe0, 0xd3, 1f);
+                Raised = Gamma(52, 62, 82, Opaque(0.85f));
+                TrackOff = Gamma(90, 100, 120, Opaque(0.70f));
+                ChipEdge = new Color(1f, 1f, 1f, Light(0.16f));
+                FieldEdge = new Color(1f, 1f, 1f, Light(0.14f));
+                Hairline = new Color(1f, 1f, 1f, Light(0.14f));
+            }
+            else
+            {
+                Panel = Gamma(12, 16, 24, Opaque(0.80f));
+                Card = Gamma(6, 8, 13, Opaque(0.55f));
+                Field = Gamma(4, 6, 10, Opaque(0.60f));
+                Muted = Gamma(0xaa, 0xb6, 0xc4, 1f);
+                AccentText = Gamma(0x62, 0xd3, 0xc4, 1f);
+                Raised = new Color(0.165f, 0.196f, 0.26f);
+                TrackOff = new Color(0.23f, 0.26f, 0.32f);
+                ChipEdge = Border;
+                FieldEdge = Border;
+                Hairline = new Color(1f, 1f, 1f, Light(0.07f));
+            }
+            Revision++;
+        }
+
+        // The accent as text, any other colour as it is: for a label that
+        // takes the colour of its band or tag.
+        internal static Color Readable(Color color)
+        {
+            return color == Accent ? AccentText : color;
+        }
+
+        private static Color Gamma(int r, int g, int b, float alpha)
+        {
+            return new Color(r / 255f, g / 255f, b / 255f, alpha);
+        }
+
+        private static bool Linear => QualitySettings.activeColorSpace == ColorSpace.Linear;
+
+        // A dark colour over the picture. In gamma space it keeps (1 - a) of
+        // what is behind; in linear space that is about (1 - a)^2.2 of it,
+        // and less for the picture's darker parts. 1.65 matches the mock
+        // over the title screen (0.80 -> 0.93, 0.59 -> 0.77, as notes.md).
+        private static float Opaque(float alpha)
+        {
+            return Linear ? 1f - Mathf.Pow(1f - alpha, 1.65f) : alpha;
+        }
+
+        // White over the dark panel (about 0.12 in gamma space): the alpha
+        // that lightens it as much as the browser does.
+        private static float Light(float alpha)
+        {
+            if (!Linear)
+            {
+                return alpha;
+            }
+            const float under = 0.12f;
+            float target = Mathf.GammaToLinearSpace(under + alpha * (1f - under));
+            float behind = Mathf.GammaToLinearSpace(under);
+            return Mathf.Clamp01((target - behind) / (1f - behind));
+        }
 
         // A scroll view's scrollSensitivity. The game's input module gives 6
         // for one notch of the wheel, so a notch moves 84, about one row of
@@ -47,6 +164,10 @@ namespace DragNWash.ModFramework.Mods
 
         // A 3-unit line around the same shape, for the gamepad's frame.
         internal static Sprite Outline;
+
+        // A 1-unit line around a panel's shape (18-unit corners), used as it
+        // is: the faint edge of the list's and the details' panels.
+        internal static Sprite PanelEdge;
 
         // Filled, with 16-unit corners: a pill at any width, a circle when square.
         internal static Sprite Pill;
@@ -72,6 +193,7 @@ namespace DragNWash.ModFramework.Mods
             {
                 Rounded = Sliced("ModsRounded", 12, 0f);
                 Outline = Sliced("ModsOutline", 12, 3f);
+                PanelEdge = Sliced("ModsPanelEdge", 18, 1f);
                 Pill = Sliced("ModsPill", 16, 0f);
                 PillOutline = Sliced("ModsPillOutline", 16, 2f);
                 Triangle = Icon("ModsTriangle", 16, (x, y) =>
@@ -242,7 +364,7 @@ namespace DragNWash.ModFramework.Mods
                 {
                     image.pixelsPerUnitMultiplier = 16f / Mathf.Max(1f, radius);
                 }
-                image.fillCenter = sprite != Outline && sprite != PillOutline;
+                image.fillCenter = sprite != Outline && sprite != PillOutline && sprite != PanelEdge;
             }
             image.color = color;
             return image;
@@ -368,7 +490,7 @@ namespace DragNWash.ModFramework.Mods
         {
             RectTransform tag = Rect(parent, name);
             Shape(tag.gameObject, PillOutline, color, height / 2f).raycastTarget = false;
-            TMP_Text label = Text(tag, "Label", text, size, color, FontStyles.Bold, false);
+            TMP_Text label = Text(tag, "Label", text, size, Readable(color), FontStyles.Bold, false);
             label.alignment = TextAlignmentOptions.Center;
             float width = Width(label) + 22f;
             tag.sizeDelta = new Vector2(width, height);
