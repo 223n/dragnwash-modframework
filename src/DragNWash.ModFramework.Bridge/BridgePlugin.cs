@@ -32,6 +32,7 @@ namespace DragNWash.ModFramework.Bridge
         private int _problemPort;
         private string _problemText = "";
         private Vector2 _scroll;
+        private float _contentHeight = 400;     // how tall the tab came out last draw
 
         private enum ListenProblem { None, Reserved, InUse, Other }
 
@@ -260,7 +261,42 @@ namespace DragNWash.ModFramework.Bridge
             return names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
         }
 
-        private string Setup => $"claude mcp add --transport http dragnwash http://127.0.0.1:{_port.Value}/mcp --header \"Authorization: Bearer {BridgeToken.Value}\"";
+        private string Address => $"http://127.0.0.1:{_port.Value}/mcp";
+
+        // The clients Copy setup has a setup for, each in the form its own
+        // documentation gives: Claude Code's "claude mcp add" with --header,
+        // VS Code's .vscode/mcp.json ("servers", type "http", "headers"), and
+        // Cursor's mcp.json ("mcpServers", "url", "headers").
+        private static readonly string[] Clients = { "Claude Code", "VS Code", "Cursor" };
+        private int _client;
+
+        private string SetupFor(int client)
+        {
+            string token = BridgeToken.Value;   // letters, digits, '-' and '_': nothing to escape
+            string headers = "      \"headers\": { \"Authorization\": \"Bearer " + token + "\" }\n";
+            switch (client)
+            {
+                case 1:
+                    return "{\n  \"servers\": {\n    \"dragnwash\": {\n      \"type\": \"http\",\n      \"url\": \"" + Address + "\",\n" + headers + "    }\n  }\n}\n";
+                case 2:
+                    return "{\n  \"mcpServers\": {\n    \"dragnwash\": {\n      \"url\": \"" + Address + "\",\n" + headers + "    }\n  }\n}\n";
+                default:
+                    return $"claude mcp add --transport http dragnwash {Address} --header \"Authorization: Bearer {token}\"";
+            }
+        }
+
+        private static string SetupNote(int client)
+        {
+            switch (client)
+            {
+                case 1:
+                    return "For .vscode/mcp.json in your project. If the file lists other servers, add just the dragnwash entry to them.";
+                case 2:
+                    return "For .cursor/mcp.json in your project, or ~/.cursor/mcp.json for every project. If the file lists other servers, add just the dragnwash entry.";
+                default:
+                    return "Run it in a terminal. Already set up in Claude Code? Run claude mcp remove dragnwash first, since adding the same name twice fails.";
+            }
+        }
 
         private string Command(string[] args)
         {
@@ -421,6 +457,80 @@ namespace DragNWash.ModFramework.Bridge
             }
         }
 
+        // Address, token and setup, a row each, every one with its own Copy.
+        // The token is never drawn: the tab may be on a stream or in a
+        // screenshot. Copying it alone gives away no more than Copy setup,
+        // which always had it in.
+        private float DrawConnection(float x, float y, float width, string who)
+        {
+            var s = TW.Styles;
+            float row = TW.RowHeight, labelWidth = 80, left = x + labelWidth, room = width - labelWidth;
+            // Copying works while it is not listening, for setting a client up
+            // ahead; the notice says it won't answer yet.
+            string later = Server != null ? "" : " It won't answer until the Bridge is listening.";
+            GUI.Label(new Rect(x, y, width, 26), "CONNECTION", s.Label);
+            y += 30;
+
+            string address = Address;
+            float copyWidth = ButtonRow.Width("Copy");
+            GUI.Label(new Rect(x, y, labelWidth, row), "Address", s.MutedLabel);
+            float addressWidth = Mathf.Max(0, room - copyWidth - 8);
+            GUI.Label(new Rect(left, y, addressWidth, row), TW.Elide(address, s.Label, addressWidth), s.Label);
+            if (GUI.Button(new Rect(x + width - copyWidth, y, copyWidth, row), "Copy", s.Button))
+            {
+                GUIUtility.systemCopyBuffer = address;
+                TW.ShowNotice("The address is on the clipboard." + later, NoticeKind.Info, 8f);
+            }
+            y += row + 6;
+
+            float newWidth = ButtonRow.Width("New token"), buttonsWidth = copyWidth + 8 + newWidth;
+            GUI.Label(new Rect(x, y, labelWidth, row), "Token", s.MutedLabel);
+            const string kept = "Kept in your user profile, never shown here";
+            var keptRect = new Rect(left, y, Mathf.Max(0, room - buttonsWidth - 8), row);
+            string keptShown = TW.Elide(kept, s.MutedLabel, keptRect.width);
+            GUI.Label(keptRect, keptShown, s.MutedLabel);
+            if (keptShown != kept) TW.Hint(keptRect, kept);
+            if (GUI.Button(new Rect(x + width - buttonsWidth, y, copyWidth, row), "Copy", s.Button))
+            {
+                GUIUtility.systemCopyBuffer = BridgeToken.Value;
+                TW.ShowNotice("The token is on the clipboard." + later, NoticeKind.Info, 8f);
+            }
+            // It cuts off whoever is connected, so it asks first - and only
+            // then: with nobody connected there is nothing to lose.
+            if (GUI.Button(new Rect(x + width - newWidth, y, newWidth, row), "New token", TW.IsConfirming(NewTokenId) ? s.SelectedButton : s.Button))
+            {
+                if (who == null) NewToken(null);
+                else TW.AskConfirm(NewTokenId);
+            }
+            y += row + 6;
+            if (TW.IsConfirming(NewTokenId))
+            {
+                if (TW.Confirm(new Rect(x, y, width, row), NewTokenId, who != null ? $"New token? Disconnects {who}." : "New token?", "Yes, new token",
+                    "Yes makes the token; Cancel or 5 s keeps the old one. Esc = Cancel."))
+                {
+                    NewToken(who);
+                }
+                y += row + 6;
+            }
+
+            GUI.Label(new Rect(x, y, labelWidth, row), "Setup", s.MutedLabel);
+            var buttons = new ButtonRow(left, y, room);
+            for (int i = 0; i < Clients.Length; i++)
+            {
+                if (buttons.Button(Clients[i], _client == i)) _client = i;
+            }
+            if (buttons.Button("Copy setup"))
+            {
+                GUIUtility.systemCopyBuffer = SetupFor(_client);
+                TW.ShowNotice($"The {Clients[_client]} setup, with the token, is on the clipboard." + later, NoticeKind.Info, 8f);
+            }
+            y = buttons.Bottom + 4;
+            string note = SetupNote(_client);
+            float noteHeight = s.WrappedLabel.CalcHeight(new GUIContent(note), room);
+            GUI.Label(new Rect(left, y, room, noteHeight), note, s.WrappedLabel);
+            return y + noteHeight;
+        }
+
         private void DrawTab(Rect area)
         {
             var s = TW.Styles;
@@ -429,13 +539,16 @@ namespace DragNWash.ModFramework.Bridge
             float inner = w - 20;
             List<McpProtocol.Session> sessions = McpProtocol.AllSessions();
             List<McpProtocol.CallRecord> calls = McpProtocol.RecentCalls();
-            float content = 360 + (sessions.Count + calls.Count) * 26 + (TW.IsConfirming(NewTokenId) || TW.IsConfirming(DisconnectId) ? row + 6 : 0);
             TW.ApplyScroll(area, ref _scroll);
-            _scroll = GUI.BeginScrollView(area, _scroll, new Rect(0, 0, inner, Mathf.Max(area.height, content)), false, false);
+            // As tall as the last draw came out: the panel and the rows wrap
+            // with the window's width, so no fixed sum is ever right.
+            _scroll = GUI.BeginScrollView(area, _scroll, new Rect(0, 0, inner, Mathf.Max(area.height, _contentHeight)), false, false);
             float y = 8;
             GUI.Label(new Rect(x, y, inner, 26), "BRIDGE: AI CLIENTS OVER MCP (READ-ONLY)", s.Label);
             y += 32;
             y = DrawStatus(x, y, inner) + 12;
+            string who = Connected(sessions);
+            y = DrawConnection(x, y, inner, who) + 16;
             // The row wraps: six buttons do not fit a narrow window, and the
             // last of them was walking off the edge.
             float bx = x, by = y;
@@ -464,19 +577,8 @@ namespace DragNWash.ModFramework.Bridge
             {
                 OpenPage("v:graphs");
             }
-            if (Button("Copy setup", 130))
-            {
-                GUIUtility.systemCopyBuffer = Setup;
-                TW.ShowNotice("The Claude Code setup command, with the token, is on the clipboard.", NoticeKind.Info, 8f);
-            }
-            // Both cut off whoever is connected, so they ask first - and only
+            // It cuts off whoever is connected, so it asks first - and only
             // then: with nobody connected there is nothing to lose.
-            string who = Connected(sessions);
-            if (Button("New token", 120, TW.IsConfirming(NewTokenId)))
-            {
-                if (who == null) NewToken(null);
-                else TW.AskConfirm(NewTokenId);
-            }
             if (Button("Disconnect all", 150, TW.IsConfirming(DisconnectId)))
             {
                 if (who == null) TW.ShowNotice("No client is connected.", NoticeKind.Info, 6f);
@@ -484,15 +586,6 @@ namespace DragNWash.ModFramework.Bridge
             }
             y = by;
             y += row + 10;
-            if (TW.IsConfirming(NewTokenId))
-            {
-                if (TW.Confirm(new Rect(x, y, inner, row), NewTokenId, who != null ? $"New token? Disconnects {who}." : "New token?", "Yes, new token",
-                    "Yes makes the token; Cancel or 5 s keeps the old one. Esc = Cancel."))
-                {
-                    NewToken(who);
-                }
-                y += row + 6;
-            }
             if (TW.IsConfirming(DisconnectId))
             {
                 if (TW.Confirm(new Rect(x, y, inner, row), DisconnectId, who != null ? $"Disconnect {who}?" : "Disconnect every client?", "Yes, disconnect",
@@ -504,8 +597,6 @@ namespace DragNWash.ModFramework.Bridge
                 }
                 y += row + 6;
             }
-            GUI.Label(new Rect(x, y, inner, 60), "Setup for Claude Code (Copy setup puts it on the clipboard with the token): claude mcp add --transport http dragnwash http://127.0.0.1:" + _port.Value + "/mcp --header \"Authorization: Bearer <token>\". VS Code and Cursor take the same URL and header. The token is kept in your user profile, not in the game folder.", s.WrappedLabel);
-            y += 72;
             GUI.Label(new Rect(x, y, inner, 26), $"CLIENTS ({sessions.Count})" + (PageDoor.SignedIn > 0 ? $"   PAGE: {PageDoor.SignedIn} signed in" : ""), s.Label);
             y += 28;
             if (sessions.Count == 0)
@@ -524,6 +615,7 @@ namespace DragNWash.ModFramework.Bridge
             if (calls.Count == 0)
             {
                 GUI.Label(new Rect(x, y, inner, 26), "None yet.", s.MutedLabel);
+                y += 26;
             }
             for (int i = calls.Count - 1; i >= 0; i--)
             {
@@ -531,6 +623,7 @@ namespace DragNWash.ModFramework.Bridge
                 GUI.Label(new Rect(x, y, inner, 26), $"{c.Time:HH:mm:ss}  {c.Client}: {c.Tool}{(c.Ok ? "" : "  (failed)")}", s.MutedLabel);
                 y += 26;
             }
+            _contentHeight = y + 12;
             GUI.EndScrollView();
         }
     }
