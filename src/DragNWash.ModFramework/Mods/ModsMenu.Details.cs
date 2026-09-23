@@ -403,7 +403,10 @@ namespace DragNWash.ModFramework.Mods
             TMP_Text label = ModsLook.Text(rect, "Label", text, size, color, FontStyles.Bold, false);
             label.alignment = TextAlignmentOptions.Center;
             rect.sizeDelta = new Vector2(ModsLook.Width(label) + 32f, 44f);
-            button.onClick.AddListener(onClick);
+            if (onClick != null)
+            {
+                button.onClick.AddListener(onClick);
+            }
             return rect.gameObject;
         }
 
@@ -517,11 +520,6 @@ namespace DragNWash.ModFramework.Mods
             {
                 return;
             }
-            if (key == TabSettings)
-            {
-                OpenSettings(entry);
-                return;
-            }
             _tab = key;
             RebuildDetails(false);
             Focus("Tab" + key);
@@ -531,7 +529,7 @@ namespace DragNWash.ModFramework.Mods
         internal void StepTab(int direction)
         {
             ModCatalog.Entry entry = _selected;
-            if (entry == null || _settingsFor != null || !isActiveAndEnabled)
+            if (entry == null || !isActiveAndEnabled)
             {
                 return;
             }
@@ -549,6 +547,11 @@ namespace DragNWash.ModFramework.Mods
             if (tab.Page != null)
             {
                 BuildPage(tab.Page);
+                return;
+            }
+            if (tab.Key == TabSettings)
+            {
+                BuildSettingsTab(entry);
                 return;
             }
             BuildAbout(entry);
@@ -660,6 +663,11 @@ namespace DragNWash.ModFramework.Mods
             if (focused == null || !focused.activeInHierarchy || mouse != null && mouse.leftButton.wasReleasedThisFrame)
             {
                 return false;
+            }
+            // Esc while a key is being taken stops taking it, and stays.
+            if (focused.GetComponent<ShortcutCapture>() != null)
+            {
+                return true;
             }
             if (Details != null && focused.transform.IsChildOf(Details))
             {

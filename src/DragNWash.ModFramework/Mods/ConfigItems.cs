@@ -55,6 +55,8 @@ namespace DragNWash.ModFramework.Mods
 
         internal bool IsShortcut => Entry.SettingType == typeof(KeyboardShortcut);
 
+        internal bool IsColor => Entry.SettingType == typeof(UnityEngine.Color);
+
         // The value as it stands in the config file: what the text field edits.
         internal string SerializedText
         {
@@ -381,6 +383,45 @@ namespace DragNWash.ModFramework.Mods
                 double step = (f >= 5.0 ? 5.0 : f >= 2.0 ? 2.0 : 1.0) * power;
                 return IsInteger ? Math.Max(1.0, Math.Round(step)) : step;
             }
+        }
+
+        // The values a slider stops at: the ends of the range and every
+        // multiple of the step between them, as the - and + buttons go.
+        internal List<double> Positions()
+        {
+            var positions = new List<double>();
+            if (!HasRange || !(Max > Min))
+            {
+                return positions;
+            }
+            double step = StepSize;
+            positions.Add(Min);
+            for (double k = Math.Floor(Min / step + 1e-9) + 1.0; k * step < Max - step * 1e-6 && positions.Count < 1000; k++)
+            {
+                positions.Add(Math.Round(k * step, 6));
+            }
+            positions.Add(Max);
+            return positions;
+        }
+
+        // Picks one of the choices by its place in the list.
+        internal void Choose(int index)
+        {
+            if (Type == Kind.Choice && index >= 0 && index < Choices.Length)
+            {
+                Set(Choices[index]);
+            }
+        }
+
+        // Sets a number from a slider: rounded as the type needs.
+        internal void SetNumber(double value)
+        {
+            if (Type != Kind.Number)
+            {
+                return;
+            }
+            value = IsInteger ? Math.Round(value) : Math.Round(value, 6);
+            Set(Convert.ChangeType(value, Entry.SettingType, CultureInfo.InvariantCulture));
         }
 
         internal void ResetToDefault()

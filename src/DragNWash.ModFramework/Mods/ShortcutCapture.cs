@@ -9,8 +9,8 @@ using UnityEngine;
 namespace DragNWash.ModFramework.Mods
 {
     // Takes the next key pressed as a KeyboardShortcut for the selected setting,
-    // with whichever modifier keys are held. Lives on the Capture button while
-    // capturing and removes itself when done. Keys are read through BepInEx's
+    // with whichever modifier keys are held. Lives on the setting's Change
+    // button while capturing and removes itself when done; Esc cancels. Keys are read through BepInEx's
     // UnityInput, which works whether the game uses the old Input class or the
     // Input System (this game has the old one switched off).
     internal sealed class ShortcutCapture : MonoBehaviour
@@ -59,6 +59,12 @@ namespace DragNWash.ModFramework.Mods
                     if (!UnityInput.Current.GetKeyDown(key))
                     {
                         continue;
+                    }
+                    // Esc (the game's Back) stops taking a key instead of becoming one.
+                    if (key == KeyCode.Escape)
+                    {
+                        Cancel();
+                        return;
                     }
                     KeyCode[] held = Modifiers.Where(m => UnityInput.Current.GetKey(m)).ToArray();
                     string before = Item?.SerializedText;

@@ -116,7 +116,6 @@ namespace DragNWash.ModFramework.Mods
 
             // The new list has new entries; keep pointing at the same mods.
             _selected = entries.FirstOrDefault(e => SameMod(e, _selected)) ?? FirstShown(entries);
-            _settingsFor = _settingsFor == null ? null : entries.FirstOrDefault(e => SameMod(e, _settingsFor)) ?? _settingsFor;
             _entries = entries;
             if (rebuild)
             {
@@ -222,11 +221,12 @@ namespace DragNWash.ModFramework.Mods
         }
 
         // The list and the details built again with what is now known, keeping
-        // what the pad or keyboard had selected. Settings and pages are left
-        // alone until the player comes back to the list.
-        private void RebuildKeepingFocus()
+        // what the pad or keyboard had selected. A page another mod built is
+        // left alone, and so is the Settings tab (a value may be half typed)
+        // unless `evenSettings` (the panel changed size).
+        private void RebuildKeepingFocus(bool evenSettings = false)
         {
-            if (!isActiveAndEnabled || OnModPage || _settingsFor != null)
+            if (!isActiveAndEnabled)
             {
                 return;
             }
@@ -237,7 +237,10 @@ namespace DragNWash.ModFramework.Mods
             string listName = focused != null && focusedRow == null &&
                               (ListTop != null && focused.transform.IsChildOf(ListTop) || focused.transform.IsChildOf(Content)) ? focused.name : null;
             RebuildList();
-            RebuildDetails(false);
+            if (!OnModPage && (evenSettings || _tab != TabSettings))
+            {
+                RebuildDetails(false);
+            }
             if (focusedRow != null && EventSystem.current != null)
             {
                 ModRowSelect row = _rows

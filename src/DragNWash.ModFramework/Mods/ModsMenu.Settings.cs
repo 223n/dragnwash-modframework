@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using BepInEx.Configuration;
 using TMPro;
@@ -10,9 +11,13 @@ using UnityEngine.UI;
 
 namespace DragNWash.ModFramework.Mods
 {
-    // A mod's settings page: its BepInEx config entries in the list on the left,
-    // the selected entry's description and controls on the right. Back (the
-    // game's button, Esc or the pad's cancel) returns to the list of mods.
+    // A mod's Settings tab: its BepInEx config entries by section, one row
+    // each with the name, the description and the control side by side, so
+    // the player can read while changing. Switches for on/off, sliders for
+    // numbers with a range, - and + for other numbers, buttons for a few
+    // choices, the key and Change for a shortcut, a swatch beside a colour.
+    // A row whose value is not the default has a dot and a button back to it.
+    // A warning about a row sits right under it.
     internal sealed partial class ModsMenu
     {
         internal const string TextSettings = "Settings";
@@ -22,7 +27,7 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextSaved = "Saved";
         internal const string TextEditInFile = "Change this in the mod's config file in BepInEx/config.";
         internal const string TextNotAccepted = "Not accepted: ";
-        internal const string TextCaptureKey = "Capture key";
+        internal const string TextChange = "Change";
         internal const string TextPressKey = "Press a key...";
         internal const string TextShowAdvanced = "Show advanced settings";
         internal const string TextRestart = "Takes effect after the game restarts.";
@@ -31,54 +36,31 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextAllAnswer = "All of them will answer it.";
         private bool _showAdvanced;
 
-        private static readonly Color StepColor = new Color(0.25f, 0.25f, 0.25f, 1f);
-        private static readonly Color FieldColor = new Color(0.12f, 0.12f, 0.14f, 1f);
-        private static readonly Color NoteErrorColor = new Color(1f, 0.55f, 0.5f, 1f);
-
-        private TMP_Text _settingNote;
-
-        // Changes are saved at once; a "Saved" tag beside the value says so.
+        // Changes are saved at once; a "Saved" tag on the row says so.
         private const float SavedSeconds = 2f;
         private ConfigItem _savedItem;
         private float _savedAt = float.NegativeInfinity;
 
-        private ModCatalog.Entry _settingsFor;
         private List<ConfigItem> _items = new List<ConfigItem>();
-        private ConfigItem _item;
+        private readonly Dictionary<ConfigItem, SettingRow> _settingRows = new Dictionary<ConfigItem, SettingRow>();
 
-        private void OpenSettings(ModCatalog.Entry entry)
-        {
-            _items = ConfigItem.For(entry);
-            if (_items.Count == 0)
-            {
-                return;
-            }
-            _settingsFor = entry;
-            _showAdvanced = false;
-            _item = Shown().FirstOrDefault() ?? _items[0];
-            RebuildList();
-            RebuildDetails(false);
-            Focus("Step+", "Toggle", "Reset");
-        }
+        // Why a typed value was refused, shown under its row until the row is
+        // built again for another reason.
+        private readonly Dictionary<ConfigItem, string> _refused = new Dictionary<ConfigItem, string>();
 
-        private void CloseSettings()
-        {
-            _selected = _settingsFor ?? _selected;
-            _settingsFor = null;
-            _item = null;
-            RebuildList();
-            RebuildDetails(false);
-            Focus("Tab" + TabSettings);
-        }
+        private RectTransform _settingsContent;
 
-        internal void SelectItem(ConfigItem item)
+        // What changes on a row without building it again, so a slider being
+        // dragged is not taken from under the pointer.
+        private sealed class SettingRow
         {
-            if (item == null || ReferenceEquals(item, _item))
-            {
-                return;
-            }
-            _item = item;
-            RebuildDetails(false);
+            internal RectTransform Root;
+            internal GameObject Dot;
+            internal Button Reset;
+            internal GameObject DefaultLine;
+            internal TMP_InputField Field;
+            internal Slider Slider;
+            internal List<double> Positions;
         }
 
         // The settings on the page: advanced ones only when asked for.
@@ -87,11 +69,18 @@ namespace DragNWash.ModFramework.Mods
             return _items.Where(i => _showAdvanced || !i.Advanced);
         }
 
-        private void BuildSettingsList()
+        private void BuildSettingsTab(ModCatalog.Entry entry)
         {
+            _items = ConfigItem.For(entry);
+            _settingRows.Clear();
+            RectTransform content = ScrollArea(_body);
+            content.GetComponent<VerticalLayoutGroup>().spacing = 8f;
+            _settingsContent = content;
+
+            Line(content, TextAfterRestart, 18f, FontStyles.Italic, ModsLook.Muted, 0f);
             if (_items.Any(i => i.Advanced))
             {
-                _rows.Add(CreateAdvancedRow());
+                CreateAdvancedRow(content);
             }
             string section = null;
             foreach (ConfigItem item in Shown())
@@ -99,226 +88,494 @@ namespace DragNWash.ModFramework.Mods
                 if (item.Section != section)
                 {
                     section = item.Section;
-                    _rows.Add(CreateSectionRow(item));
+                    Spacer(content, 6f);
+                    Heading(content, Escape(item.SectionTitle));
+                    if (!string.IsNullOrEmpty(item.SectionDescription))
+                    {
+                        Line(content, Escape(item.SectionDescription), 18f, FontStyles.Normal, ModsLook.Muted, 0f);
+                    }
                 }
-                _rows.Add(CreateSettingRow(item));
+                _settingRows[item] = BuildSettingRow(content, item);
             }
         }
 
-        private GameObject CreateSectionRow(ConfigItem first)
+        // A row at the top of the tab that shows or hides the advanced settings.
+        private void CreateAdvancedRow(RectTransform content)
         {
-            bool described = !string.IsNullOrEmpty(first.SectionDescription);
-            float height = described ? 84f : 56f;
-            var row = new GameObject("Section " + first.Section, typeof(RectTransform));
-            row.transform.SetParent(Content, false);
-            LayoutElement layout = row.AddComponent<LayoutElement>();
-            layout.minHeight = height;
-            layout.preferredHeight = height;
-            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, height);
-            layout.flexibleWidth = 1f;
-            TMP_Text label = UiText.Create(row.transform, "Label", Escape(first.SectionTitle), UiText.BodySize);
-            label.alignment = TextAlignmentOptions.BottomLeft;
-            label.fontStyle |= FontStyles.Bold;
-            var labelRect = (RectTransform)label.transform;
-            // With a description the heading takes the upper part of the row and
-            // the description the lower; the two must not overlap.
-            labelRect.offsetMin = new Vector2(110f, described ? 44f : 0f);
-            if (described)
-            {
-                TMP_Text note = UiText.Create(row.transform, "Description", Escape(first.SectionDescription), UiText.BodySize * 0.8f);
-                note.alignment = TextAlignmentOptions.TopLeft;
-                note.textWrappingMode = TextWrappingModes.NoWrap;
-                note.overflowMode = TextOverflowModes.Ellipsis;
-                note.color = new Color(note.color.r, note.color.g, note.color.b, 0.75f);
-                var noteRect = (RectTransform)note.transform;
-                noteRect.offsetMin = new Vector2(110f, 4f);
-                noteRect.offsetMax = new Vector2(-20f, -44f);
-            }
-            return row;
-        }
-
-        // A row at the top of the page that shows or hides the advanced settings.
-        private GameObject CreateAdvancedRow()
-        {
-            var row = new GameObject("Advanced", typeof(RectTransform));
-            row.transform.SetParent(Content, false);
-            LayoutElement layout = row.AddComponent<LayoutElement>();
-            layout.minHeight = 72f;
-            layout.preferredHeight = 72f;
-            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 72f);
-            layout.flexibleWidth = 1f;
-
-            var band = new GameObject("Band", typeof(RectTransform));
-            var bandRect = (RectTransform)band.transform;
-            bandRect.SetParent(row.transform, false);
-            bandRect.anchorMin = Vector2.zero;
-            bandRect.anchorMax = Vector2.one;
-            bandRect.offsetMin = new Vector2(90f, 4f);
-            bandRect.offsetMax = new Vector2(0f, -4f);
-            Image image = ModsLook.Shape(band, ModsLook.Rounded, Color.white);
-            Button button = band.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.colors = ListColors(button.colors);
-            button.onClick.AddListener(() =>
+            RectTransform row = RowFrame(content, "Advanced");
+            RectTransform top = RowTop(row);
+            RectTransform text = TextColumn(top);
+            ModsLook.Text(text, "Title", TextShowAdvanced, 22f, ModsLook.Label, FontStyles.Bold, true);
+            RectTransform controls = Controls(top);
+            SwitchButton(controls, "Advanced", _showAdvanced, () =>
             {
                 _showAdvanced = !_showAdvanced;
-                if (_item != null && _item.Advanced && !_showAdvanced)
-                {
-                    _item = Shown().FirstOrDefault() ?? _item;
-                }
-                RebuildList();
                 RebuildDetails(false);
+                Focus("Advanced");
             });
-
-            TMP_Text key = UiText.Create(band.transform, "Key", TextShowAdvanced, UiText.BodySize);
-            key.alignment = TextAlignmentOptions.MidlineLeft;
-            key.fontStyle |= FontStyles.Italic;
-            key.textWrappingMode = TextWrappingModes.NoWrap;
-            key.overflowMode = TextOverflowModes.Ellipsis;
-            var keyRect = (RectTransform)key.transform;
-            keyRect.anchorMax = new Vector2(0.62f, 1f);
-            keyRect.offsetMin = new Vector2(20f, 0f);
-
-            TMP_Text value = UiText.Create(band.transform, "Value", _showAdvanced ? TextOn : TextOff, UiText.BodySize);
-            value.alignment = TextAlignmentOptions.MidlineRight;
-            var valueRect = (RectTransform)value.transform;
-            valueRect.anchorMin = new Vector2(0.62f, 0f);
-            valueRect.offsetMax = new Vector2(-20f, 0f);
-            return row;
         }
 
-        private GameObject CreateSettingRow(ConfigItem item)
+        private SettingRow BuildSettingRow(RectTransform content, ConfigItem item)
         {
-            var row = new GameObject("Setting " + item.Key, typeof(RectTransform));
-            row.transform.SetParent(Content, false);
-            LayoutElement layout = row.AddComponent<LayoutElement>();
-            layout.minHeight = 72f;
-            layout.preferredHeight = 72f;
-            ((RectTransform)row.transform).sizeDelta = new Vector2(0f, 72f);
-            layout.flexibleWidth = 1f;
+            var built = new SettingRow();
+            RectTransform row = RowFrame(content, "Setting " + item.Section + "." + item.Key);
+            built.Root = row;
 
-            var band = new GameObject("Band", typeof(RectTransform));
-            var bandRect = (RectTransform)band.transform;
-            bandRect.SetParent(row.transform, false);
-            bandRect.anchorMin = Vector2.zero;
-            bandRect.anchorMax = Vector2.one;
-            bandRect.offsetMin = new Vector2(90f, 4f);
-            bandRect.offsetMax = new Vector2(0f, -4f);
-            Image image = ModsLook.Shape(band, ModsLook.Rounded, Color.white);
-            Button button = band.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.colors = ListColors(button.colors);
-            ConfigRowSelect select = band.AddComponent<ConfigRowSelect>();
-            select.Menu = this;
-            select.Item = item;
-            button.onClick.AddListener(() =>
+            // The dot left of the name: the value is not the default.
+            RectTransform dot = ModsLook.Rect(row, "Changed");
+            dot.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            dot.anchorMin = dot.anchorMax = new Vector2(0f, 1f);
+            dot.pivot = new Vector2(0.5f, 0.5f);
+            dot.sizeDelta = new Vector2(8f, 8f);
+            dot.anchoredPosition = new Vector2(9f, -27f);
+            ModsLook.Shape(dot.gameObject, ModsLook.Pill, ModsLook.Accent).raycastTarget = false;
+            built.Dot = dot.gameObject;
+
+            RectTransform top = RowTop(row);
+            RectTransform text = TextColumn(top);
+            ModsLook.Text(text, "Title", Escape(item.Title), 22f, ModsLook.Label, FontStyles.Bold, true);
+            if (!string.IsNullOrEmpty(item.Description))
             {
-                SelectItem(item);
-                if (PadSupport.PadPressedThisFrame())
-                {
-                    Focus("Step+", "Toggle", "Reset");
-                }
-            });
-
-            TMP_Text key = UiText.Create(band.transform, "Key", Escape(item.Title), UiText.BodySize);
-            key.alignment = TextAlignmentOptions.MidlineLeft;
-            key.textWrappingMode = TextWrappingModes.NoWrap;
-            key.overflowMode = TextOverflowModes.Ellipsis;
-            var keyRect = (RectTransform)key.transform;
-            keyRect.anchorMax = new Vector2(0.62f, 1f);
-            keyRect.offsetMin = new Vector2(20f, 0f);
-
-            TMP_Text value = UiText.Create(band.transform, "Value", Escape(item.ValueText), UiText.BodySize);
-            value.alignment = TextAlignmentOptions.MidlineRight;
-            value.textWrappingMode = TextWrappingModes.NoWrap;
-            value.overflowMode = TextOverflowModes.Ellipsis;
-            var valueRect = (RectTransform)value.transform;
-            valueRect.anchorMin = new Vector2(0.62f, 0f);
-            valueRect.offsetMax = new Vector2(-20f, 0f);
-            return row;
-        }
-
-        private void BuildSettingDetails()
-        {
-            ConfigItem item = _item;
-            if (Details == null || item == null)
-            {
-                return;
+                ModsLook.Text(text, "Description", item.Description, 18f, ModsLook.Muted, FontStyles.Normal, true);
             }
-
-            Label("Mod", Escape(_settingsFor.DisplayName), UiText.BodySize, 0.91f, 0.98f, false);
-            Label("Key", Escape(item.Title), UiText.TitleSize * 0.55f, 0.81f, 0.91f, false);
-            string section = item.SectionTitle + (item.Title != item.Key ? "   " + item.Key : "");
-            Label("Section", Escape(section), UiText.BodySize * 0.85f, 0.75f, 0.81f, false).fontStyle |= FontStyles.Italic;
-
-            string description = item.Description ?? "";
             if (item.RequiresRestart)
             {
-                description += (description.Length > 0 ? "\n\n" : "") + TextRestart;
+                ModsLook.Text(text, "Restart", TextRestart, 18f, ModsLook.Accent, FontStyles.Italic, true);
             }
-            if (description.Length > 0)
-            {
-                TMP_Text d = Label("Description", description, UiText.BodySize, 0.45f, 0.74f, true);
-                d.alignment = TextAlignmentOptions.TopLeft;
-            }
+            // What the reset button goes back to, while the value is another.
+            RectTransform defaultLine = ModsLook.Rect(text, "Default");
+            HorizontalLayoutGroup pair = defaultLine.gameObject.AddComponent<HorizontalLayoutGroup>();
+            pair.spacing = 10f;
+            pair.childControlWidth = true;
+            pair.childControlHeight = true;
+            pair.childForceExpandWidth = false;
+            pair.childForceExpandHeight = false;
+            TMP_Text defaultLabel = ModsLook.Text(defaultLine, "Label", TextDefault, 18f, ModsLook.Muted, FontStyles.Bold, false);
+            ModsLook.Size(defaultLabel.gameObject, ModsLook.Width(defaultLabel), -1f, 0f, 0f);
+            TMP_Text defaultValue = ModsLook.Text(defaultLine, "Value", Escape(item.DefaultText), 18f, ModsLook.Muted, FontStyles.Normal, false);
+            LayoutElement defaultSize = ModsLook.Size(defaultValue.gameObject, -1f, -1f, 1f, 0f);
+            defaultSize.minWidth = 0f;
+            defaultSize.preferredWidth = 0f;
+            built.DefaultLine = defaultLine.gameObject;
 
-            LabelPair("Default", TextDefault, Escape(item.DefaultText), UiText.BodySize, 0.37f, 0.44f);
-
+            RectTransform controls = Controls(top);
             switch (item.Type)
             {
                 case ConfigItem.Kind.Toggle:
-                    MakeButton("Toggle", item.ValueText, 0.04f, 0.4f, 0.2f, 0.33f,
-                        (bool)item.Entry.BoxedValue ? OnColor : OffColor, () => Change(item, 1, "Toggle"));
+                    SwitchButton(controls, "Toggle", (bool)item.Entry.BoxedValue, () => Change(item, 1, "Toggle"));
                     break;
                 case ConfigItem.Kind.Choice:
+                    if (!ChoiceButtons(controls, item))
+                    {
+                        Stepper(controls, item, built, false);
+                    }
+                    break;
                 case ConfigItem.Kind.Number:
-                    MakeButton("Step-", "<", 0.04f, 0.16f, 0.2f, 0.33f, StepColor, () => Change(item, -1, "Step-"));
-                    TMP_Text value = Label("Value", Escape(item.ValueText), UiText.ButtonSize, 0.2f, 0.33f, false);
-                    value.alignment = TextAlignmentOptions.Center;
-                    var valueRect = (RectTransform)value.transform;
-                    valueRect.anchorMin = new Vector2(0.16f, 0.2f);
-                    valueRect.anchorMax = new Vector2(0.62f, 0.33f);
-                    MakeButton("Step+", ">", 0.62f, 0.74f, 0.2f, 0.33f, StepColor, () => Change(item, 1, "Step+"));
+                    if (item.HasRange && item.Max > item.Min)
+                    {
+                        built.Field = ValueField(controls, item, 120f);
+                        SliderLine(row, item, built);
+                    }
+                    else
+                    {
+                        Stepper(controls, item, built, true);
+                    }
                     break;
                 case ConfigItem.Kind.Text:
-                    MakeTextField(item);
+                    if (item.IsShortcut)
+                    {
+                        built.Field = ValueField(controls, item, 180f);
+                        GameObject change = FlatButton(controls, "Capture", TextChange, 20f, ModsLook.Raised, ModsLook.Label, null);
+                        ModsLook.Size(change, ((RectTransform)change.transform).sizeDelta.x, 44f, 0f, 0f);
+                        change.GetComponent<Button>().onClick.AddListener(() => ToggleCapture(item, change));
+                    }
+                    else
+                    {
+                        if (item.IsColor)
+                        {
+                            Swatch(controls, item);
+                        }
+                        built.Field = ValueField(controls, item, 260f);
+                    }
                     break;
                 default:
-                    TMP_Text shown = Label("Value", Escape(item.ValueText), UiText.ButtonSize, 0.26f, 0.34f, false);
-                    shown.fontStyle |= FontStyles.Bold;
-                    TMP_Text note = Label("EditInFile", TextEditInFile, UiText.BodySize * 0.85f, 0.18f, 0.26f, true);
-                    note.fontStyle |= FontStyles.Italic;
+                    TMP_Text shown = ModsLook.Text(controls, "Value", Escape(item.ValueText), 20f, ModsLook.Label, FontStyles.Bold, false);
+                    ModsLook.Size(shown.gameObject, Mathf.Min(260f, ModsLook.Width(shown)), 44f, 0f, 0f);
                     break;
             }
 
             if (item.Type != ConfigItem.Kind.ReadOnly)
             {
-                MakeButton("Reset", TextResetToDefault, 0.04f, 0.46f, 0.04f, 0.15f, StepColor, () => Reset(item));
-                TMP_Text note = Label("Note", TextAfterRestart, UiText.BodySize * 0.8f, 0.03f, 0.16f, true);
-                note.fontStyle |= FontStyles.Italic;
-                var noteRect = (RectTransform)note.transform;
-                noteRect.anchorMin = new Vector2(0.5f, 0.03f);
-                _settingNote = note;
-                string shared = SharedKeyWarning(item);
-                if (shared != null)
-                {
-                    note.text = shared;
-                    note.color = WarnColor;
-                }
+                built.Reset = ResetButton(controls, item);
+            }
 
-                float elapsed = Time.unscaledTime - _savedAt;
-                if (ReferenceEquals(item, _savedItem) && elapsed < SavedSeconds)
+            // Warnings about this row, under it.
+            if (item.Type == ConfigItem.Kind.ReadOnly)
+            {
+                Band(row, "EditInFile", null, TextEditInFile, ModsLook.Muted);
+            }
+            string shared = SharedKeyWarning(item);
+            if (shared != null)
+            {
+                Band(row, "SharedKey", null, shared, ModsLook.Warning);
+                if (built.Field != null)
                 {
-                    // Beside the control that changed it: the toggle is narrower
-                    // than the rows of the other kinds.
-                    SavedTag(item.Type == ConfigItem.Kind.Toggle ? 0.44f : 0.77f, SavedSeconds - elapsed);
+                    RectTransform edge = ModsLook.Rect(built.Field.transform, "Edge");
+                    ModsLook.Stretch(edge);
+                    ModsLook.Shape(edge.gameObject, ModsLook.Outline, ModsLook.Warning, 10f).raycastTarget = false;
                 }
+            }
+            if (_refused.TryGetValue(item, out string reason))
+            {
+                _refused.Remove(item);
+                Band(row, "NotAccepted", null, TextNotAccepted + reason, ModsLook.Error);
+            }
+
+            float elapsed = Time.unscaledTime - _savedAt;
+            if (ReferenceEquals(item, _savedItem) && elapsed < SavedSeconds)
+            {
+                SavedTag(row, SavedSeconds - elapsed);
+            }
+            Refresh(item, built);
+            return built;
+        }
+
+        // The parts that follow the value: the dot, the reset button, the
+        // default line, and the field and slider when not being used.
+        private static void Refresh(ConfigItem item, SettingRow row)
+        {
+            bool changed = !item.IsDefault;
+            row.Dot.SetActive(changed);
+            row.DefaultLine.SetActive(changed && item.Type != ConfigItem.Kind.Toggle);
+            if (row.Reset != null)
+            {
+                row.Reset.interactable = changed;
+                CanvasGroup group = row.Reset.GetComponent<CanvasGroup>();
+                group.alpha = changed ? 1f : 0.35f;
+            }
+            if (row.Field != null && !row.Field.isFocused)
+            {
+                row.Field.SetTextWithoutNotify(item.Type == ConfigItem.Kind.Number ? item.ValueText : item.SerializedText);
+            }
+            if (row.Slider != null)
+            {
+                row.Slider.SetValueWithoutNotify(NearestPosition(row.Positions, item));
             }
         }
 
-        // A change was just saved: "Saved" beside the value for two seconds,
-        // after each change (a Reset too). A value set to what it already was
-        // is not a change.
+        // ---- the pieces of a row ----
+
+        private static RectTransform RowFrame(RectTransform content, string name)
+        {
+            RectTransform row = ModsLook.Rect(content, name);
+            ModsLook.Shape(row.gameObject, ModsLook.Rounded, ModsLook.Inset, 10f).raycastTarget = false;
+            VerticalLayoutGroup column = row.gameObject.AddComponent<VerticalLayoutGroup>();
+            column.padding = new RectOffset(20, 14, 12, 12);
+            column.spacing = 8f;
+            column.childControlWidth = true;
+            column.childControlHeight = true;
+            column.childForceExpandWidth = true;
+            column.childForceExpandHeight = false;
+            return row;
+        }
+
+        // The name and description on the left, the controls on the right.
+        private static RectTransform RowTop(RectTransform row)
+        {
+            RectTransform top = ModsLook.Rect(row, "Top");
+            HorizontalLayoutGroup line = top.gameObject.AddComponent<HorizontalLayoutGroup>();
+            line.spacing = 16f;
+            line.childAlignment = TextAnchor.UpperLeft;
+            line.childControlWidth = true;
+            line.childControlHeight = true;
+            line.childForceExpandWidth = false;
+            line.childForceExpandHeight = false;
+            return top;
+        }
+
+        private static RectTransform TextColumn(RectTransform top)
+        {
+            RectTransform text = ModsLook.Rect(top, "Text");
+            VerticalLayoutGroup lines = text.gameObject.AddComponent<VerticalLayoutGroup>();
+            lines.spacing = 4f;
+            lines.childControlWidth = true;
+            lines.childControlHeight = true;
+            lines.childForceExpandWidth = true;
+            lines.childForceExpandHeight = false;
+            LayoutElement size = ModsLook.Size(text.gameObject, -1f, -1f, 1f, 0f);
+            size.minWidth = 0f;
+            size.preferredWidth = 0f;
+            return text;
+        }
+
+        private static RectTransform Controls(RectTransform top)
+        {
+            RectTransform controls = ModsLook.Rect(top, "Controls");
+            HorizontalLayoutGroup line = controls.gameObject.AddComponent<HorizontalLayoutGroup>();
+            line.spacing = 8f;
+            line.childAlignment = TextAnchor.MiddleRight;
+            line.childControlWidth = true;
+            line.childControlHeight = true;
+            line.childForceExpandWidth = false;
+            line.childForceExpandHeight = false;
+            ModsLook.Size(controls.gameObject, -1f, -1f, 0f, 0f);
+            return controls;
+        }
+
+        // A switch that is a button: the track and knob show the value.
+        private static GameObject SwitchButton(RectTransform parent, string name, bool on, UnityAction onClick)
+        {
+            RectTransform hit = ModsLook.Rect(parent, name);
+            ModsLook.Size(hit.gameObject, 76f, 40f, 0f, 0f);
+            Image face = hit.gameObject.AddComponent<Image>();
+            face.color = ModsLook.Clear;
+            Button button = hit.gameObject.AddComponent<Button>();
+            button.targetGraphic = face;
+            ModsLook.Colors(button, ModsLook.Clear, ModsLook.Clear, ModsLook.Clear);
+            RectTransform track = ModsLook.Switch(hit, "Track", on, 76f, 40f);
+            ModsLook.Stretch(track);
+            button.onClick.AddListener(onClick);
+            return hit.gameObject;
+        }
+
+        // Up to four choices as buttons side by side, the chosen one lit.
+        // Returns false when they would not fit; the row then uses - and +.
+        private bool ChoiceButtons(RectTransform parent, ConfigItem item)
+        {
+            if (item.Choices.Length > 4)
+            {
+                return false;
+            }
+            float budget = InnerWidth * 0.5f;
+            var labels = item.Choices.Select(c => Escape(item.Format(c))).ToList();
+            var built = new List<GameObject>();
+            float total = 0f;
+            for (int i = 0; i < item.Choices.Length; i++)
+            {
+                object choice = item.Choices[i];
+                bool chosen = Equals(choice, item.Entry.BoxedValue);
+                int index = i;
+                GameObject button = FlatButton(parent, "Choice" + i, labels[i], 19f, chosen ? ModsLook.Accent : ModsLook.Raised,
+                    chosen ? ModsLook.Inset : ModsLook.Label, () => Choose(item, index));
+                float width = ((RectTransform)button.transform).sizeDelta.x;
+                ModsLook.Size(button, width, 44f, 0f, 0f);
+                built.Add(button);
+                total += width + 8f;
+            }
+            if (total <= budget)
+            {
+                return true;
+            }
+            foreach (GameObject button in built)
+            {
+                button.SetActive(false);
+                Destroy(button);
+            }
+            return false;
+        }
+
+        // - value + for choices and numbers without a range. A number's value
+        // can be typed as well.
+        private void Stepper(RectTransform parent, ConfigItem item, SettingRow row, bool typed)
+        {
+            StepButton(parent, "Step-", "-", () => Change(item, -1, "Step-"));
+            if (typed)
+            {
+                row.Field = ValueField(parent, item, 120f);
+            }
+            else
+            {
+                TMP_Text value = ModsLook.Text(parent, "Value", Escape(item.ValueText), 20f, ModsLook.Label, FontStyles.Bold, false);
+                value.alignment = TextAlignmentOptions.Center;
+                ModsLook.Size(value.gameObject, Mathf.Clamp(ModsLook.Width(value) + 16f, 90f, 240f), 44f, 0f, 0f);
+            }
+            StepButton(parent, "Step+", "+", () => Change(item, 1, "Step+"));
+        }
+
+        private static void StepButton(RectTransform parent, string name, string text, UnityAction onClick)
+        {
+            GameObject button = FlatButton(parent, name, text, 26f, ModsLook.Raised, ModsLook.Label, onClick);
+            ModsLook.Size(button, 50f, 44f, 0f, 0f);
+        }
+
+        // A line under the row with - , the slider and +. The slider stops at
+        // the same values as the buttons, one step for each press of left or
+        // right on the pad.
+        private void SliderLine(RectTransform row, ConfigItem item, SettingRow built)
+        {
+            RectTransform line = ModsLook.Rect(row, "SliderLine");
+            HorizontalLayoutGroup parts = line.gameObject.AddComponent<HorizontalLayoutGroup>();
+            parts.spacing = 16f;
+            parts.childAlignment = TextAnchor.MiddleLeft;
+            parts.childControlWidth = true;
+            parts.childControlHeight = true;
+            parts.childForceExpandWidth = false;
+            parts.childForceExpandHeight = false;
+
+            StepButton(line, "Step-", "-", () => Change(item, -1, "Step-"));
+
+            RectTransform area = ModsLook.Rect(line, "Slider");
+            ModsLook.Size(area.gameObject, -1f, 40f, 1f, 0f);
+            // Something under the whole area to catch the pointer.
+            area.gameObject.AddComponent<Image>().color = ModsLook.Clear;
+
+            RectTransform track = ModsLook.Rect(area, "Track");
+            track.anchorMin = new Vector2(0f, 0.5f);
+            track.anchorMax = new Vector2(1f, 0.5f);
+            track.sizeDelta = new Vector2(0f, 8f);
+            ModsLook.Shape(track.gameObject, ModsLook.Pill, ModsLook.Border).raycastTarget = false;
+
+            RectTransform fillArea = ModsLook.Rect(area, "Fill Area");
+            fillArea.anchorMin = new Vector2(0f, 0.5f);
+            fillArea.anchorMax = new Vector2(1f, 0.5f);
+            fillArea.sizeDelta = new Vector2(0f, 8f);
+            RectTransform fill = ModsLook.Rect(fillArea, "Fill");
+            ModsLook.Stretch(fill);
+            ModsLook.Shape(fill.gameObject, ModsLook.Pill, ModsLook.Accent).raycastTarget = false;
+
+            RectTransform handleArea = ModsLook.Rect(area, "Handle Slide Area");
+            ModsLook.Stretch(handleArea, 14f, 0f, 14f, 0f);
+            RectTransform handle = ModsLook.Rect(handleArea, "Handle");
+            handle.sizeDelta = new Vector2(28f, 28f);
+            Image knob = ModsLook.Shape(handle.gameObject, ModsLook.Pill, Color.white);
+            RectTransform ring = ModsLook.Rect(handle, "Ring");
+            ModsLook.Stretch(ring);
+            ModsLook.Shape(ring.gameObject, ModsLook.PillOutline, ModsLook.Accent).raycastTarget = false;
+
+            Slider slider = area.gameObject.AddComponent<Slider>();
+            slider.fillRect = fill;
+            slider.handleRect = handle;
+            slider.targetGraphic = knob;
+            slider.direction = Slider.Direction.LeftToRight;
+            List<double> positions = item.Positions();
+            slider.wholeNumbers = true;
+            slider.minValue = 0f;
+            slider.maxValue = Mathf.Max(1, positions.Count - 1);
+            slider.SetValueWithoutNotify(NearestPosition(positions, item));
+            ModsLook.Colors(slider, ModsLook.Label, Color.white, ModsLook.Muted);
+            // Left and right move the slider, up and down go to the next row.
+            // With a neighbour on the left, Unity's slider would go there instead.
+            slider.navigation = new Navigation { mode = Navigation.Mode.Vertical };
+            built.Slider = slider;
+            built.Positions = positions;
+            slider.onValueChanged.AddListener(v =>
+            {
+                int index = Mathf.Clamp(Mathf.RoundToInt(v), 0, positions.Count - 1);
+                string before = item.SerializedText;
+                item.SetNumber(positions[index]);
+                MarkSaved(item, before);
+                // Only the parts that follow the value: the slider stays in hand.
+                Refresh(item, built);
+                if (ReferenceEquals(item, _savedItem) && item.SerializedText != before)
+                {
+                    SavedTag(built.Root, SavedSeconds);
+                }
+            });
+
+            StepButton(line, "Step+", "+", () => Change(item, 1, "Step+"));
+        }
+
+        private static int NearestPosition(List<double> positions, ConfigItem item)
+        {
+            if (positions == null || positions.Count == 0)
+            {
+                return 0;
+            }
+            double value = Convert.ToDouble(item.Entry.BoxedValue, CultureInfo.InvariantCulture);
+            int best = 0;
+            for (int i = 1; i < positions.Count; i++)
+            {
+                if (Math.Abs(positions[i] - value) < Math.Abs(positions[best] - value))
+                {
+                    best = i;
+                }
+            }
+            return best;
+        }
+
+        // A field for values BepInEx reads as text (strings, shortcuts,
+        // colours, numbers typed in). Enter or leaving the field applies the
+        // text; a value the config parser refuses is put back and the reason
+        // shown under the row.
+        private TMP_InputField ValueField(RectTransform parent, ConfigItem item, float width)
+        {
+            RectTransform box = ModsLook.Rect(parent, "Field");
+            ModsLook.Size(box.gameObject, width, 44f, 0f, 0f);
+            // Built inactive: the input field looks for its text component when
+            // it wakes, which must be set by then.
+            box.gameObject.SetActive(false);
+            Image background = ModsLook.Shape(box.gameObject, ModsLook.Rounded, Color.white, 10f);
+
+            RectTransform area = ModsLook.Rect(box, "Text Area");
+            ModsLook.Stretch(area, 12f, 4f, 12f, 4f);
+            area.gameObject.AddComponent<RectMask2D>();
+
+            TMP_Text text = ModsLook.Text(area, "Text", "", 20f, ModsLook.Label, FontStyles.Normal, false);
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.richText = false;
+            if (item.Type == ConfigItem.Kind.Number || item.IsShortcut)
+            {
+                text.alignment = TextAlignmentOptions.Center;
+            }
+
+            TMP_InputField field = box.gameObject.AddComponent<TMP_InputField>();
+            field.targetGraphic = background;
+            field.textViewport = area;
+            field.textComponent = text;
+            field.lineType = TMP_InputField.LineType.SingleLine;
+            field.richText = false;
+            field.customCaretColor = true;
+            field.caretColor = ModsLook.Label;
+            field.selectionColor = new Color(ModsLook.Accent.r, ModsLook.Accent.g, ModsLook.Accent.b, 0.4f);
+            ModsLook.Colors(field, ModsLook.Panel, ModsLook.Hover, ModsLook.Panel);
+            field.onEndEdit.AddListener(value => ApplyText(item, field, value));
+            box.gameObject.SetActive(true);
+            // Only now: text given to the field while it was inactive was not shown.
+            field.text = item.Type == ConfigItem.Kind.Number ? item.ValueText : item.SerializedText;
+            field.ForceLabelUpdate();
+            return field;
+        }
+
+        // A square of the colour, beside its text.
+        private static void Swatch(RectTransform parent, ConfigItem item)
+        {
+            RectTransform swatch = ModsLook.Rect(parent, "Swatch");
+            ModsLook.Size(swatch.gameObject, 40f, 40f, 0f, 0f);
+            Color color = item.Entry.BoxedValue is Color c ? c : Color.clear;
+            color.a = 1f;
+            ModsLook.Shape(swatch.gameObject, ModsLook.Rounded, color, 8f).raycastTarget = false;
+            RectTransform edge = ModsLook.Rect(swatch, "Edge");
+            ModsLook.Stretch(edge);
+            ModsLook.Shape(edge.gameObject, ModsLook.Outline, ModsLook.Border, 8f).raycastTarget = false;
+        }
+
+        // The arrow going round: back to the default. Dim and passed over by
+        // the pad while the value is the default.
+        private Button ResetButton(RectTransform parent, ConfigItem item)
+        {
+            GameObject button;
+            if (ModsLook.ResetArrow != null)
+            {
+                button = FlatButton(parent, "Reset", "", 20f, ModsLook.Raised, ModsLook.Label, () => Reset(item));
+                RectTransform icon = ModsLook.Rect(button.transform, "Icon");
+                icon.sizeDelta = new Vector2(26f, 26f);
+                Image image = icon.gameObject.AddComponent<Image>();
+                image.sprite = ModsLook.ResetArrow;
+                image.color = ModsLook.Label;
+                image.raycastTarget = false;
+                ModsLook.Size(button, 50f, 44f, 0f, 0f);
+            }
+            else
+            {
+                button = FlatButton(parent, "Reset", TextResetToDefault, 18f, ModsLook.Raised, ModsLook.Label, () => Reset(item));
+                ModsLook.Size(button, ((RectTransform)button.transform).sizeDelta.x, 44f, 0f, 0f);
+            }
+            button.AddComponent<CanvasGroup>();
+            return button.GetComponent<Button>();
+        }
+
+        // "Saved" on the row's top edge for two seconds after each change (a
+        // reset too). A value set to what it already was is not a change.
         private void MarkSaved(ConfigItem item, string before)
         {
             if (item != null && item.SerializedText != before)
@@ -328,47 +585,27 @@ namespace DragNWash.ModFramework.Mods
             }
         }
 
-        private void SavedTag(float left, float seconds)
+        private static void SavedTag(RectTransform row, float seconds)
         {
-            GameObject area = Part("SavedTag", left, 0.96f, 0.2f, 0.33f);
-            TMP_Text label = UiText.Create(area.transform, "Label", TextSaved, UiText.BodySize * 0.9f);
-            label.enableAutoSizing = false;
-            label.fontSize = UiText.BodySize * 0.9f;
-            label.textWrappingMode = TextWrappingModes.NoWrap;
-            label.alignment = TextAlignmentOptions.Center;
-            label.color = UpdateColor;
-            Vector2 size = label.GetPreferredValues(label.text);
-
-            // A thin frame around the word, as wide as it is in this language.
-            var box = new GameObject("Box", typeof(RectTransform));
-            var boxRect = (RectTransform)box.transform;
-            boxRect.SetParent(area.transform, false);
-            boxRect.anchorMin = new Vector2(0f, 0.5f);
-            boxRect.anchorMax = new Vector2(0f, 0.5f);
-            boxRect.pivot = new Vector2(0f, 0.5f);
-            boxRect.sizeDelta = new Vector2(Mathf.Ceil(size.x) + 24f, Mathf.Ceil(size.y) + 10f);
-            boxRect.anchoredPosition = Vector2.zero;
-            foreach ((Vector2 min, Vector2 max) in new[]
+            Transform old = row.Find("Saved");
+            if (old != null)
             {
-                (new Vector2(0f, 0f), new Vector2(1f, 0f)),
-                (new Vector2(0f, 1f), new Vector2(1f, 1f)),
-                (new Vector2(0f, 0f), new Vector2(0f, 1f)),
-                (new Vector2(1f, 0f), new Vector2(1f, 1f)),
-            })
-            {
-                var edge = new GameObject("Edge", typeof(RectTransform));
-                var edgeRect = (RectTransform)edge.transform;
-                edgeRect.SetParent(boxRect, false);
-                edgeRect.anchorMin = min;
-                edgeRect.anchorMax = max;
-                edgeRect.sizeDelta = new Vector2(min.x == max.x ? 2f : 0f, min.y == max.y ? 2f : 0f);
-                edgeRect.anchoredPosition = Vector2.zero;
-                Image line = edge.AddComponent<Image>();
-                line.color = UpdateColor;
-                line.raycastTarget = false;
+                old.gameObject.SetActive(false);
+                Destroy(old.gameObject);
             }
-            label.transform.SetParent(boxRect, false);
-            area.AddComponent<SavedTagTimer>().Until = Time.unscaledTime + seconds;
+            RectTransform tag = ModsLook.Rect(row, "Saved");
+            tag.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            ModsLook.Shape(tag.gameObject, ModsLook.Pill, ModsLook.Panel).raycastTarget = false;
+            RectTransform edge = ModsLook.Rect(tag, "Edge");
+            ModsLook.Stretch(edge);
+            ModsLook.Shape(edge.gameObject, ModsLook.PillOutline, ModsLook.Accent).raycastTarget = false;
+            TMP_Text label = ModsLook.Text(tag, "Label", TextSaved, 17f, ModsLook.Accent, FontStyles.Bold, false);
+            label.alignment = TextAlignmentOptions.Center;
+            tag.anchorMin = tag.anchorMax = new Vector2(1f, 1f);
+            tag.pivot = new Vector2(1f, 0.5f);
+            tag.sizeDelta = new Vector2(ModsLook.Width(label) + 24f, 26f);
+            tag.anchoredPosition = new Vector2(-16f, 0f);
+            tag.gameObject.AddComponent<SavedTagTimer>().Until = Time.unscaledTime + seconds;
         }
 
         // Another setting on the same key, said where the note is: right after
@@ -395,67 +632,16 @@ namespace DragNWash.ModFramework.Mods
             return note == null ? null : Escape(note);
         }
 
-        // A text field for values BepInEx reads as text (strings, shortcuts,
-        // colours...). Enter or leaving the field applies the text; a value the
-        // config parser refuses is put back and the reason shown. A keyboard
-        // shortcut also gets a Capture button that takes the next key pressed.
-        private void MakeTextField(ConfigItem item)
-        {
-            bool shortcut = item.IsShortcut;
-            GameObject go = Part("Text", 0.04f, shortcut ? 0.46f : 0.74f, 0.2f, 0.33f);
-            // Built inactive: the input field looks for its text component when
-            // it wakes, which must be set by then.
-            go.SetActive(false);
-            Image background = go.AddComponent<Image>();
-            background.color = FieldColor;
-
-            var area = new GameObject("Text Area", typeof(RectTransform));
-            var areaRect = (RectTransform)area.transform;
-            areaRect.SetParent(go.transform, false);
-            areaRect.anchorMin = Vector2.zero;
-            areaRect.anchorMax = Vector2.one;
-            areaRect.offsetMin = new Vector2(12f, 4f);
-            areaRect.offsetMax = new Vector2(-12f, -4f);
-            area.AddComponent<RectMask2D>();
-
-            TMP_Text text = UiText.Create(area.transform, "Text", "", UiText.ButtonSize);
-            text.alignment = TextAlignmentOptions.MidlineLeft;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.enableAutoSizing = false;
-            text.fontSize = UiText.ButtonSize * 0.8f;
-            text.richText = false;
-
-            TMP_InputField field = go.AddComponent<TMP_InputField>();
-            field.targetGraphic = background;
-            field.textViewport = areaRect;
-            field.textComponent = text;
-            field.lineType = TMP_InputField.LineType.SingleLine;
-            field.richText = false;
-            field.customCaretColor = true;
-            field.caretColor = Color.white;
-            field.selectionColor = new Color(0.55f, 0.75f, 1f, 0.5f);
-            ColorBlock colors = field.colors;
-            colors.normalColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.selectedColor = Color.white;
-            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-            field.colors = colors;
-            field.onEndEdit.AddListener(value => ApplyText(item, field, value));
-            go.SetActive(true);
-            // Only now: text given to the field while it was inactive was not shown.
-            field.text = item.SerializedText;
-            field.ForceLabelUpdate();
-
-            if (shortcut)
-            {
-                MakeButton("Capture", TextCaptureKey, 0.5f, 0.74f, 0.2f, 0.33f, StepColor, () => ToggleCapture(item));
-            }
-        }
+        // ---- changing a value ----
 
         private void ApplyText(ConfigItem item, TMP_InputField field, string value)
         {
-            if (item == null || !ReferenceEquals(item, _item) || value == item.SerializedText)
+            if (item == null || field == null || !field.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+            string current = item.Type == ConfigItem.Kind.Number ? item.ValueText : item.SerializedText;
+            if (value == current)
             {
                 return;
             }
@@ -463,28 +649,26 @@ namespace DragNWash.ModFramework.Mods
             string error = item.SetText(value);
             if (error != null)
             {
-                field.text = item.SerializedText;
-                if (_settingNote != null)
-                {
-                    _settingNote.text = TextNotAccepted + error;
-                    _settingNote.color = NoteErrorColor;
-                }
-                return;
+                _refused[item] = error;
             }
-            MarkSaved(item, before);
-            RebuildList();
-            RebuildDetails(false);
-            Focus("Reset");
+            else
+            {
+                MarkSaved(item, before);
+            }
+            // A shortcut can start or stop clashing with other rows' keys.
+            if (item.IsShortcut)
+            {
+                RebuildSettingsKeeping(item, "Field");
+            }
+            else
+            {
+                RebuildRow(item, "Field");
+            }
         }
 
         // Starts taking the next key for a shortcut, or stops if already taking one.
-        private void ToggleCapture(ConfigItem item)
+        private void ToggleCapture(ConfigItem item, GameObject button)
         {
-            GameObject button = _detailParts.FirstOrDefault(p => p != null && p.name == "Capture");
-            if (button == null)
-            {
-                return;
-            }
             ShortcutCapture running = button.GetComponent<ShortcutCapture>();
             if (running != null)
             {
@@ -500,9 +684,7 @@ namespace DragNWash.ModFramework.Mods
         internal void AfterCapture(ConfigItem item, string before)
         {
             MarkSaved(item, before);
-            RebuildList();
-            RebuildDetails(false);
-            Focus("Capture");
+            RebuildSettingsKeeping(item, "Capture");
         }
 
         private void Change(ConfigItem item, int direction, string focus)
@@ -510,9 +692,15 @@ namespace DragNWash.ModFramework.Mods
             string before = item.SerializedText;
             item.Step(direction);
             MarkSaved(item, before);
-            RebuildList();
-            RebuildDetails(false);
-            Focus(focus);
+            RebuildRow(item, focus);
+        }
+
+        private void Choose(ConfigItem item, int index)
+        {
+            string before = item.SerializedText;
+            item.Choose(index);
+            MarkSaved(item, before);
+            RebuildRow(item, "Choice" + index);
         }
 
         private void Reset(ConfigItem item)
@@ -520,15 +708,67 @@ namespace DragNWash.ModFramework.Mods
             string before = item.SerializedText;
             item.ResetToDefault();
             MarkSaved(item, before);
-            RebuildList();
+            // The reset button is passed over now; the pad goes to the control.
+            if (item.IsShortcut)
+            {
+                RebuildSettingsKeeping(item, "Capture");
+            }
+            else
+            {
+                RebuildRow(item, "Toggle", "Choice0", "Step+", "Field", "Slider");
+            }
+        }
+
+        // Builds one row again in its place, and puts the pad back on the
+        // first of the named controls it has. Nothing else on the tab moves.
+        private void RebuildRow(ConfigItem item, params string[] focus)
+        {
+            if (_settingsContent == null || !_settingRows.TryGetValue(item, out SettingRow old) || old.Root == null)
+            {
+                RebuildSettingsKeeping(item, focus);
+                return;
+            }
+            int index = old.Root.GetSiblingIndex();
+            old.Root.gameObject.SetActive(false);
+            Destroy(old.Root.gameObject);
+            SettingRow row = BuildSettingRow(_settingsContent, item);
+            row.Root.SetSiblingIndex(index);
+            _settingRows[item] = row;
+            foreach (string name in focus)
+            {
+                if (FocusIn(row.Root, name))
+                {
+                    return;
+                }
+            }
+        }
+
+        // The whole tab again, for changes that reach other rows.
+        private void RebuildSettingsKeeping(ConfigItem item, params string[] focus)
+        {
+            float scroll = _settingsContent != null ? _settingsContent.anchoredPosition.y : 0f;
             RebuildDetails(false);
-            Focus("Reset");
+            if (_settingsContent != null)
+            {
+                // Laid out now, or the scroll view would find it empty and
+                // put it back at the top.
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_settingsContent);
+                _settingsContent.anchoredPosition = new Vector2(_settingsContent.anchoredPosition.x, scroll);
+            }
+            if (_settingRows.TryGetValue(item, out SettingRow row))
+            {
+                foreach (string name in focus)
+                {
+                    if (FocusIn(row.Root, name))
+                    {
+                        return;
+                    }
+                }
+            }
         }
 
         // Selection moves to a button of the rebuilt panel so a pad user keeps
-        // their place. Unity destroys the old objects at the end of the frame,
-        // so look only among the current parts; a button held while the mods
-        // are checked is passed over.
+        // their place; a button held while the mods are checked is passed over.
         private void Focus(params string[] names)
         {
             if (EventSystem.current == null)
@@ -542,43 +782,6 @@ namespace DragNWash.ModFramework.Mods
                     return;
                 }
             }
-        }
-
-        private GameObject MakeButton(string name, string text, float left, float right, float bottom, float top, Color color, UnityAction onClick)
-        {
-            GameObject go = Part(name, left, right, bottom, top);
-            Image background = go.AddComponent<Image>();
-            background.color = color;
-            Button button = go.AddComponent<Button>();
-            button.targetGraphic = background;
-            ColorBlock colors = button.colors;
-            colors.normalColor = new Color(0.85f, 0.85f, 0.85f, 1f);
-            colors.highlightedColor = Color.white;
-            colors.selectedColor = Color.white;
-            colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
-            button.colors = colors;
-            TMP_Text label = UiText.Create(go.transform, "Label", text, UiText.ButtonSize);
-            label.alignment = TextAlignmentOptions.Center;
-            // One line: a long label (Japanese, German) shrinks instead of breaking
-            // in the middle of a word.
-            label.textWrappingMode = TextWrappingModes.NoWrap;
-            label.overflowMode = TextOverflowModes.Ellipsis;
-            ((RectTransform)label.transform).offsetMin = new Vector2(8f, 0f);
-            ((RectTransform)label.transform).offsetMax = new Vector2(-8f, 0f);
-            button.onClick.AddListener(onClick);
-            return go;
-        }
-
-        // A row of a list on the Mods screen's panel: a darker band, lighter
-        // under the pointer or the pad.
-        private static ColorBlock ListColors(ColorBlock colors)
-        {
-            colors.normalColor = ModsLook.Inset;
-            colors.highlightedColor = ModsLook.Hover;
-            colors.selectedColor = ModsLook.Hover;
-            colors.pressedColor = ModsLook.Raised;
-            colors.colorMultiplier = 1f;
-            return colors;
         }
     }
 
@@ -594,18 +797,6 @@ namespace DragNWash.ModFramework.Mods
             {
                 gameObject.SetActive(false);
             }
-        }
-    }
-
-    // Shows a setting's details as soon as its row is selected, by mouse or pad.
-    internal sealed class ConfigRowSelect : MonoBehaviour, ISelectHandler
-    {
-        internal ModsMenu Menu;
-        internal ConfigItem Item;
-
-        public void OnSelect(BaseEventData eventData)
-        {
-            Menu?.SelectItem(Item);
         }
     }
 }

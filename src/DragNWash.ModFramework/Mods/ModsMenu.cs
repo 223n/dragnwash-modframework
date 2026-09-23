@@ -11,10 +11,11 @@ namespace DragNWash.ModFramework.Mods
     // The Mods screen. A game Menu, so MenuManager shows and hides it, and the
     // game handles the cursor and pad input as on any other screen.
     //
-    // Two columns, like Forge's mod list: the installed mods on the left (in
-    // the game's scroll view), details of the selected one on the right with
-    // its On/Off button. Every fixed word is its own label so translation mods
-    // can translate it. Switching takes effect at the next launch.
+    // Two columns, like a settings app: the installed mods on the left (in
+    // the game's scroll view, ModsMenu.List.cs), the selected one's details
+    // on the right with its switch, notes and tabs (ModsMenu.Details.cs).
+    // Every fixed word is its own label so translation mods can translate it.
+    // Switching takes effect at the next launch.
     internal sealed partial class ModsMenu : Menu
     {
         internal RectTransform Content;
@@ -44,8 +45,6 @@ namespace DragNWash.ModFramework.Mods
         internal const string TextConfirmUninstall = "Press Uninstall again to remove this mod when the game next starts. Your settings for it are removed too.";
         internal const string TextUninstallNextLaunch = "Removed when the game next starts";
 
-        private static readonly Color WarnColor = new Color(1f, 0.75f, 0.5f, 1f);
-        private static readonly Color UpdateColor = new Color(0.6f, 0.95f, 0.75f, 1f);
         private List<PatchConflicts.Conflict> _conflicts = new List<PatchConflicts.Conflict>();
 
         // The Back button's pointing hand is drawn just right of the button,
@@ -54,8 +53,6 @@ namespace DragNWash.ModFramework.Mods
         internal const float ListPanelLeft = ListLeftMargin - 34f;
         private const float RowHeight = 80f;
 
-        private static readonly Color OnColor = new Color(0.36f, 0.62f, 0.36f, 1f);
-        private static readonly Color OffColor = new Color(0.62f, 0.3f, 0.27f, 1f);
 
         private List<ModCatalog.Entry> _entries = new List<ModCatalog.Entry>();
         private readonly List<GameObject> _rows = new List<GameObject>();
@@ -69,7 +66,6 @@ namespace DragNWash.ModFramework.Mods
             base.OnShow(response);
             _confirming = null;
             _confirmingUninstall = null;
-            _settingsFor = null;
             _tab = TabAbout;
             _query = "";
             _filter = ListFilter.All;
@@ -95,11 +91,6 @@ namespace DragNWash.ModFramework.Mods
         {
             if (e is MenuEventUserIntent intent && (intent.name == "Back" || intent.name == "Cancel"))
             {
-                if (_settingsFor != null)
-                {
-                    CloseSettings();
-                    return new MenuResponseIgnored();
-                }
                 if (StepBack())
                 {
                     return new MenuResponseIgnored();
@@ -120,18 +111,7 @@ namespace DragNWash.ModFramework.Mods
                 return;
             }
             // The list's filters and tags are measured too.
-            if (_settingsFor == null)
-            {
-                RebuildKeepingFocus();
-                return;
-            }
-            GameObject focused = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
-            string focusName = focused != null && focused.transform.IsChildOf(Details) ? focused.name : null;
-            RebuildDetails(false);
-            if (focusName != null)
-            {
-                Focus(focusName);
-            }
+            RebuildKeepingFocus(true);
         }
 
         internal void Select(ModCatalog.Entry entry)
@@ -161,17 +141,6 @@ namespace DragNWash.ModFramework.Mods
             }
             _rows.Clear();
 
-            // The search and the filters are for the mods, not for a mod's settings.
-            if (ListTop != null)
-            {
-                ListTop.gameObject.SetActive(_settingsFor == null);
-            }
-            if (_settingsFor != null)
-            {
-                BuildSettingsList();
-                return;
-            }
-
             BuildModList();
             if (Checking)
             {
@@ -195,12 +164,6 @@ namespace DragNWash.ModFramework.Mods
             }
             _detailParts.Clear();
             _spinners.RemoveAll(t => t == null || !t.gameObject.activeInHierarchy);
-
-            if (_settingsFor != null)
-            {
-                BuildSettingDetails();
-                return;
-            }
 
             ModCatalog.Entry entry = _selected;
             if (Details == null || entry == null)
@@ -243,44 +206,9 @@ namespace DragNWash.ModFramework.Mods
             return go;
         }
 
-        private TMP_Text Label(string name, string text, float size, float bottom, float top, bool wrap)
-        {
-            TMP_Text label = UiText.Create(Details, name, text, size);
-            _detailParts.Add(label.gameObject);
-            label.alignment = TextAlignmentOptions.MidlineLeft;
-            label.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
-            label.overflowMode = TextOverflowModes.Ellipsis;
-            if (wrap)
-            {
-                // Wraps at full size, and only shrinks a little when the text still
-                // does not fit (a narrow window, a long translation).
-                label.fontSizeMin = size * 0.7f;
-            }
-            var rect = (RectTransform)label.transform;
-            rect.anchorMin = new Vector2(0f, bottom);
-            rect.anchorMax = new Vector2(1f, top);
-            rect.offsetMin = new Vector2(28f, 0f);
-            rect.offsetMax = new Vector2(-28f, 0f);
-            return label;
-        }
-
         private List<PatchConflicts.Conflict> ConflictsOf(ModCatalog.Entry entry)
         {
             return entry.Guid == null ? new List<PatchConflicts.Conflict>() : _conflicts.Where(c => c.Guids.Contains(entry.Guid)).ToList();
-        }
-
-        // A bold label and its value on one line. The value starts after the label's
-        // actual width, which differs a lot between languages.
-        private TMP_Text LabelPair(string name, string label, string value, float size, float bottom, float top)
-        {
-            TMP_Text head = Label(name + "Label", label, size, bottom, top, false);
-            head.fontStyle |= FontStyles.Bold;
-            head.enableAutoSizing = false;
-            head.fontSize = size;
-            float width = head.GetPreferredValues(head.text).x;
-            TMP_Text text = Label(name, value, size, bottom, top, false);
-            ((RectTransform)text.transform).offsetMin = new Vector2(28f + width + 16f, 0f);
-            return text;
         }
 
         // First press asks, second press records it; on a mod waiting to be
