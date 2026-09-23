@@ -33,6 +33,11 @@ namespace DragNWash.ModFramework.Bridge
         private string _problemText = "";
         private Vector2 _scroll;
         private float _contentHeight = 400;     // how tall the tab came out last draw
+        private volatile bool _searching;       // Use a free port is looking
+        private int _searchFrom;
+        private int _found = -1;                // what it found, for Update: the port, 0 for none, -1 for nothing yet
+        private int _portChangedFrom;           // the port clients were set up for, until they are set up again; 0 for none
+        private DateTime _portChangedAt;
 
         private enum ListenProblem { None, Reserved, InUse, Other }
 
@@ -147,9 +152,64 @@ namespace DragNWash.ModFramework.Bridge
             if (problem == ListenProblem.Reserved)
             {
                 return "Windows has probably set this port aside (Hyper-V, WSL and Docker do that, and the ranges can change when the PC restarts). " +
-                       "Choose another [Bridge] Port, and register the new address with your client.";
+                       "Press Use a free port in the Bridge tab of the F1 window (or change [Bridge] Port), and set your client up again.";
             }
-            return "Another program may use it; change [Bridge] Port.";
+            return "Another program may use it; press Use a free port in the Bridge tab of the F1 window, or change [Bridge] Port.";
+        }
+
+        // "Use a free port": looks on a worker thread (netsh and a bind per
+        // port take a moment), then Update moves the Bridge there.
+        private void UseFreePort()
+        {
+            if (_searching) return;
+            _searching = true;
+            int from = _searchFrom = _port.Value;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                int found = 0;
+                try
+                {
+                    found = FreePort.After(from);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogWarning($"[bridge] Looking for a free port failed: {ex.Message}");
+                }
+                System.Threading.Interlocked.Exchange(ref _found, found);
+            });
+        }
+
+        private void Update()
+        {
+            int found = System.Threading.Interlocked.Exchange(ref _found, -1);
+            if (found < 0) return;
+            _searching = false;
+            if (found == 0)
+            {
+                TW.ShowNotice($"None of the {FreePort.Tries} ports after {_searchFrom} is free. Try again after the PC restarts.", NoticeKind.Error);
+                return;
+            }
+            // Turned off, moved elsewhere or listening again while it looked.
+            if (!Wanted || Server != null || _port.Value != _searchFrom) return;
+            if (_portChangedFrom == 0) _portChangedFrom = _searchFrom;
+            if (_portChangedFrom == found) _portChangedFrom = 0;
+            _portChangedAt = DateTime.Now;
+            Log.LogInfo($"[bridge] Port {_searchFrom} could not be used; moving to {found}.");
+            _port.Value = found;   // saved, and SettingChanged listens on it
+            if (Server != null)
+            {
+                TW.ShowNotice(_portChangedFrom != 0
+                    ? $"Listening on port {found} now. Clients set up for {_portChangedFrom} need the new setup (Copy setup)."
+                    : $"Listening on port {found} now.", NoticeKind.Info, 10f);
+            }
+        }
+
+        private void TryAgain()
+        {
+            int port = _port.Value;
+            Apply();
+            if (Server != null) TW.ShowNotice($"Listening on port {port} now.", NoticeKind.Info, 6f);
+            else TW.ShowNotice($"Port {port} still can't be used.", NoticeKind.Warning, 6f);
         }
 
         private void Stop(string why)
@@ -368,7 +428,11 @@ namespace DragNWash.ModFramework.Bridge
                 detail = "The Bridge only listens while the developer tools are on.";
             }
 
-            string[] buttons = { _enabled.Value ? "Turn off" : "Turn on" };
+            // Mending it where it shows: the Mods screen's port stepper jumps
+            // by thousands, and a gamepad or the Deck has no cfg to edit.
+            string[] buttons = failed
+                ? new[] { _searching ? "Looking..." : "Use a free port", "Try again", "Turn off" }
+                : new[] { _enabled.Value ? "Turn off" : "Turn on" };
             const float pad = 10, titleHeight = 26;
             float textX = x + 3 + pad, textWidth = width - 3 - pad * 2;
             float detailHeight = s.WrappedLabel.CalcHeight(new GUIContent(detail), textWidth);
@@ -382,7 +446,15 @@ namespace DragNWash.ModFramework.Bridge
             GUI.Label(new Rect(textX, y + pad + titleHeight, textWidth, detailHeight), detail, s.WrappedLabel);
 
             var row = new ButtonRow(textX, y + pad + titleHeight + detailHeight + 8, textWidth);
-            if (row.Button(buttons[0]))
+            if (failed)
+            {
+                bool was = GUI.enabled;
+                GUI.enabled = was && !_searching;
+                if (row.Button(buttons[0])) UseFreePort();
+                if (row.Button(buttons[1])) TryAgain();
+                GUI.enabled = was;
+            }
+            if (row.Button(buttons[buttons.Length - 1]))
             {
                 _enabled.Value = !_enabled.Value;
             }
@@ -398,16 +470,16 @@ namespace DragNWash.ModFramework.Bridge
             {
                 case ListenProblem.Reserved:
                     title = $"Not listening: Windows won't let the game use port {_problemPort}";
-                    detail = "Windows keeps some ports for Hyper-V, WSL or Docker, and which ones can change when the PC restarts. Change the port and set your client up again, or try this one later.";
+                    detail = "Windows keeps some ports for Hyper-V, WSL or Docker, and which ones can change when the PC restarts. Use a free port and set your client up again, or try this one later.";
                     break;
                 case ListenProblem.InUse:
                     title = $"Not listening: port {_problemPort} is in use";
-                    detail = "Another program probably has it. Change the port, or close that program and try again.";
+                    detail = "Another program probably has it. Use a free port, or close that program and try again.";
                     break;
                 default:
                     title = $"Not listening on port {_problemPort}";
                     // Mono's message can come in the system's language.
-                    detail = TW.Drawable(_problemText) + ".";
+                    detail = TW.Drawable(_problemText) + ". Use a free port, or try again.";
                     break;
             }
         }
@@ -479,9 +551,22 @@ namespace DragNWash.ModFramework.Bridge
             if (GUI.Button(new Rect(x + width - copyWidth, y, copyWidth, row), "Copy", s.Button))
             {
                 GUIUtility.systemCopyBuffer = address;
+                _portChangedFrom = 0;
                 TW.ShowNotice("The address is on the clipboard." + later, NoticeKind.Info, 8f);
             }
             y += row + 6;
+            // After Use a free port, until a copy or a client connecting shows
+            // the client has the new address.
+            if (_portChangedFrom != 0)
+            {
+                Color was = GUI.contentColor;
+                GUI.contentColor = TW.WarningColor;
+                string changed = $"Port changed from {_portChangedFrom}. Set your client up again with Copy setup.";
+                GUI.Label(new Rect(left, y, room, 26), TW.Elide(changed, s.Label, room), s.Label);
+                GUI.contentColor = was;
+                TW.Hint(new Rect(left, y, room, 26), changed);
+                y += 30;
+            }
 
             float newWidth = ButtonRow.Width("New token"), buttonsWidth = copyWidth + 8 + newWidth;
             GUI.Label(new Rect(x, y, labelWidth, row), "Token", s.MutedLabel);
@@ -522,6 +607,7 @@ namespace DragNWash.ModFramework.Bridge
             if (buttons.Button("Copy setup"))
             {
                 GUIUtility.systemCopyBuffer = SetupFor(_client);
+                _portChangedFrom = 0;
                 TW.ShowNotice($"The {Clients[_client]} setup, with the token, is on the clipboard." + later, NoticeKind.Info, 8f);
             }
             y = buttons.Bottom + 4;
@@ -548,6 +634,7 @@ namespace DragNWash.ModFramework.Bridge
             y += 32;
             y = DrawStatus(x, y, inner) + 12;
             string who = Connected(sessions);
+            if (_portChangedFrom != 0 && sessions.Any(c => c.Started >= _portChangedAt)) _portChangedFrom = 0;
             y = DrawConnection(x, y, inner, who) + 16;
             // The row wraps: six buttons do not fit a narrow window, and the
             // last of them was walking off the edge.
