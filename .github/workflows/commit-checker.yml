@@ -9,6 +9,9 @@ name: Commit checker
 # whole history. A range it cannot resolve - a brand-new branch, or a push that
 # followed a rewrite - is reported and passed, not failed.
 #
+# A second job asks GitHub whether every commit's author is a GitHub account,
+# and fails when one is not (see authors below).
+#
 # A failure's reason is an annotation on the run, and it says how to fix it.
 # The same check runs locally:
 #   python tools/check-commits.py
@@ -51,3 +54,55 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/work -w /work -e BASE -e HEAD \
             "${{ steps.image.outputs.tag }}" python tools/check-commits.py "$BASE" "$HEAD"
+
+  # Every commit has to belong to a GitHub account, so the history can credit
+  # the person who wrote it: GitHub links a commit through its author's email,
+  # and an email that is on nobody's account leaves the commit nameless. This
+  # asks GitHub itself, so nothing from the pull request is checked out or run.
+  authors:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Every commit's author is a GitHub account
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let commits;
+            if (context.eventName === 'pull_request') {
+              commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner, repo, pull_number: context.payload.pull_request.number, per_page: 100,
+              });
+            } else {
+              const before = context.payload.before;
+              if (!before || /^0+$/.test(before)) {
+                core.info('A new branch: no range to look at.');
+                return;
+              }
+              try {
+                const cmp = await github.rest.repos.compareCommitsWithBasehead({
+                  owner, repo, basehead: `${before}...${context.sha}`,
+                });
+                commits = cmp.data.commits;
+              } catch (e) {
+                core.info(`Could not compare ${before}...${context.sha} (${e.message}); passing.`);
+                return;
+              }
+            }
+            const nameless = commits.filter(c => !c.author);
+            if (nameless.length === 0) {
+              core.info(`${commits.length} commit(s), every author is a GitHub account.`);
+              return;
+            }
+            for (const c of nameless) {
+              const a = c.commit.author;
+              core.error(`${c.sha.slice(0, 7)} "${c.commit.message.split('\n')[0]}": the author email ${a.email} is not on any GitHub account.`,
+                { title: 'Commit author not linked to GitHub' });
+            }
+            core.setFailed(
+              `${nameless.length} of ${commits.length} commit(s) have an author email that is not on any GitHub account, so GitHub cannot say who wrote them. ` +
+              'Either add that email to your account (github.com/settings/emails) and re-run this check, ' +
+              'or set your GitHub no-reply email (shown on the same page) with `git config user.email <address>`, ' +
+              'redo the commits with `git rebase -i --exec "git commit --amend --no-edit --reset-author" <base>`, and push again.');
