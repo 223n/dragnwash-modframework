@@ -128,6 +128,14 @@ If it catches you, fix the commit (`git commit --amend`, adding
 `--reset-author` when the author is wrong, or `git rebase -i` for an older one)
 and push again.
 
+A second job in the same checker asks GitHub whether every commit's author is
+a GitHub account. The commit's email has to be on your account, or be your
+GitHub no-reply address (both are on github.com/settings/emails); otherwise
+GitHub can't say who wrote it. To fix it, add the email to your account and
+re-run the check, or set the no-reply address with `git config user.email`
+and redo the commits with
+`git rebase -i --exec "git commit --amend --no-edit --reset-author" <base>`.
+
 The core and the libraries can't be built on a runner because they need the
 game's assemblies, so **you** are the one who checked them. In the pull
 request, say what you ran the change against: the game build, the platform, and

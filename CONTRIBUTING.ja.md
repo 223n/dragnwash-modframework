@@ -121,6 +121,15 @@ docker compose run --rm checks
 違うなら `--reset-author` も付けて、古いものなら `git rebase -i`）、もう一度 push
 してください。
 
+同じチェッカーのもう 1 つのジョブは、どのコミットの作者も GitHub のアカウントに
+なっているかを GitHub に聞きます。コミットのメールアドレスが自分のアカウントに
+登録してあるか、GitHub の no-reply アドレスでないと、誰が書いたのか GitHub には
+分かりません（どちらも github.com/settings/emails で見られます）。直すには、その
+アドレスをアカウントに足してチェックをやり直すか、`git config user.email` で
+no-reply アドレスにしてから
+`git rebase -i --exec "git commit --amend --no-edit --reset-author" <base>` で
+コミットを作り直してください。
+
 中核とライブラリはゲームのアセンブリが要るので、CI ではビルドできません。つまり、
 動くのを確かめたのは**あなた**です。どのゲームのビルドとどの環境で、何を見て
 確かめたのかを、プルリクエストに書いてください。
