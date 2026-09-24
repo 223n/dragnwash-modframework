@@ -1,0 +1,92 @@
+name: Comment on commit authors
+
+# Runs after "Commit checker" finishes on a pull request. When a commit's
+# author is not a GitHub account (the checker's authors job), it leaves one
+# comment saying which commits and how to fix them, in English and Japanese,
+# and updates that comment once they are fixed. It lives in a separate
+# workflow so it can comment on pull requests from forks.
+#
+# SECURITY: nothing from the pull request is checked out or run. The pull
+# request is found by the head SHA that GitHub sets on the workflow_run event,
+# the commits come from GitHub's API, and a commit's own message is shown only
+# inside a code span with its backticks taken out.
+
+on:
+  workflow_run:
+    workflows: ["Commit checker"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const run = context.payload.workflow_run;
+
+            // The same lookup as the translation check's commenter: by the
+            // head SHA only GitHub sets, oldest pull request first.
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', sort: 'created', direction: 'asc', per_page: 100,
+            });
+            const match = open.find(p => p.head.sha === run.head_sha);
+            if (!match) {
+              core.info(`No open pull request has head ${run.head_sha}; nothing to comment on.`);
+              return;
+            }
+            const pr = match.number;
+
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner, repo, pull_number: pr, per_page: 100,
+            });
+            const nameless = commits.filter(c => !c.author);
+            const marker = '<!-- commit-authors -->';
+
+            let body;
+            if (nameless.length === 0) {
+              body = `${marker}\nEvery commit's author is a GitHub account now. Thank you!\n\nどのコミットも GitHub のアカウントに紐付きました。ありがとうございます！`;
+            } else {
+              const line = c => {
+                const head = c.commit.message.split('\n')[0].replace(/`/g, "'").slice(0, 100);
+                return `- ${c.sha.slice(0, 7)} \`${head}\``;
+              };
+              const shown = nameless.slice(0, 30).map(line);
+              if (nameless.length > 30) shown.push(`- ... and ${nameless.length - 30} more`);
+              body = [
+                marker,
+                `Thanks for the pull request! ${nameless.length} of its ${commits.length} commits were made with an email that isn't on any GitHub account, so GitHub can't tell who wrote them, and the **Commit checker** stops here:`,
+                '',
+                ...shown,
+                '',
+                'Either of these fixes it:',
+                '',
+                '1. Add that email to your account under [Settings → Emails](https://github.com/settings/emails), then re-run the check. Nothing needs to be pushed.',
+                '2. Or use your GitHub no-reply address (shown on the same page): `git config user.email <address>`, then redo the commits with `git rebase -i --exec "git commit --amend --no-edit --reset-author" <base>` and force-push this branch.',
+                '',
+                '---',
+                '',
+                `プルリクエストありがとうございます！${commits.length} 個のコミットのうち ${nameless.length} 個が、どの GitHub アカウントにも登録されていないメールアドレスで作られていて、誰が書いたのか GitHub に分からないため、**Commit checker** で止まっています。`,
+                '',
+                '直し方はどちらかです。',
+                '',
+                '1. そのアドレスを [Settings → Emails](https://github.com/settings/emails) で自分のアカウントに足して、チェックをやり直す（push は要りません）。',
+                '2. 同じページにある GitHub の no-reply アドレスを `git config user.email <アドレス>` で設定し、`git rebase -i --exec "git commit --amend --no-edit --reset-author" <base>` でコミットを作り直して、このブランチに force-push する。',
+                '',
+                'See CONTRIBUTING.md for more. / くわしくは CONTRIBUTING.ja.md にあります。',
+              ].join('\n');
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr, per_page: 100 });
+            // Only ever edit a comment this workflow wrote.
+            const mine = comments.find(c => c.user && c.user.type === 'Bot' && c.body && c.body.startsWith(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else if (nameless.length > 0) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr, body });
+            }
