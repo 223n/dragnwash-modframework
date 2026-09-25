@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using BepInEx;
 using UnityEngine;
@@ -142,8 +143,14 @@ namespace DragNWash.ModFramework.ToolWindow
                     // have, which then draws nothing (seen in Steam's Linux
                     // runtime), so skip names the OS does not list and check that
                     // a glyph really renders.
+                    // Arial Unicode MS and Apple SD Gothic Neo are for macOS,
+                    // where Hiragino Sans renders but TextCore cannot load it
+                    // (see TextCoreLoads) and PingFang is not where Unity looks.
+                    // Arial Unicode MS has every symbol the window draws;
+                    // Apple SD Gothic Neo lacks ▾ and the Inspector's icons, so
+                    // it comes last.
                     var installed = new HashSet<string>(Font.GetOSInstalledFontNames() ?? new string[0], StringComparer.OrdinalIgnoreCase);
-                    foreach (string name in new[] { "Yu Gothic UI", "Meiryo UI", "Hiragino Sans", "PingFang SC", "Noto Sans CJK JP", "Noto Sans CJK SC" })
+                    foreach (string name in new[] { "Yu Gothic UI", "Meiryo UI", "Hiragino Sans", "Arial Unicode MS", "PingFang SC", "Noto Sans CJK JP", "Noto Sans CJK SC", "Apple SD Gothic Neo" })
                     {
                         if (installed.Count > 0 && !installed.Contains(name))
                         {
@@ -164,7 +171,7 @@ namespace DragNWash.ModFramework.ToolWindow
                         {
                             continue;
                         }
-                        if (Renders(candidate))
+                        if (Renders(candidate) && TextCoreLoads(candidate, name))
                         {
                             Font = candidate;
                             ToolWindowPlugin.Log.LogInfo($"Window font: {string.Join(" + ", names)}");
@@ -175,7 +182,7 @@ namespace DragNWash.ModFramework.ToolWindow
                     if (Font == null)
                     {
                         Font bundled = LoadBundle();
-                        if (bundled != null && Renders(bundled))
+                        if (bundled != null && Renders(bundled) && TextCoreLoads(bundled, bundled.name))
                         {
                             Font = bundled;
                             Bold = true;
@@ -184,7 +191,7 @@ namespace DragNWash.ModFramework.ToolWindow
                     if (Font == null)
                     {
                         Font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                        ToolWindowPlugin.Log.LogInfo("Window font: no OS or bundled font renders here; using Unity's built-in font (ASCII only).");
+                        ToolWindowPlugin.Log.LogInfo("Window font: no OS or bundled font can be drawn here; using Unity's built-in font (ASCII only).");
                     }
                 }
                 if (Font == null)
@@ -298,6 +305,45 @@ namespace DragNWash.ModFramework.ToolWindow
             catch
             {
                 return false;
+            }
+        }
+
+        // Unity 6's IMGUI draws with the TextCore font asset it makes from the
+        // window's Font (RuntimeTextSettings.defaultTextSettings
+        // .GetCachedFontAsset). For a Font made from OS names that asset is
+        // looked up again by the Font's first name and the style "Regular";
+        // when nothing matches, IMGUI draws no text at all and tries again for
+        // every string, two lines in Player.log each time. On macOS Hiragino
+        // Sans has only W0 to W9, so the window stayed blank while Renders
+        // passed. Asking the same method here, from Update or Awake, settles
+        // it before the font is chosen: an asset it makes is kept for this
+        // Font, so IMGUI uses it as is, and a failure costs its two lines
+        // once. Where the method is not there (IMGUI before TextCore) or
+        // reflection fails, the font is used as before.
+        private static bool TextCoreLoads(Font font, string name)
+        {
+            try
+            {
+                object settings = typeof(GUIStyle).Assembly.GetType("UnityEngine.RuntimeTextSettings")
+                    ?.GetProperty("defaultTextSettings", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    ?.GetValue(null, null);
+                MethodInfo getAsset = settings?.GetType().GetMethod("GetCachedFontAsset",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(Font) }, null);
+                if (getAsset == null)
+                {
+                    return true;
+                }
+                if (getAsset.Invoke(settings, new object[] { font }) is UnityEngine.Object asset && asset != null)
+                {
+                    return true;
+                }
+                ToolWindowPlugin.Log.LogInfo($"Window font: skipped {name}; Unity's text engine (TextCore) cannot load it, and the window would draw no text with it.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                ToolWindowPlugin.Log.LogDebug($"Window font: could not ask TextCore about {name} ({ex.GetBaseException().Message}); using it as before.");
+                return true;
             }
         }
 
